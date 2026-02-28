@@ -18,6 +18,7 @@ export const labels = {
   location: 'Локација',
   mrbs: 'MRBS',
   none: 'Нема',
+  notAvailable: 'Недостапен',
   note: 'НАПОМЕНА',
   position: 'Позиција',
   prerequisite: 'Предуслов',

@@ -59,6 +59,22 @@ const addCurriculumSection = (
   }
 };
 
+const addUnavailableSection = (
+  containerBuilder: ContainerBuilder,
+  year: '2018' | '2023',
+) => {
+  containerBuilder
+    .addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(
+        heading(`${labels.accreditation} ${year}`, HeadingLevel.Three),
+      ),
+    )
+    .addSeparatorComponents((separator) => separator.setDivider(false))
+    .addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(`> :x: ${labels.notAvailable}`),
+    );
+};
+
 export const getCourseComponent = (course: Course) => {
   const containerBuilder = new ContainerBuilder();
 
@@ -66,18 +82,24 @@ export const getCourseComponent = (course: Course) => {
     textDisplay.setContent(heading(course.name, HeadingLevel.Two)),
   );
 
+  containerBuilder.addSeparatorComponents((separator) =>
+    separator.setSpacing(SeparatorSpacingSize.Large),
+  );
+
   if (course['2023-available']) {
-    containerBuilder.addSeparatorComponents((separator) =>
-      separator.setSpacing(SeparatorSpacingSize.Large),
-    );
     addCurriculumSection(containerBuilder, course, '2023');
+  } else {
+    addUnavailableSection(containerBuilder, '2023');
   }
 
+  containerBuilder.addSeparatorComponents((separator) =>
+    separator.setSpacing(SeparatorSpacingSize.Large),
+  );
+
   if (course['2018-available']) {
-    containerBuilder.addSeparatorComponents((separator) =>
-      separator.setSpacing(SeparatorSpacingSize.Large),
-    );
     addCurriculumSection(containerBuilder, course, '2018');
+  } else {
+    addUnavailableSection(containerBuilder, '2018');
   }
 
   containerBuilder
