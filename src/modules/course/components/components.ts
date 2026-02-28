@@ -123,16 +123,11 @@ export const getCourseComponent = (course: Course) => {
       ),
     );
 
-  const retiredText = getRetiredStaff(
-    course.professors,
-    course.assistants,
-  );
+  const retiredText = getRetiredStaff(course.professors, course.assistants);
 
   if (retiredText) {
     containerBuilder.addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(
-        `**${labels.retired}**\n${retiredText}`,
-      ),
+      textDisplay.setContent(`**${labels.retired}**\n${retiredText}`),
     );
   }
 
