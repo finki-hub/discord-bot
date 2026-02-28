@@ -9,13 +9,14 @@ import {
 
 import { labels } from '@/translations/labels.js';
 
+import { ACCREDITATION_YEARS, type AccreditationYear } from '../constants.js';
 import { type Course } from '../schemas/Course.js';
 import { extractParticipants, getRetiredStaff, linkStaff } from './utils.js';
 
 const addCurriculumSection = (
   containerBuilder: ContainerBuilder,
   course: Course,
-  year: '2018' | '2023',
+  year: AccreditationYear,
 ) => {
   const name = course[`${year}-name`];
   const code = course[`${year}-code`];
@@ -65,7 +66,7 @@ const addCurriculumSection = (
 
 const addUnavailableSection = (
   containerBuilder: ContainerBuilder,
-  year: '2018' | '2023',
+  year: AccreditationYear,
 ) => {
   containerBuilder
     .addTextDisplayComponents((textDisplay) =>
@@ -86,24 +87,16 @@ export const getCourseComponent = (course: Course) => {
     textDisplay.setContent(heading(course.name, HeadingLevel.Two)),
   );
 
-  containerBuilder.addSeparatorComponents((separator) =>
-    separator.setSpacing(SeparatorSpacingSize.Large),
-  );
+  for (const year of ACCREDITATION_YEARS) {
+    containerBuilder.addSeparatorComponents((separator) =>
+      separator.setSpacing(SeparatorSpacingSize.Large),
+    );
 
-  if (course['2023-available']) {
-    addCurriculumSection(containerBuilder, course, '2023');
-  } else {
-    addUnavailableSection(containerBuilder, '2023');
-  }
-
-  containerBuilder.addSeparatorComponents((separator) =>
-    separator.setSpacing(SeparatorSpacingSize.Large),
-  );
-
-  if (course['2018-available']) {
-    addCurriculumSection(containerBuilder, course, '2018');
-  } else {
-    addUnavailableSection(containerBuilder, '2018');
+    if (course[`${year}-available`]) {
+      addCurriculumSection(containerBuilder, course, year);
+    } else {
+      addUnavailableSection(containerBuilder, year);
+    }
   }
 
   containerBuilder

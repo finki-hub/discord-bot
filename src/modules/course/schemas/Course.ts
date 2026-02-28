@@ -1,36 +1,67 @@
 import { z } from 'zod';
 
+import {
+  ACCREDITATION_FIELDS,
+  ACCREDITATION_YEARS,
+  type AccreditationField,
+  accreditationKey,
+  type AccreditationYear,
+} from '../constants.js';
+
+const buildAccreditationShape = () => {
+  const shape: Record<string, z.ZodType> = {};
+
+  for (const year of ACCREDITATION_YEARS) {
+    for (const field of ACCREDITATION_FIELDS) {
+      const key = accreditationKey(year, field);
+      shape[key] = field === 'available' ? z.string() : z.string().optional();
+    }
+  }
+
+  return shape;
+};
+
 export const CourseSchema = z
   .object({
-    '2018-available': z.string(),
-    '2018-code': z.string().optional(),
-    '2018-level': z.string().optional(),
-    '2018-name': z.string().optional(),
-    '2018-prerequisite': z.string().optional(),
-    '2018-semester': z.string().optional(),
-    '2023-available': z.string(),
-    '2023-code': z.string().optional(),
-    '2023-level': z.string().optional(),
-    '2023-name': z.string().optional(),
-    '2023-prerequisite': z.string().optional(),
-    '2023-semester': z.string().optional(),
+    ...buildAccreditationShape(),
     assistants: z.string().optional(),
     name: z.string(),
     professors: z.string(),
   })
   .catchall(z.string())
-  .transform((data) => ({
-    ...data,
-    '2018-available': data['2018-available'] === 'TRUE',
-    '2023-available': data['2023-available'] === 'TRUE',
-    assistants: (data.assistants ?? '')
-      .split(/\r?\n|\\n/u)
-      .map((s) => s.trim())
-      .filter((name) => name.length > 0),
-    professors: data.professors
-      .split(/\r?\n|\\n/u)
-      .map((s) => s.trim())
-      .filter((name) => name.length > 0),
-  }));
+  .transform((data) => {
+    const transformed: Record<string, unknown> = { ...data };
 
-export type Course = z.infer<typeof CourseSchema>;
+    for (const year of ACCREDITATION_YEARS) {
+      const key = accreditationKey(year, 'available');
+      transformed[key] = data[key] === 'TRUE';
+    }
+
+    transformed['assistants'] = (data.assistants ?? '')
+      .split(/\r?\n|\\n/u)
+      .map((s) => s.trim())
+      .filter((name) => name.length > 0);
+
+    transformed['professors'] = data.professors
+      .split(/\r?\n|\\n/u)
+      .map((s) => s.trim())
+      .filter((name) => name.length > 0);
+
+    return transformed as Course;
+  });
+
+export type Course = AccreditationAvailability &
+  AccreditationOptionalFields & {
+    [key: string]: unknown;
+    assistants: string[];
+    name: string;
+    professors: string[];
+  };
+
+type AccreditationAvailability = {
+  [Y in AccreditationYear as `${Y}-available`]: boolean;
+};
+
+type AccreditationOptionalFields = {
+  [Y in AccreditationYear as `${Y}-${Exclude<AccreditationField, 'available'>}`]?: string;
+};

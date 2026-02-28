@@ -4,6 +4,7 @@ import { logger } from '@/common/logger/index.js';
 import { fetchJsonFromUrl, parseContent } from '@/common/utils/data.js';
 import { getDataStorageUrl } from '@/configuration/environment.js';
 
+import { ACCREDITATION_YEARS } from '../constants.js';
 import { type Course, CourseSchema } from '../schemas/Course.js';
 import { clearTransformedCourses } from './cache.js';
 
@@ -74,14 +75,13 @@ export const startPeriodicReload = () => {
   logger.info('Periodic courses reload scheduled (every hour)');
 };
 
-// Getter functions
 export const getCourses = (): string[] => courses.map((course) => course.name);
 
 export const getCourseNameVariants = (): Array<[string, string]> =>
   courses.flatMap((course) => {
     const variants: Array<[string, string]> = [[course.name, course.name]];
 
-    for (const year of ['2018', '2023'] as const) {
+    for (const year of ACCREDITATION_YEARS) {
       const accreditationName = course[`${year}-name`];
 
       if (
