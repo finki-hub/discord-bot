@@ -108,24 +108,46 @@ export const getCourseComponent = (course: Course) => {
         heading(`**${labels.staff}**`, HeadingLevel.Three),
       ),
     )
-    .addSeparatorComponents((separator) => separator.setDivider(false))
-    .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(
-        `**${labels.professors}**\n${linkStaff(course.professors)}`,
-      ),
-    )
-    .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(
-        `**${labels.assistants}**\n${linkStaff(course.assistants)}`,
-      ),
-    );
+    .addSeparatorComponents((separator) => separator.setDivider(false));
 
-  const retiredText = getRetiredStaff(course.professors, course.assistants);
+  const professorChunks = linkStaff(course.professors);
 
-  if (retiredText) {
+  containerBuilder.addTextDisplayComponents((textDisplay) =>
+    textDisplay.setContent(`**${labels.professors}**\n${professorChunks[0]}`),
+  );
+
+  for (const chunk of professorChunks.slice(1)) {
     containerBuilder.addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.retiredPlural}**\n${retiredText}`),
+      textDisplay.setContent(chunk),
     );
+  }
+
+  const assistantChunks = linkStaff(course.assistants);
+
+  containerBuilder.addTextDisplayComponents((textDisplay) =>
+    textDisplay.setContent(`**${labels.assistants}**\n${assistantChunks[0]}`),
+  );
+
+  for (const chunk of assistantChunks.slice(1)) {
+    containerBuilder.addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(chunk),
+    );
+  }
+
+  const retiredChunks = getRetiredStaff(course.professors, course.assistants);
+
+  if (retiredChunks.length > 0) {
+    containerBuilder.addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(
+        `**${labels.retiredPlural}**\n${retiredChunks[0]}`,
+      ),
+    );
+
+    for (const chunk of retiredChunks.slice(1)) {
+      containerBuilder.addTextDisplayComponents((textDisplay) =>
+        textDisplay.setContent(chunk),
+      );
+    }
   }
 
   const participants = extractParticipants(course);

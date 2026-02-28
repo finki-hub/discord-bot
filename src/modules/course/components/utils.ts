@@ -34,39 +34,62 @@ const formatEntries = (entries: StaffEntry[]): string =>
     .map(({ name, profile }) => formatStaffMember(name, profile))
     .join('\n');
 
-const formatPlain = (entries: StaffEntry[]): string =>
-  entries.map(({ name }) => name).join('\n');
+const MAX_CONTENT_LENGTH = 3_500;
 
-export const linkStaff = (names: string[]): string => {
+const chunkStaffEntries = (
+  entries: StaffEntry[],
+  formatter: (entries: StaffEntry[]) => string,
+): string[] => {
+  const chunks: string[] = [];
+  let currentChunk: StaffEntry[] = [];
+
+  for (const entry of entries) {
+    currentChunk.push(entry);
+
+    if (formatter(currentChunk).length > MAX_CONTENT_LENGTH) {
+      currentChunk.pop();
+
+      if (currentChunk.length > 0) {
+        chunks.push(formatter(currentChunk));
+      }
+
+      currentChunk = [entry];
+    }
+  }
+
+  if (currentChunk.length > 0) {
+    chunks.push(formatter(currentChunk));
+  }
+
+  return chunks;
+};
+
+export const linkStaff = (names: string[]): string[] => {
   if (names.length === 0) {
-    return labels.none;
+    return [labels.none];
   }
 
   const active = resolveStaff(names).filter((entry) => entry.active);
 
   if (active.length === 0) {
-    return labels.none;
+    return [labels.none];
   }
 
-  const linked = formatEntries(active);
-
-  return linked.length < 1_000 ? linked : formatPlain(active);
+  return chunkStaffEntries(active, formatEntries);
 };
 
-export const getRetiredStaff = (...nameGroups: string[][]): string => {
+export const getRetiredStaff = (...nameGroups: string[][]): string[] => {
   const retired = nameGroups
     .flatMap((names) => resolveStaff(names))
     .filter((entry) => !entry.active);
 
   if (retired.length === 0) {
-    return '';
+    return [];
   }
 
-  const linked = formatEntries(retired);
-
-  return linked.length < 1_000
-    ? strikethrough(linked)
-    : strikethrough(formatPlain(retired));
+  return chunkStaffEntries(retired, (entries) =>
+    strikethrough(formatEntries(entries)),
+  );
 };
 
 const ParticipantSchema = z
