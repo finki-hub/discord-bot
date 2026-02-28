@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const StaffSchema = z
   .object({
-    active: z.string(),
+    active: z.union([z.string(), z.number()]),
     cabinet: z.string().optional(),
     consultations: z.url().optional(),
     courses: z.url().optional(),
@@ -14,7 +14,11 @@ export const StaffSchema = z
   })
   .transform((data) => ({
     ...data,
-    active: data.active === 'TRUE',
+    active:
+      data.active === 'TRUE' ||
+      data.active === '1' ||
+      data.active === 1 ||
+      data.active === true,
   }));
 
 export type Staff = z.infer<typeof StaffSchema>;

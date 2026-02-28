@@ -10,7 +10,7 @@ import {
 import { labels } from '@/translations/labels.js';
 
 import { type Course } from '../schemas/Course.js';
-import { extractParticipants, linkStaff } from './utils.js';
+import { extractParticipants, getRetiredStaff, linkStaff } from './utils.js';
 
 const addCurriculumSection = (
   containerBuilder: ContainerBuilder,
@@ -122,6 +122,19 @@ export const getCourseComponent = (course: Course) => {
         `**${labels.assistants}**\n${linkStaff(course.assistants)}`,
       ),
     );
+
+  const retiredText = getRetiredStaff(
+    course.professors,
+    course.assistants,
+  );
+
+  if (retiredText) {
+    containerBuilder.addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(
+        `**${labels.retired}**\n${retiredText}`,
+      ),
+    );
+  }
 
   const participants = extractParticipants(course);
 

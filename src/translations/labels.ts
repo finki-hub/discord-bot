@@ -26,6 +26,7 @@ export const labels = {
   profile: 'Профил',
   program: 'Смер',
   questions: 'Прашања',
+  retired: 'Пензионирани',
   semester: 'Семестар',
   staff: 'Кадар',
   tickets: 'Тикети',
