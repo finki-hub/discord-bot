@@ -17,6 +17,7 @@ const addCurriculumSection = (
   course: Course,
   year: '2018' | '2023',
 ) => {
+  const name = course[`${year}-name`];
   const code = course[`${year}-code`];
   const level = course[`${year}-level`];
   const semester = course[`${year}-semester`];
@@ -29,6 +30,9 @@ const addCurriculumSection = (
       ),
     )
     .addSeparatorComponents((separator) => separator.setDivider(false))
+    .addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(`**${labels.name}:** ${name ?? '-'}`),
+    )
     .addTextDisplayComponents((textDisplay) =>
       textDisplay.setContent(`**${labels.code}:** ${code ?? '-'}`),
     )

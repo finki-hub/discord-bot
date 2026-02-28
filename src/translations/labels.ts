@@ -17,6 +17,7 @@ export const labels = {
   links: 'Линкови',
   location: 'Локација',
   mrbs: 'MRBS',
+  name: 'Име',
   none: 'Нема',
   notAvailable: 'Недостапен',
   note: 'НАПОМЕНА',
