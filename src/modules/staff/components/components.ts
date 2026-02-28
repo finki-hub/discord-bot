@@ -1,12 +1,15 @@
 import {
   ActionRowBuilder,
+  blockQuote,
   ButtonBuilder,
   ButtonStyle,
   ContainerBuilder,
   heading,
   HeadingLevel,
   hyperlink,
+  italic,
   SeparatorSpacingSize,
+  strikethrough,
 } from 'discord.js';
 
 import { labels } from '@/translations/labels.js';
@@ -16,10 +19,21 @@ import { type Staff } from '../schemas/Staff.js';
 export const getStaffComponent = (information: Staff) => {
   const containerBuilder = new ContainerBuilder();
 
+  const displayName = information.active
+    ? information.name
+    : strikethrough(information.name);
+
+  containerBuilder.addTextDisplayComponents((textDisplay) =>
+    textDisplay.setContent(heading(displayName, HeadingLevel.Two)),
+  );
+
+  if (!information.active) {
+    containerBuilder.addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(blockQuote(`:x: ${italic(labels.retired)}`)),
+    );
+  }
+
   containerBuilder
-    .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(heading(information.name, HeadingLevel.Two)),
-    )
     .addSeparatorComponents((separator) =>
       separator.setSpacing(SeparatorSpacingSize.Large),
     )

@@ -127,7 +127,7 @@ export const getCourseComponent = (course: Course) => {
 
   if (retiredText) {
     containerBuilder.addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.retired}**\n${retiredText}`),
+      textDisplay.setContent(`**${labels.retiredPlural}**\n${retiredText}`),
     );
   }
 
