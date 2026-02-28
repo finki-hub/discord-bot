@@ -77,5 +77,23 @@ export const startPeriodicReload = () => {
 // Getter functions
 export const getCourses = (): string[] => courses.map((course) => course.name);
 
+export const getCourseNameVariants = (): Array<[string, string]> =>
+  courses.flatMap((course) => {
+    const variants: Array<[string, string]> = [[course.name, course.name]];
+
+    for (const year of ['2018', '2023'] as const) {
+      const accreditationName = course[`${year}-name`];
+
+      if (
+        accreditationName !== undefined &&
+        accreditationName !== course.name
+      ) {
+        variants.push([accreditationName, course.name]);
+      }
+    }
+
+    return variants;
+  });
+
 export const getCourse = (name: string): Course | undefined =>
   courses.find((course) => course.name.toLowerCase() === name.toLowerCase());

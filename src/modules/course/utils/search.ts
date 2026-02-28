@@ -1,12 +1,13 @@
 import Fuse from 'fuse.js';
 
-import { createTransliterationSearchMap } from '@/common/utils/transliteration.js';
-import { getCourses } from '@/modules/course/utils/data.js';
+import { createTransliterationSearchMapFromEntries } from '@/common/utils/transliteration.js';
+import { getCourseNameVariants } from '@/modules/course/utils/data.js';
 
 export const getClosestCourse = (course: string) => {
-  const courses = getCourses();
+  const courseVariants = getCourseNameVariants();
 
-  const transformedCourseNames = createTransliterationSearchMap(courses);
+  const transformedCourseNames =
+    createTransliterationSearchMapFromEntries(courseVariants);
 
   const fuse = new Fuse(Object.keys(transformedCourseNames), {
     includeScore: true,

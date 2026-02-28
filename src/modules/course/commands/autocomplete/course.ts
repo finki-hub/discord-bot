@@ -1,12 +1,12 @@
 import { type AutocompleteInteraction } from 'discord.js';
 
 import { createAutocompleteOptions } from '@/common/commands/autocomplete.js';
-import { createTransliterationSearchMap } from '@/common/utils/transliteration.js';
+import { createTransliterationSearchMapFromEntries } from '@/common/utils/transliteration.js';
 import {
   getTransformedCourses,
   setTransformedCourses,
 } from '@/modules/course/utils/cache.js';
-import { getCourses } from '@/modules/course/utils/data.js';
+import { getCourseNameVariants } from '@/modules/course/utils/data.js';
 
 export const name = 'course';
 
@@ -17,7 +17,7 @@ export const execute = async (interaction: AutocompleteInteraction) => {
 
   if (transformedCourses === null) {
     transformedCourses = Object.entries(
-      createTransliterationSearchMap(getCourses()),
+      createTransliterationSearchMapFromEntries(getCourseNameVariants()),
     );
 
     setTransformedCourses(transformedCourses);

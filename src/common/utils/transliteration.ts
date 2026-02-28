@@ -93,3 +93,19 @@ export const createTransliterationSearchMap = (options: string[]) => {
 
   return results;
 };
+
+export const createTransliterationSearchMapFromEntries = (
+  entries: Array<[string, string]>,
+) => {
+  const results: Record<string, string> = {};
+
+  for (const [searchTerm, canonicalName] of entries) {
+    for (const transformedOption of transform(searchTerm)) {
+      results[transformedOption] = canonicalName;
+    }
+
+    results[searchTerm] = canonicalName;
+  }
+
+  return results;
+};
