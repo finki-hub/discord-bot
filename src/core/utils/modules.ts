@@ -31,7 +31,10 @@ const loadModule = async (moduleName: string) => {
     const moduleExport: unknown = await import(initFile);
     return ModuleSchema.safeParse(moduleExport);
   } catch (error) {
-    if (Error.isError(error) && error.message.includes('Cannot find module')) {
+    if (
+      error instanceof Error &&
+      error.message.includes('Cannot find module')
+    ) {
       return null;
     }
     logger.error(`Failed loading module ${moduleName}\n${String(error)}`);
