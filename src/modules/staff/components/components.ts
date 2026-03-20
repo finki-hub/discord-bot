@@ -51,11 +51,13 @@ export const getStaffComponent = (information: Staff) => {
     .addSeparatorComponents((separator) =>
       separator.setDivider(false).setSpacing(SeparatorSpacingSize.Small),
     )
-    .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(
-        `**${labels.email}:**\n${hyperlink(information.email, `mailto:${information.email}`)}`,
-      ),
-    );
+    .addTextDisplayComponents((textDisplay) => {
+      const mailtoLink = `mailto:${information.email}`;
+
+      return textDisplay.setContent(
+        `**${labels.email}:**\n${hyperlink(information.email, mailtoLink)}`,
+      );
+    });
 
   const actionRow = new ActionRowBuilder<ButtonBuilder>();
 

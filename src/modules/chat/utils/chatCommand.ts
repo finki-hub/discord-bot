@@ -1,18 +1,14 @@
 import {
   type ChatInputCommandInteraction,
-  MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
 
-import { logger } from '@/common/logger/index.js';
-import { safeStreamReplyToInteraction } from '@/common/utils/messages.js';
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
-import { commandDescriptions, commandErrors } from '@/translations/commands.js';
+import { commandDescriptions } from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
-import { LLM_ERRORS } from './constants.js';
-import { sendPrompt } from './requests.js';
+import { handlePromptWithStreaming } from './streaming.js';
 
 export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
   data: new SlashCommandBuilder()
@@ -53,44 +49,6 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
       topP,
     });
 
-    try {
-      await safeStreamReplyToInteraction(interaction, async (onChunk) => {
-        await sendPrompt(options, async (chunk) => {
-          await onChunk(chunk);
-        });
-      });
-    } catch (error) {
-      if (!Error.isError(error)) {
-        throw error;
-      }
-
-      const isLLMUnavailable = error.message === 'LLM_UNAVAILABLE';
-
-      if (isLLMUnavailable) {
-        logger.warn('LLM unavailable when executing chat query command', {
-          guildId: interaction.guild?.id,
-        });
-      } else {
-        const messageParts = [
-          'Failed executing chat query command',
-          error.message,
-          error.stack,
-        ].filter(Boolean);
-
-        logger.error(messageParts.join('\n'), {
-          guildId: interaction.guild?.id,
-        });
-      }
-
-      const errorMessage =
-        LLM_ERRORS[error.message] ?? commandErrors.unknownChatError;
-
-      await (interaction.deferred || interaction.replied
-        ? interaction.editReply(errorMessage)
-        : interaction.reply({
-            content: errorMessage,
-            flags: MessageFlags.Ephemeral,
-          }));
-    }
+    await handlePromptWithStreaming(interaction, options, 'chat query command');
   },
 });

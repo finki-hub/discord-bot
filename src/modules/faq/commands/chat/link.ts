@@ -48,10 +48,9 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
   }
 
   const normalizedUrl = getNormalizedUrl(link.url);
+  const noteLabel = `${labels.note}:`;
   const note =
-    link.description === null
-      ? ''
-      : `\n${bold(`${labels.note}:`)} ${link.description}`;
+    link.description === null ? '' : `\n${bold(noteLabel)} ${link.description}`;
 
   await interaction.editReply({
     content: user

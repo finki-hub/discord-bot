@@ -10,13 +10,9 @@ export const refreshOnConfigChange = async (
     `Config property ${property} changed for guild ${guildId}, refreshing...`,
   );
 
-  switch (property) {
-    case 'channels':
-      await initializeChannels(guildId);
-      break;
-
-    default:
-      logger.info(`No refresh needed for ${property}`);
-      break;
+  if (property === 'channels') {
+    await initializeChannels(guildId);
+  } else {
+    logger.info(`No refresh needed for ${property}`);
   }
 };

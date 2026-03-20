@@ -12,6 +12,65 @@ import type { PaginationComponentData } from '@/common/types/PaginationComponent
 
 import { paginationStringFunctions } from '@/translations/pagination.js';
 
+const buildPageButtons = (
+  buttonId: string,
+  currentPage: number,
+  totalPages: number,
+) => {
+  const rows: Array<ActionRowBuilder<ButtonBuilder>> = [];
+
+  for (let i = 0; i < totalPages; i += 5) {
+    const actionRow = new ActionRowBuilder<ButtonBuilder>();
+
+    for (let j = i; j < Math.min(i + 5, totalPages); j++) {
+      const style =
+        j === currentPage ? ButtonStyle.Primary : ButtonStyle.Secondary;
+
+      const button = new ButtonBuilder()
+        .setCustomId(`${buttonId}:page:${j}`)
+        .setLabel(`${j + 1}`)
+        .setStyle(style)
+        .setDisabled(j === currentPage);
+
+      actionRow.addComponents(button);
+    }
+
+    rows.push(actionRow);
+  }
+
+  return rows;
+};
+
+const addEntries = (
+  containerBuilder: ContainerBuilder,
+  paginatedEntries: string[],
+  description: string | undefined,
+) => {
+  if (paginatedEntries.length === 0) {
+    return;
+  }
+
+  if (description !== undefined) {
+    containerBuilder.addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(description),
+    );
+  }
+
+  containerBuilder.addSeparatorComponents((separator) =>
+    separator.setDivider(false),
+  );
+
+  for (const entry of paginatedEntries) {
+    containerBuilder.addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(entry),
+    );
+  }
+
+  containerBuilder.addSeparatorComponents((separator) =>
+    separator.setSpacing(SeparatorSpacingSize.Large),
+  );
+};
+
 export const getPaginationComponent = ({
   buttonId,
   description,
@@ -43,62 +102,32 @@ export const getPaginationComponent = ({
     containerBuilder.addTextDisplayComponents((textDisplay) =>
       textDisplay.setContent(paginationStringFunctions.noEntries(entriesLabel)),
     );
-  } else if (description !== undefined) {
-    containerBuilder.addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(description),
-    );
+
+    return containerBuilder;
   }
 
-  if (paginatedEntries.length > 0) {
+  addEntries(containerBuilder, paginatedEntries, description);
+
+  if (totalPages > 1) {
+    for (const row of buildPageButtons(buttonId, currentPage, totalPages)) {
+      containerBuilder.addActionRowComponents(row);
+    }
+
     containerBuilder.addSeparatorComponents((separator) =>
       separator.setDivider(false),
     );
-
-    for (const entry of paginatedEntries) {
-      containerBuilder.addTextDisplayComponents((textDisplay) =>
-        textDisplay.setContent(entry),
-      );
-    }
-
-    containerBuilder.addSeparatorComponents((separator) =>
-      separator.setSpacing(SeparatorSpacingSize.Large),
-    );
-
-    if (totalPages > 1) {
-      for (let i = 0; i < totalPages; i += 5) {
-        const actionRow = new ActionRowBuilder<ButtonBuilder>();
-
-        for (let j = i; j < Math.min(i + 5, totalPages); j++) {
-          const button = new ButtonBuilder()
-            .setCustomId(`${buttonId}:page:${j}`)
-            .setLabel(`${j + 1}`)
-            .setStyle(
-              j === currentPage ? ButtonStyle.Primary : ButtonStyle.Secondary,
-            )
-            .setDisabled(j === currentPage);
-
-          actionRow.addComponents(button);
-        }
-
-        containerBuilder.addActionRowComponents(actionRow);
-      }
-
-      containerBuilder.addSeparatorComponents((separator) =>
-        separator.setDivider(false),
-      );
-    }
-
-    containerBuilder.addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(
-        paginationStringFunctions.footer({
-          label: entriesLabel,
-          page: currentPage + 1,
-          pages: Math.max(1, totalPages),
-          total: entries.length,
-        }),
-      ),
-    );
   }
+
+  containerBuilder.addTextDisplayComponents((textDisplay) =>
+    textDisplay.setContent(
+      paginationStringFunctions.footer({
+        label: entriesLabel,
+        page: currentPage + 1,
+        pages: Math.max(1, totalPages),
+        total: entries.length,
+      }),
+    ),
+  );
 
   return containerBuilder;
 };
