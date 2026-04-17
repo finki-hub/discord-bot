@@ -4,7 +4,7 @@
     "discord-api-types": "^0.38.47",
     "discord.js": "^14.26.3",
     "dotenv": "^17.4.2",
-    "eventsource-parser": "^3.0.6",
+    "eventsource-parser": "^3.0.7",
     "fuse.js": "^7.3.0",
     "winston": "^3.19.0",
     "winston-transport": "^4.9.0",
