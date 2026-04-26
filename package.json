@@ -3,7 +3,6 @@
     "croner": "^10.0.1",
     "discord-api-types": "^0.38.47",
     "discord.js": "^14.26.3",
-    "dotenv": "^17.4.2",
     "eventsource-parser": "^3.0.8",
     "fuse.js": "^7.3.0",
     "winston": "^3.19.0",
@@ -12,8 +11,8 @@
   },
   "devDependencies": {
     "esbuild": "^0.28.0",
-    "eslint": "^9.39.4",
-    "eslint-config-imperium": "^3.6.0",
+    "eslint": "^10.2.1",
+    "eslint-config-imperium": "^4.0.1",
     "rimraf": "^6.1.3",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.21.0",
