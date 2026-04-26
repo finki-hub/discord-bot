@@ -1,4 +1,4 @@
-/* eslint-disable n/prefer-global/process */
+/* eslint-disable n/prefer-global/process -- env is read from node:process in one place for configuration */
 
 import { env } from 'node:process';
 import { z } from 'zod';
@@ -8,16 +8,16 @@ import { configErrors } from '../translations/errors.js';
 export const getToken = () => {
   try {
     return z.string().parse(env['TOKEN']);
-  } catch {
-    throw new Error(configErrors.noToken);
+  } catch (error) {
+    throw new Error(configErrors.noToken, { cause: error });
   }
 };
 
 export const getApplicationId = () => {
   try {
     return z.string().parse(env['APPLICATION_ID']);
-  } catch {
-    throw new Error(configErrors.noApplicationId);
+  } catch (error) {
+    throw new Error(configErrors.noApplicationId, { cause: error });
   }
 };
 

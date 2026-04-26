@@ -3,7 +3,7 @@ import { logger } from '@/common/logger/index.js';
 const shutdown = () => {
   logger.info('Shutting down gracefully...');
 
-  // eslint-disable-next-line n/no-process-exit, unicorn/no-process-exit
+  // eslint-disable-next-line n/no-process-exit, unicorn/no-process-exit -- the bot intentionally exits after graceful shutdown signals
   process.exit(0);
 };
 
