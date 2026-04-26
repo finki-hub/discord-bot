@@ -1,84 +1,28 @@
-import { Cron } from 'croner';
-
-import { logger } from '@/common/logger/index.js';
-import { fetchJsonFromUrl, parseContent } from '@/common/utils/data.js';
-import { getDataStorageUrl } from '@/configuration/environment.js';
+import {
+  loadJsonResource,
+  schedulePeriodicReload,
+} from '@/common/utils/data.js';
 
 import { ACCREDITATION_YEARS } from '../constants.js';
 import { type Course, CourseSchema } from '../schemas/Course.js';
 import { clearTransformedCourses } from './cache.js';
 
 let courses: Course[] = [];
-let reloadCron: Cron | null = null;
 
 export const reloadCourses = async () => {
-  const baseUrl = getDataStorageUrl();
-
-  if (!baseUrl) {
-    logger.warn(
-      'DATA_STORAGE_URL not configured, course data loading disabled',
-    );
-    return;
-  }
-
-  try {
-    const coursesUrl = `${baseUrl}/courses.json`;
-
-    let coursesRaw: string;
-
-    try {
-      coursesRaw = await fetchJsonFromUrl(coursesUrl);
-    } catch (error) {
-      logger.error(
-        `Failed fetching courses from data storage\n${String(error)}`,
-      );
-      throw error;
-    }
-
-    const coursesData = parseContent(coursesRaw);
-    let coursesParsed: Course[];
-
-    try {
-      coursesParsed = await CourseSchema.array().parseAsync(coursesData);
-    } catch (error) {
-      logger.error(`Failed parsing courses data\n${String(error)}`);
-      throw error;
-    }
-
-    courses = coursesParsed;
-    clearTransformedCourses();
-    logger.info('Courses data reloaded from data storage');
-  } catch (error) {
-    logger.error(`Failed reloading courses\n${String(error)}`);
-    throw error;
-  }
+  await loadJsonResource({
+    label: 'courses',
+    onLoaded: (data: Course[]) => {
+      courses = data;
+      clearTransformedCourses();
+    },
+    resource: 'courses.json',
+    schema: CourseSchema.array(),
+  });
 };
 
 export const startPeriodicReload = () => {
-  const baseUrl = getDataStorageUrl();
-
-  if (!baseUrl) {
-    logger.debug(
-      'DATA_STORAGE_URL not configured, periodic course reload disabled',
-    );
-    return;
-  }
-
-  if (reloadCron) {
-    reloadCron.stop();
-  }
-
-  // Reload every hour
-  reloadCron = new Cron('0 * * * *', async () => {
-    logger.info('Starting scheduled courses reload from data storage...');
-    try {
-      await reloadCourses();
-    } catch (error) {
-      logger.error(`Scheduled courses reload failed\n${String(error)}`);
-    }
-  });
-
-  logger.info('Periodic courses reload scheduled (every hour)');
+  schedulePeriodicReload({ label: 'courses', reload: reloadCourses });
 };
 
 export const getCourses = (): string[] => courses.map((course) => course.name);
