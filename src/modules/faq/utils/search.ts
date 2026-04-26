@@ -15,7 +15,7 @@ export const getClosestQuestion = async (question: number | string) => {
   const isNumber = typeof question === 'number';
 
   if (isNumber) {
-    return await getNthQuestion(question);
+    return getNthQuestion(question);
   }
 
   const questions = await getQuestionNames();
@@ -45,14 +45,14 @@ export const getClosestQuestion = async (question: number | string) => {
 
   const closestQuestion = transformedQuestionNames[closestLatinQuestion];
 
-  return await getQuestion(closestQuestion);
+  return getQuestion(closestQuestion);
 };
 
 export const getClosestLink = async (link: number | string) => {
   const isNumber = typeof link === 'number';
 
   if (isNumber) {
-    return await getNthLink(link);
+    return getNthLink(link);
   }
 
   const links = await getLinkNames();
@@ -82,5 +82,5 @@ export const getClosestLink = async (link: number | string) => {
 
   const closestLink = transformedLinkNames[closestLatinLink];
 
-  return await getLink(closestLink);
+  return getLink(closestLink);
 };

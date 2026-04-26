@@ -1,3 +1,8 @@
+import type { AutocompleteInteraction } from 'discord.js';
+
+import { handleRoomAutocomplete } from '@/modules/room/utils/roomAutocomplete.js';
+
 export const name = 'office';
 
-export { handleRoomAutocomplete as execute } from '@/modules/room/utils/roomAutocomplete.js';
+export const execute = (interaction: AutocompleteInteraction) =>
+  handleRoomAutocomplete(interaction);

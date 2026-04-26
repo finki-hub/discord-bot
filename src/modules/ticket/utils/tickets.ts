@@ -32,15 +32,13 @@ export const getActiveTickets = async (
     return undefined;
   }
 
-  const threads = guild.channels.cache.filter(
+  return guild.channels.cache.filter(
     (channel): channel is AnyThreadChannel =>
       channel.isThread() &&
       channel.parentId === ticketsChannelId &&
       !channel.archived &&
       !channel.locked,
   );
-
-  return threads;
 };
 
 export const getActiveTicketsSorted = async (
@@ -53,7 +51,7 @@ export const getActiveTicketsSorted = async (
       : [...ticketThreadsCollection.values()];
 
   ticketThreads.sort((a: AnyThreadChannel, b: AnyThreadChannel) => {
-    if (!a.createdTimestamp || !b.createdTimestamp) {
+    if (a.createdTimestamp === null || b.createdTimestamp === null) {
       return 0;
     }
 

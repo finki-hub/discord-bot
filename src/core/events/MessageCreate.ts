@@ -39,6 +39,5 @@ const crosspost = async (message: Message) => {
   }
 };
 
-export const execute = async (...[message]: ClientEvents[typeof name]) => {
-  await crosspost(message);
-};
+export const execute = (...[message]: ClientEvents[typeof name]) =>
+  crosspost(message);

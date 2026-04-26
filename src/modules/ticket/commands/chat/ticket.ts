@@ -70,6 +70,8 @@ const handleTicketClose = async (interaction: ChatInputCommandInteraction) => {
 
   if (
     !interaction.channel?.isThread() ||
+    interaction.channel.parentId === null ||
+    ticketsChannel === undefined ||
     interaction.channel.parentId !== ticketsChannel
   ) {
     await interaction.editReply(commandErrors.invalidChannel);
@@ -153,6 +155,5 @@ const ticketHandlers = {
   send: handleTicketSend,
 };
 
-export const execute = async (interaction: ChatInputCommandInteraction) => {
-  await executeSubcommand(interaction, ticketHandlers);
-};
+export const execute = (interaction: ChatInputCommandInteraction) =>
+  executeSubcommand(interaction, ticketHandlers);

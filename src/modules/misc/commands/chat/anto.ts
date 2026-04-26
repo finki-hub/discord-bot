@@ -12,13 +12,8 @@ export const data = new SlashCommandBuilder()
   .setName(name)
   .setDescription(commandDescriptions[name]);
 
-export const execute = async (interaction: ChatInputCommandInteraction) => {
+export const execute = (interaction: ChatInputCommandInteraction) => {
   const randomQuote = getRandomQuote();
 
-  if (randomQuote === undefined) {
-    await interaction.editReply(commandErrors.dataFetchFailed);
-    return;
-  }
-
-  await interaction.editReply(randomQuote);
+  return interaction.editReply(randomQuote ?? commandErrors.dataFetchFailed);
 };

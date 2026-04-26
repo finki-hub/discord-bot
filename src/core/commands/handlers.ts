@@ -357,17 +357,13 @@ const executeContextMenuCommand = async (
   }
 };
 
-export const handleUserContextMenuCommand = async (
+export const handleUserContextMenuCommand = (
   interaction: UserContextMenuCommandInteraction,
-) => {
-  await executeContextMenuCommand(interaction, '[User Context]');
-};
+) => executeContextMenuCommand(interaction, '[User Context]');
 
-export const handleMessageContextMenuCommand = async (
+export const handleMessageContextMenuCommand = (
   interaction: MessageContextMenuCommandInteraction,
-) => {
-  await executeContextMenuCommand(interaction, '[Message Context]');
-};
+) => executeContextMenuCommand(interaction, '[Message Context]');
 
 export const handleModalSubmit = async (
   interaction: ModalSubmitInteraction,

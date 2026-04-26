@@ -105,8 +105,7 @@ export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {
       return null;
     }
 
-    const data = QuestionsSchema.parse(await result.json());
-    return data;
+    return QuestionsSchema.parse(await result.json());
   } catch (error) {
     logger.error(`Failed getting closest questions\n${String(error)}`);
     return null;
@@ -131,8 +130,7 @@ export const getSupportedModels = async () => {
       return null;
     }
 
-    const data = await result.json();
-    return z.array(z.string()).parse(data);
+    return z.array(z.string()).parse(await result.json());
   } catch (error) {
     logger.error(`Failed getting supported models\n${String(error)}`);
     return null;
@@ -229,8 +227,7 @@ export const getUnembeddedQuestions = async (
       return null;
     }
 
-    const data = QuestionsSchema.parse(await result.json());
-    return data;
+    return QuestionsSchema.parse(await result.json());
   } catch (error) {
     logger.error(`Failed getting unembedded questions\n${String(error)}`);
     return null;

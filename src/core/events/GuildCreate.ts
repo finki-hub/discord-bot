@@ -6,7 +6,7 @@ import { initializeChannels } from '@/common/services/channels.js';
 export const name = Events.GuildCreate;
 export const once = false;
 
-export const execute = async (...[guild]: ClientEvents[typeof name]) => {
+export const execute = (...[guild]: ClientEvents[typeof name]) => {
   logger.info(`Joined guild: ${guild.name} (${guild.id})`);
-  await initializeChannels(guild.id);
+  return initializeChannels(guild.id);
 };

@@ -20,7 +20,7 @@ const getMembersByRoles = async (
   return Array.from(uniqueMembers);
 };
 
-export const getMembersByRoleIds = async (
+export const getMembersByRoleIds = (
   guild: Guild,
   roleIdsWithMembers: string[],
 ) => {
@@ -28,5 +28,5 @@ export const getMembersByRoleIds = async (
     .map((role) => guild.roles.cache.get(role))
     .filter((role) => role !== undefined);
 
-  return await getMembersByRoles(guild, rolesList);
+  return getMembersByRoles(guild, rolesList);
 };

@@ -14,8 +14,7 @@ export const data = new SlashCommandBuilder()
   .setName(name)
   .setDescription(commandDescriptions[name]);
 
-export const execute = async (interaction: ChatInputCommandInteraction) => {
-  await interaction.editReply({
+export const execute = (interaction: ChatInputCommandInteraction) =>
+  interaction.editReply({
     content: commandResponses.home,
   });
-};
