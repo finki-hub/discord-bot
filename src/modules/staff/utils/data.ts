@@ -21,22 +21,24 @@ export const reloadStaff = async () => {
   try {
     const staffUrl = `${baseUrl}/staff.json`;
 
-    const staffRaw = await fetchJsonFromUrl(staffUrl).catch(
-      (error: unknown) => {
-        logger.error(
-          `Failed fetching staff from data storage\n${String(error)}`,
-        );
-        throw error;
-      },
-    );
+    let staffRaw: string;
+
+    try {
+      staffRaw = await fetchJsonFromUrl(staffUrl);
+    } catch (error) {
+      logger.error(`Failed fetching staff from data storage\n${String(error)}`);
+      throw error;
+    }
 
     const staffData = parseContent(staffRaw);
-    const staffParsed = await StaffSchema.array()
-      .parseAsync(staffData)
-      .catch((error: unknown) => {
-        logger.error(`Failed parsing staff data\n${String(error)}`);
-        throw error;
-      });
+    let staffParsed: Staff[];
+
+    try {
+      staffParsed = await StaffSchema.array().parseAsync(staffData);
+    } catch (error) {
+      logger.error(`Failed parsing staff data\n${String(error)}`);
+      throw error;
+    }
 
     staff = staffParsed;
     clearTransformedProfessors();
@@ -62,11 +64,13 @@ export const startPeriodicReload = () => {
   }
 
   // Reload every hour
-  reloadCron = new Cron('0 * * * *', () => {
+  reloadCron = new Cron('0 * * * *', async () => {
     logger.info('Starting scheduled staff reload from data storage...');
-    reloadStaff().catch((error: unknown) => {
+    try {
+      await reloadStaff();
+    } catch (error) {
       logger.error(`Scheduled staff reload failed\n${String(error)}`);
-    });
+    }
   });
 
   logger.info('Periodic staff reload scheduled (every hour)');

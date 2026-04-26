@@ -24,22 +24,26 @@ export const reloadCourses = async () => {
   try {
     const coursesUrl = `${baseUrl}/courses.json`;
 
-    const coursesRaw = await fetchJsonFromUrl(coursesUrl).catch(
-      (error: unknown) => {
-        logger.error(
-          `Failed fetching courses from data storage\n${String(error)}`,
-        );
-        throw error;
-      },
-    );
+    let coursesRaw: string;
+
+    try {
+      coursesRaw = await fetchJsonFromUrl(coursesUrl);
+    } catch (error) {
+      logger.error(
+        `Failed fetching courses from data storage\n${String(error)}`,
+      );
+      throw error;
+    }
 
     const coursesData = parseContent(coursesRaw);
-    const coursesParsed = await CourseSchema.array()
-      .parseAsync(coursesData)
-      .catch((error: unknown) => {
-        logger.error(`Failed parsing courses data\n${String(error)}`);
-        throw error;
-      });
+    let coursesParsed: Course[];
+
+    try {
+      coursesParsed = await CourseSchema.array().parseAsync(coursesData);
+    } catch (error) {
+      logger.error(`Failed parsing courses data\n${String(error)}`);
+      throw error;
+    }
 
     courses = coursesParsed;
     clearTransformedCourses();
@@ -65,11 +69,13 @@ export const startPeriodicReload = () => {
   }
 
   // Reload every hour
-  reloadCron = new Cron('0 * * * *', () => {
+  reloadCron = new Cron('0 * * * *', async () => {
     logger.info('Starting scheduled courses reload from data storage...');
-    reloadCourses().catch((error: unknown) => {
+    try {
+      await reloadCourses();
+    } catch (error) {
       logger.error(`Scheduled courses reload failed\n${String(error)}`);
-    });
+    }
   });
 
   logger.info('Periodic courses reload scheduled (every hour)');

@@ -1,4 +1,6 @@
 import { Cron } from 'croner';
+import { randomInt } from 'node:crypto';
+import { z } from 'zod';
 
 import { logger } from '@/common/logger/index.js';
 import { fetchJsonFromUrl, parseContent } from '@/common/utils/data.js';
@@ -20,17 +22,20 @@ export const reloadQuotes = async () => {
   try {
     const antoUrl = `${baseUrl}/anto.json`;
 
-    const antoRaw = await fetchJsonFromUrl(antoUrl).catch((error: unknown) => {
+    let antoRaw: string;
+
+    try {
+      antoRaw = await fetchJsonFromUrl(antoUrl);
+    } catch (error) {
       logger.error(
         `Failed fetching anto quotes from data storage\n${String(error)}`,
       );
       throw error;
-    });
+    }
 
     const quotesData = parseContent(antoRaw);
-    const quotesParsed = Array.isArray(quotesData)
-      ? (quotesData as string[])
-      : [];
+    const quotesResult = z.array(z.string()).safeParse(quotesData);
+    const quotesParsed = quotesResult.success ? quotesResult.data : [];
 
     quotes = quotesParsed;
     logger.info('Anto quotes data reloaded from data storage');
@@ -55,11 +60,13 @@ export const startPeriodicReload = () => {
   }
 
   // Reload every hour
-  reloadCron = new Cron('0 * * * *', () => {
+  reloadCron = new Cron('0 * * * *', async () => {
     logger.info('Starting scheduled anto quotes reload from data storage...');
-    reloadQuotes().catch((error: unknown) => {
+    try {
+      await reloadQuotes();
+    } catch (error) {
       logger.error(`Scheduled anto quotes reload failed\n${String(error)}`);
-    });
+    }
   });
 
   logger.info('Periodic anto quotes reload scheduled (every hour)');
@@ -72,6 +79,6 @@ export const getRandomQuote = (): string | undefined => {
     return undefined;
   }
 
-  const randomIndex = Math.floor(Math.random() * quotes.length);
+  const randomIndex = randomInt(quotes.length);
   return quotes[randomIndex];
 };

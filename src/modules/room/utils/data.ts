@@ -21,22 +21,24 @@ export const reloadRooms = async () => {
   try {
     const roomsUrl = `${baseUrl}/rooms.json`;
 
-    const roomsRaw = await fetchJsonFromUrl(roomsUrl).catch(
-      (error: unknown) => {
-        logger.error(
-          `Failed fetching rooms from data storage\n${String(error)}`,
-        );
-        throw error;
-      },
-    );
+    let roomsRaw: string;
+
+    try {
+      roomsRaw = await fetchJsonFromUrl(roomsUrl);
+    } catch (error) {
+      logger.error(`Failed fetching rooms from data storage\n${String(error)}`);
+      throw error;
+    }
 
     const roomsData = parseContent(roomsRaw);
-    const roomsParsed = await RoomSchema.array()
-      .parseAsync(roomsData)
-      .catch((error: unknown) => {
-        logger.error(`Failed parsing rooms data\n${String(error)}`);
-        throw error;
-      });
+    let roomsParsed: Room[];
+
+    try {
+      roomsParsed = await RoomSchema.array().parseAsync(roomsData);
+    } catch (error) {
+      logger.error(`Failed parsing rooms data\n${String(error)}`);
+      throw error;
+    }
 
     rooms = roomsParsed;
     clearTransformedRooms();
@@ -62,11 +64,13 @@ export const startPeriodicReload = () => {
   }
 
   // Reload every hour
-  reloadCron = new Cron('0 * * * *', () => {
+  reloadCron = new Cron('0 * * * *', async () => {
     logger.info('Starting scheduled rooms reload from data storage...');
-    reloadRooms().catch((error: unknown) => {
+    try {
+      await reloadRooms();
+    } catch (error) {
       logger.error(`Scheduled rooms reload failed\n${String(error)}`);
-    });
+    }
   });
 
   logger.info('Periodic rooms reload scheduled (every hour)');

@@ -24,23 +24,28 @@ export const reloadSessions = async () => {
   try {
     const sessionsUrl = `${baseUrl}/sessions.json`;
 
-    const sessionsRaw = await fetchJsonFromUrl(sessionsUrl).catch(
-      (error: unknown) => {
-        logger.error(
-          `Failed fetching sessions from data storage\n${String(error)}`,
-        );
-        throw error;
-      },
-    );
+    let sessionsRaw: string;
+
+    try {
+      sessionsRaw = await fetchJsonFromUrl(sessionsUrl);
+    } catch (error) {
+      logger.error(
+        `Failed fetching sessions from data storage\n${String(error)}`,
+      );
+      throw error;
+    }
 
     const sessionsData = parseContent(sessionsRaw, {});
-    const sessionsParsed = await z
-      .record(z.string(), z.string())
-      .parseAsync(sessionsData)
-      .catch((error: unknown) => {
-        logger.error(`Failed parsing sessions data\n${String(error)}`);
-        throw error;
-      });
+    let sessionsParsed: Record<string, string>;
+
+    try {
+      sessionsParsed = await z
+        .record(z.string(), z.string())
+        .parseAsync(sessionsData);
+    } catch (error) {
+      logger.error(`Failed parsing sessions data\n${String(error)}`);
+      throw error;
+    }
 
     sessions = sessionsParsed;
     clearTransformedSessions();
@@ -67,11 +72,13 @@ export const startPeriodicReload = () => {
   }
 
   // Reload every hour
-  reloadCron = new Cron('0 * * * *', () => {
+  reloadCron = new Cron('0 * * * *', async () => {
     logger.info('Starting scheduled sessions reload from data storage...');
-    reloadSessions().catch((error: unknown) => {
+    try {
+      await reloadSessions();
+    } catch (error) {
       logger.error(`Scheduled sessions reload failed\n${String(error)}`);
-    });
+    }
   });
 
   logger.info('Periodic sessions reload scheduled (every hour)');
