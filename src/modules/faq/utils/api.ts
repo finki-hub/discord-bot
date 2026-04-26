@@ -10,15 +10,33 @@ import { QuestionSchema, QuestionsSchema } from '../schemas/Question.js';
 const CACHE_TTL = 60 * 1_000;
 const MAX_FETCH_TIMEOUT = 2_000;
 
-let questionNamesCache: null | {
-  data: null | string[];
-  timestamp: number;
-} = null;
+const cacheState: {
+  linkNamesCache: null | {
+    data: null | string[];
+    timestamp: number;
+  };
+  questionNamesCache: null | {
+    data: null | string[];
+    timestamp: number;
+  };
+} = {
+  linkNamesCache: null,
+  questionNamesCache: null,
+};
 
-let linkNamesCache: null | {
-  data: null | string[];
-  timestamp: number;
-} = null;
+const setQuestionNamesCache = (data: string[]) => {
+  cacheState.questionNamesCache = {
+    data,
+    timestamp: Date.now(),
+  };
+};
+
+const setLinkNamesCache = (data: string[]) => {
+  cacheState.linkNamesCache = {
+    data,
+    timestamp: Date.now(),
+  };
+};
 
 const fetchWithTimeout = async (
   url: string,
@@ -36,7 +54,7 @@ const fetchWithTimeout = async (
   } catch (error) {
     clearTimeout(timeoutId);
     if (Error.isError(error) && error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${timeout}ms`);
+      throw new Error(`Request timeout after ${timeout}ms`, { cause: error });
     }
     throw error;
   }
@@ -80,14 +98,14 @@ export const getQuestions = async () => {
 
 export const getQuestionNames = async (useCache = true) => {
   if (useCache) {
-    const cached = getValidCacheData(questionNamesCache, CACHE_TTL);
+    const cached = getValidCacheData(cacheState.questionNamesCache, CACHE_TTL);
     if (cached !== null) return cached;
   }
 
   const chatbotUrl = getChatbotUrl();
 
   if (chatbotUrl === null) {
-    return getCachedData(questionNamesCache);
+    return getCachedData(cacheState.questionNamesCache);
   }
 
   try {
@@ -97,20 +115,17 @@ export const getQuestionNames = async (useCache = true) => {
     );
 
     if (!result.ok) {
-      return getCachedData(questionNamesCache);
+      return getCachedData(cacheState.questionNamesCache);
     }
 
     const data = z.array(z.string()).parse(await result.json());
 
-    questionNamesCache = {
-      data,
-      timestamp: Date.now(),
-    };
+    setQuestionNamesCache(data);
 
     return data;
   } catch (error) {
     logger.error(apiErrorFunctions.getQuestionNamesError(error));
-    return getCachedData(questionNamesCache);
+    return getCachedData(cacheState.questionNamesCache);
   }
 };
 
@@ -190,14 +205,14 @@ export const getLinks = async () => {
 
 export const getLinkNames = async (useCache = true) => {
   if (useCache) {
-    const cached = getValidCacheData(linkNamesCache, CACHE_TTL);
+    const cached = getValidCacheData(cacheState.linkNamesCache, CACHE_TTL);
     if (cached !== null) return cached;
   }
 
   const chatbotUrl = getChatbotUrl();
 
   if (chatbotUrl === null) {
-    return getCachedData(linkNamesCache);
+    return getCachedData(cacheState.linkNamesCache);
   }
 
   try {
@@ -207,20 +222,17 @@ export const getLinkNames = async (useCache = true) => {
     );
 
     if (!result.ok) {
-      return getCachedData(linkNamesCache);
+      return getCachedData(cacheState.linkNamesCache);
     }
 
     const data = z.array(z.string()).parse(await result.json());
 
-    linkNamesCache = {
-      data,
-      timestamp: Date.now(),
-    };
+    setLinkNamesCache(data);
 
     return data;
   } catch (error) {
     logger.error(apiErrorFunctions.getLinkNamesError(error));
-    return getCachedData(linkNamesCache);
+    return getCachedData(cacheState.linkNamesCache);
   }
 };
 

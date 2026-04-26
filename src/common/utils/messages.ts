@@ -146,11 +146,22 @@ export const safeStreamReplyToInteraction = async (
 
   const MAX_LENGTH = 2_000;
   const buffers: string[] = [''];
-  const messageIds: string[] = [];
-  let isFirst = true;
+  const streamState = {
+    isFirst: true,
+    messageIds: [] as string[],
+  };
 
   const formatContent = (text: string) =>
     useCodeBlock ? codeBlock(language, text) : text;
+  const setFirstMessageId = (messageId: string) => {
+    streamState.messageIds[0] = messageId;
+  };
+  const setMessageId = (index: number, messageId: string) => {
+    streamState.messageIds[index] = messageId;
+  };
+  const markFirstReplySent = () => {
+    streamState.isFirst = false;
+  };
 
   const sendOrEdit = async (index: number, content: string) => {
     if (content.length === 0) {
@@ -160,29 +171,29 @@ export const safeStreamReplyToInteraction = async (
     const baseOptions = mentionUsers ? {} : { allowedMentions: { users: [] } };
 
     if (index === 0) {
-      if (isFirst) {
+      if (streamState.isFirst) {
         if (interaction.deferred) {
           const msg = await interaction.editReply({
             ...baseOptions,
             content: formatContent(content),
           });
-          messageIds[0] = msg.id;
+          setFirstMessageId(msg.id);
         } else {
           const msg = await interaction.reply({
             ...baseOptions,
             content: formatContent(content),
           });
-          messageIds[0] = msg.id;
+          setFirstMessageId(msg.id);
         }
-        isFirst = false;
+        markFirstReplySent();
       } else {
         await interaction.editReply({
           ...baseOptions,
           content: formatContent(content),
         });
       }
-    } else if (messageIds[index]) {
-      await interaction.channel?.messages.edit(messageIds[index], {
+    } else if (streamState.messageIds[index]) {
+      await interaction.channel?.messages.edit(streamState.messageIds[index], {
         content: formatContent(content),
       });
     } else {
@@ -190,7 +201,7 @@ export const safeStreamReplyToInteraction = async (
         ...baseOptions,
         content: formatContent(content),
       });
-      messageIds[index] = msg.id;
+      setMessageId(index, msg.id);
     }
   };
 
@@ -200,9 +211,9 @@ export const safeStreamReplyToInteraction = async (
     let bufferIndex = buffers.length - 1;
     buffers[bufferIndex] += chunk;
 
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bufferIndex is derived from buffers.length and always points at an existing entry here
     while (buffers[bufferIndex]!.length > MAX_LENGTH) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bufferIndex is guaranteed to point to the current buffer while splitting
       const [head, tail] = smartSplit(buffers[bufferIndex]!, MAX_LENGTH);
       buffers[bufferIndex] = head;
       buffers.push(tail);
