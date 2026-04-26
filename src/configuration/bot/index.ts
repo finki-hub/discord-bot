@@ -16,31 +16,43 @@ import {
 
 type ConfigShape = NonNullable<BotConfig>;
 
-let multiGuildConfig: MultiGuildConfig | undefined;
+const configState: { multiGuildConfig: MultiGuildConfig | undefined } = {
+  multiGuildConfig: undefined,
+};
+
+const setMultiGuildConfig = (value: MultiGuildConfig) => {
+  configState.multiGuildConfig = value;
+};
+
+const getLoadedConfigState = async (): Promise<MultiGuildConfig> => {
+  if (configState.multiGuildConfig === undefined) {
+    setMultiGuildConfig((await getConfigFile()) ?? {});
+  }
+
+  return configState.multiGuildConfig ?? {};
+};
 
 const getGuildConfig = async (guildId: string): Promise<ConfigShape> => {
-  if (multiGuildConfig === undefined) {
-    const loaded = await getConfigFile();
-    multiGuildConfig = loaded ?? {};
-  }
+  const currentConfig = await getLoadedConfigState();
 
-  if (multiGuildConfig[guildId] === undefined) {
+  if (currentConfig[guildId] === undefined) {
     logger.info(`Initializing default configuration for guild ${guildId}`);
-    multiGuildConfig[guildId] = BotConfigSchema.parse(DEFAULT_CONFIGURATION);
-    await setConfigFile(multiGuildConfig);
+    currentConfig[guildId] = BotConfigSchema.parse(DEFAULT_CONFIGURATION);
+    setMultiGuildConfig(currentConfig);
+    await setConfigFile(currentConfig);
   }
 
-  return multiGuildConfig[guildId] ?? DEFAULT_CONFIGURATION;
+  return currentConfig[guildId] ?? DEFAULT_CONFIGURATION;
 };
 
 export const reloadConfig = async () => {
   const currentConfig = await getConfigFile();
 
   try {
-    multiGuildConfig = currentConfig ?? {};
+    setMultiGuildConfig(currentConfig ?? {});
     logger.info('Configuration reloaded');
   } catch (error) {
-    multiGuildConfig = {};
+    setMultiGuildConfig({});
 
     logger.warn(configErrorFunctions.invalidConfiguration(error));
     logger.error(`Failed reloading configuration\n${String(error)}`);
@@ -60,16 +72,13 @@ export const setConfigProperty = async <T extends BotConfigKeys>(
   value: ConfigShape[T],
   guildId: string,
 ) => {
-  if (multiGuildConfig === undefined) {
-    const loaded = await getConfigFile();
-    multiGuildConfig = loaded ?? {};
-  }
-
   const guildConfig = await getGuildConfig(guildId);
   guildConfig[key] = value;
-  multiGuildConfig[guildId] = guildConfig;
+  const currentConfig = await getLoadedConfigState();
+  currentConfig[guildId] = guildConfig;
+  setMultiGuildConfig(currentConfig);
 
-  const newValue = await setConfigFile(multiGuildConfig);
+  const newValue = await setConfigFile(currentConfig);
 
   return newValue?.[guildId] ?? null;
 };
@@ -77,27 +86,21 @@ export const setConfigProperty = async <T extends BotConfigKeys>(
 export const getGuildConfigFull = async (
   guildId: string,
 ): Promise<BotConfig | null> => {
-  if (multiGuildConfig === undefined) {
-    const loaded = await getConfigFile();
-    multiGuildConfig = loaded ?? {};
-  }
+  const currentConfig = await getLoadedConfigState();
 
-  return multiGuildConfig[guildId] ?? null;
+  return currentConfig[guildId] ?? null;
 };
 
 export const setGuildConfigFull = async (
   guildId: string,
   config: BotConfig,
 ): Promise<BotConfig | null> => {
-  if (multiGuildConfig === undefined) {
-    const loaded = await getConfigFile();
-    multiGuildConfig = loaded ?? {};
-  }
-
   const validated = BotConfigSchema.parse(config);
-  multiGuildConfig[guildId] = validated;
+  const currentConfig = await getLoadedConfigState();
+  currentConfig[guildId] = validated;
+  setMultiGuildConfig(currentConfig);
 
-  const newValue = await setConfigFile(multiGuildConfig);
+  const newValue = await setConfigFile(currentConfig);
 
   return newValue?.[guildId] ?? null;
 };

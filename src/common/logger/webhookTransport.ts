@@ -3,7 +3,7 @@ import type { LogEntry } from 'winston';
 import { WebhookClient } from 'discord.js';
 import TransportStream from 'winston-transport';
 
-import { getConfigProperty } from '@/configuration/bot/index.js';
+import { getConfig } from '@/configuration/bot/file.js';
 
 export class WebhookTransport extends TransportStream {
   private readonly webhookClients = new Map<string, WebhookClient>();
@@ -25,16 +25,14 @@ export class WebhookTransport extends TransportStream {
         'guildId' in info && typeof info['guildId'] === 'string'
           ? info['guildId']
           : null;
-      void this.sendToWebhook(message, guildId).finally(() => {
-        callback();
-      });
+      void this.logToWebhook(message, guildId, callback);
       return;
     }
 
     callback();
   }
 
-  // eslint-disable-next-line class-methods-use-this
+  // eslint-disable-next-line class-methods-use-this -- formatting a log entry does not require instance state
   private formatMessage(info: LogEntry): string {
     const timestamp =
       typeof info['timestamp'] === 'string'
@@ -57,7 +55,8 @@ export class WebhookTransport extends TransportStream {
       return null;
     }
 
-    const webhookUrl = await getConfigProperty('errorWebhook', guildId);
+    const config = await getConfig();
+    const webhookUrl = config?.[guildId]?.errorWebhook;
 
     if (webhookUrl === undefined) {
       return null;
@@ -72,12 +71,25 @@ export class WebhookTransport extends TransportStream {
       this.webhookClients.set(webhookUrl, webhookClient);
       return webhookClient;
     } catch (error) {
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- logger transport initialization must avoid recursive logging through the same transport
       console.error(
         `Failed initializing error webhook for guild ${guildId}:`,
         error,
       );
       return null;
+    }
+  }
+
+  private async logToWebhook(
+    message: string,
+    guildId: null | string,
+    callback: () => void,
+  ): Promise<void> {
+    try {
+      await this.sendToWebhook(message, guildId);
+    } finally {
+      // eslint-disable-next-line n/callback-return -- winston transport callback is intentionally invoked from async cleanup
+      callback();
     }
   }
 
@@ -96,7 +108,7 @@ export class WebhookTransport extends TransportStream {
         content: message,
       });
     } catch (error) {
-      // eslint-disable-next-line no-console
+      // eslint-disable-next-line no-console -- logger transport send failures must avoid recursive logging through the same transport
       console.error('Failed sending to error webhook:', error);
       for (const [url, cachedClient] of this.webhookClients.entries()) {
         if (cachedClient === webhookClient) {

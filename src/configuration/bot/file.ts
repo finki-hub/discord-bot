@@ -1,12 +1,10 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 
-import { logger } from '@/common/logger/index.js';
 import {
   type MultiGuildConfig,
   MultiGuildConfigSchema,
 } from '@/modules/admin/schemas/BotConfig.js';
-import { configErrorFunctions } from '@/translations/errors.js';
 
 const CONFIG_FILE_PATH = join(process.cwd(), 'config', 'bot.json');
 
@@ -61,20 +59,11 @@ export const getConfig = async (): Promise<MultiGuildConfig | null> => {
         const jsonContent = serializeConfig(emptyConfig);
         await writeFile(CONFIG_FILE_PATH, jsonContent, 'utf8');
 
-        logger.info(
-          'Created config/bot.json with empty multi-guild configuration',
-        );
-
         return emptyConfig;
-      } catch (createError) {
-        logger.error(
-          `Failed creating config file with defaults\n${String(createError)}`,
-        );
+      } catch {
         return null;
       }
     }
-
-    logger.error(`Failed reading config file\n${String(error)}`);
 
     return null;
   }
@@ -93,13 +82,8 @@ export const setConfig = async (
 
     await writeFile(CONFIG_FILE_PATH, jsonContent, 'utf8');
 
-    logger.info('Configuration saved');
-
     return validated;
-  } catch (error) {
-    logger.error(`Failed writing config file\n${String(error)}`);
-    logger.warn(configErrorFunctions.invalidConfiguration(error));
-
+  } catch {
     return null;
   }
 };

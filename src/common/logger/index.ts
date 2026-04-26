@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/restrict-template-expressions */
+/* eslint-disable @typescript-eslint/restrict-template-expressions -- winston formatter values are stringified for logging output */
 
 import { createLogger, format, transports } from 'winston';
 
