@@ -30,6 +30,7 @@ const getCommandImportPath = (dirent: Dirent) => {
 
 const getModuleCommands = async (module: string) => {
   try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- module names come from discovered local build output directories
     const commandsContents = await readdir(
       `./dist/modules/${module}/commands`,
       {

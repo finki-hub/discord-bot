@@ -1,4 +1,4 @@
-/* eslint-disable camelcase */
+/* eslint-disable camelcase -- API payload fields intentionally use snake_case before schema transformation */
 
 import { z } from 'zod';
 

@@ -6,13 +6,14 @@ import {
 } from 'discord.js';
 
 import { getPaginationComponent } from '@/common/components/pagination.js';
-import { name as ticketListButtonId } from '@/modules/ticket/commands/button/ticketList.js';
 import { TICKETS_PER_PAGE } from '@/modules/ticket/utils/constants.js';
 import { componentMessages } from '@/translations/components.js';
 import { emojis } from '@/translations/emojis.js';
 import { labels } from '@/translations/labels.js';
 
 import { type Ticket } from '../schemas/Ticket.js';
+
+const TICKET_LIST_BUTTON_ID = 'ticketList';
 
 const dateFormatter = new Intl.DateTimeFormat('mk-MK', {
   dateStyle: 'long',
@@ -67,7 +68,7 @@ export const getTicketListComponent = (
   page: number,
 ) =>
   getPaginationComponent({
-    buttonId: ticketListButtonId,
+    buttonId: TICKET_LIST_BUTTON_ID,
     description: componentMessages.allTickets,
     entries: ticketThreads.map(
       (thread) =>

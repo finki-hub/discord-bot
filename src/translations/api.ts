@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/restrict-template-expressions */
+/* eslint-disable @typescript-eslint/restrict-template-expressions -- unknown errors are interpolated into user-facing debug strings */
 
 export const apiErrorFunctions = {
   getLinkError: (error: unknown) => `Failed getting link\n${error}`,

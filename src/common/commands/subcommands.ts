@@ -18,7 +18,7 @@ const callHandler = <T>(
     return (handler as HandlerWithoutContext)(interaction);
   }
 
-  return (handler as HandlerWithContext<T>)(interaction, context);
+  return handler(interaction, context);
 };
 
 export const executeSubcommand = async <T = void>(

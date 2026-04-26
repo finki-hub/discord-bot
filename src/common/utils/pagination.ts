@@ -24,7 +24,7 @@ export const handlePagination = async <T>({
     return;
   }
 
-  const page = action === 'page' && pageStr ? Number.parseInt(pageStr) : 0;
+  const page = action === 'page' && pageStr ? Number.parseInt(pageStr, 10) : 0;
 
   try {
     await interaction.update({

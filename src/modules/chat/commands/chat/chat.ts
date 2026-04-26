@@ -36,6 +36,8 @@ import { generateModelChoices } from '@/modules/chat/utils/utils.js';
 import { commandDescriptions, commandErrors } from '@/translations/commands.js';
 import { labels } from '@/translations/labels.js';
 
+const EMBEDDINGS_MODEL_OPTION_NAME = 'embeddings-model';
+
 export const name = 'chat';
 
 export const permissions = {
@@ -66,7 +68,7 @@ export const data = new SlashCommandBuilder()
       )
       .addStringOption((option) =>
         option
-          .setName('embeddings-model')
+          .setName(EMBEDDINGS_MODEL_OPTION_NAME)
           .setDescription('Моделот за ембедирање')
           .setRequired(false)
           .setChoices(generateModelChoices(EMBEDDING_MODELS)),
@@ -99,7 +101,7 @@ export const data = new SlashCommandBuilder()
       .setDescription(commandDescriptions['chat embed'])
       .addStringOption((option) =>
         option
-          .setName('embeddings-model')
+          .setName(EMBEDDINGS_MODEL_OPTION_NAME)
           .setDescription('Моделот за ембедирање')
           .setRequired(false)
           .setChoices(generateModelChoices(EMBEDDING_MODELS)),
@@ -133,7 +135,7 @@ export const data = new SlashCommandBuilder()
       .setDescription(commandDescriptions['chat unembedded'])
       .addStringOption((option) =>
         option
-          .setName('embeddings-model')
+          .setName(EMBEDDINGS_MODEL_OPTION_NAME)
           .setDescription('Моделот за ембедирање')
           .setRequired(false)
           .setChoices(generateModelChoices(EMBEDDING_MODELS)),
@@ -157,7 +159,7 @@ export const data = new SlashCommandBuilder()
       )
       .addStringOption((option) =>
         option
-          .setName('embeddings-model')
+          .setName(EMBEDDINGS_MODEL_OPTION_NAME)
           .setDescription('Моделот за ембедирање')
           .setRequired(false)
           .setChoices(generateModelChoices(EMBEDDING_MODELS)),
@@ -198,7 +200,8 @@ export const data = new SlashCommandBuilder()
 const handleChatClosest = async (interaction: ChatInputCommandInteraction) => {
   const prompt = interaction.options.getString('query', true);
   const embeddingsModel =
-    interaction.options.getString('embeddings-model', false) ?? undefined;
+    interaction.options.getString(EMBEDDINGS_MODEL_OPTION_NAME, false) ??
+    undefined;
   const threshold =
     interaction.options.getNumber('threshold', false) ?? undefined;
   const limit = interaction.options.getNumber('limit', false) ?? undefined;
@@ -230,11 +233,10 @@ const handleChatClosest = async (interaction: ChatInputCommandInteraction) => {
   }
 
   const content = closestQuestions
-    .slice()
-    .sort((a, b) => {
-      if (!a.distance && !b.distance) return 0;
-      if (!a.distance) return 1;
-      if (!b.distance) return -1;
+    .toSorted((a, b) => {
+      if (a.distance === undefined && b.distance === undefined) return 0;
+      if (a.distance === undefined) return 1;
+      if (b.distance === undefined) return -1;
       return a.distance - b.distance;
     })
     .map(
@@ -267,7 +269,7 @@ const { execute: handleChatQuery } = getCommonCommand('ask');
 
 const handleChatEmbed = async (interaction: ChatInputCommandInteraction) => {
   const embeddingsModel =
-    interaction.options.getString('embeddings-model') ?? undefined;
+    interaction.options.getString(EMBEDDINGS_MODEL_OPTION_NAME) ?? undefined;
   const question = interaction.options.getString('question') ?? undefined;
   const allQuestions =
     interaction.options.getBoolean('all-questions') ?? undefined;

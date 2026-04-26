@@ -82,10 +82,7 @@ export const data = new SlashCommandBuilder()
   .addSubcommand((subcommand) =>
     subcommand
       .setName('data')
-      .setDescription(
-        (commandDescriptions['config data'] as string | undefined) ??
-          'Освежи ги податоците од складиштето',
-      ),
+      .setDescription(commandDescriptions['config data']),
   )
   .setContexts(InteractionContextType.Guild)
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);

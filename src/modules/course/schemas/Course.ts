@@ -8,6 +8,8 @@ import {
   type AccreditationYear,
 } from '../constants.js';
 
+const NEWLINE_SPLIT_REGEX = /\r?\n|\\n/u;
+
 const buildAccreditationShape = () => {
   const shape: Record<string, z.ZodType> = {};
 
@@ -38,12 +40,12 @@ export const CourseSchema = z
     }
 
     transformed['assistants'] = (data.assistants ?? '')
-      .split(/\r?\n|\\n/u)
+      .split(NEWLINE_SPLIT_REGEX)
       .map((s) => s.trim())
       .filter((name) => name.length > 0);
 
     transformed['professors'] = data.professors
-      .split(/\r?\n|\\n/u)
+      .split(NEWLINE_SPLIT_REGEX)
       .map((s) => s.trim())
       .filter((name) => name.length > 0);
 

@@ -13,18 +13,19 @@ import {
 } from '@/translations/components.js';
 import { labels } from '@/translations/labels.js';
 
-import { name as listCommandsButtonId } from '../commands/button/listCommands.js';
-import { name as listLinksButtonId } from '../commands/button/listLinks.js';
-import { name as listQuestionsButtonId } from '../commands/button/listQuestions.js';
 import {
   COMMANDS_PER_PAGE,
   LINKS_PER_PAGE,
   QUESTIONS_PER_PAGE,
 } from '../utils/constants.js';
 
+const LIST_COMMANDS_BUTTON_ID = 'listCommands';
+const LIST_LINKS_BUTTON_ID = 'listLinks';
+const LIST_QUESTIONS_BUTTON_ID = 'listQuestions';
+
 export const getListCommandsComponent = (commands: string[], page: number) =>
   getPaginationComponent({
-    buttonId: listCommandsButtonId,
+    buttonId: LIST_COMMANDS_BUTTON_ID,
     description: componentMessages.allCommands,
     entries: commands.map(
       (command) =>
@@ -38,7 +39,7 @@ export const getListCommandsComponent = (commands: string[], page: number) =>
 
 export const getListLinksComponent = (links: Link[], page: number) =>
   getPaginationComponent({
-    buttonId: listLinksButtonId,
+    buttonId: LIST_LINKS_BUTTON_ID,
     description: componentMessageFunctions.allLinks(getCommandMention('link')),
     entries: links.map((link) =>
       heading(
@@ -57,7 +58,7 @@ export const getListQuestionsComponent = (
   page: number,
 ) =>
   getPaginationComponent({
-    buttonId: listQuestionsButtonId,
+    buttonId: LIST_QUESTIONS_BUTTON_ID,
     description: componentMessageFunctions.allQuestions(
       getCommandMention('faq'),
     ),

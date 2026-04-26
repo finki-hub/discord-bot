@@ -1,4 +1,4 @@
-/* eslint-disable camelcase */
+/* eslint-disable camelcase -- API payload fields intentionally use snake_case before schema transformation */
 
 import { z } from 'zod';
 
@@ -66,7 +66,10 @@ export const FillEmbeddingsOptionsSchema = z
     all_models: data.allModels,
     all_questions: data.allQuestions,
     embeddings_model: data.embeddingsModel,
-    questions: data.questions?.length ? data.questions : undefined,
+    questions:
+      data.questions !== undefined && data.questions.length > 0
+        ? data.questions
+        : undefined,
   }));
 
 export type FillEmbeddingsOptions = z.infer<typeof FillEmbeddingsOptionsSchema>;

@@ -64,13 +64,11 @@ const transformations = {
 };
 
 const transform = (word: string) => {
-  let suffixes: string[] = [];
-
-  suffixes = word.length === 1 ? [''] : transform(word.slice(1));
+  const suffixes = word.length === 1 ? [''] : transform(word.slice(1));
 
   const transformed: string[] = [];
 
-  // @ts-expect-error even if this is undefined, nullish coalescing works just fine
+  // @ts-expect-error -- indexing by runtime character may return undefined; nullish coalescing intentionally falls back to the original character
   for (const letter of transformations[word[0]] ?? word[0]) {
     for (const suffix of suffixes) {
       transformed.push(letter + suffix);
