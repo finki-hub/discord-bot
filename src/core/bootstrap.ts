@@ -11,8 +11,20 @@ import { attachProcessListeners } from './utils/process.js';
 export const bootstrap = async () => {
   logger.info('Starting bot initialization...');
 
-  process.loadEnvFile();
-  logger.debug('Environment variables loaded');
+  try {
+    process.loadEnvFile();
+    logger.debug('Environment variables loaded from .env file');
+  } catch (error) {
+    if (
+      !(error instanceof Error) ||
+      !('code' in error) ||
+      error.code !== 'ENOENT'
+    ) {
+      throw error;
+    }
+
+    logger.debug('No .env file found, using platform environment variables');
+  }
 
   attachProcessListeners();
   logger.debug('Process listeners attached');
