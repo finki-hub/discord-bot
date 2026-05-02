@@ -2,7 +2,7 @@
   "dependencies": {
     "croner": "^10.0.1",
     "discord-api-types": "^0.38.47",
-    "discord.js": "^14.26.3",
+    "discord.js": "^14.26.4",
     "eventsource-parser": "^3.0.8",
     "fuse.js": "^7.3.0",
     "winston": "^3.19.0",
