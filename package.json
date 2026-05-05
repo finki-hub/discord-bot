@@ -7,7 +7,7 @@
     "fuse.js": "^7.3.0",
     "winston": "^3.19.0",
     "winston-transport": "^4.9.0",
-    "zod": "^4.4.2"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "esbuild": "^0.28.0",
