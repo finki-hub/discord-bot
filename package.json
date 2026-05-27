@@ -3,7 +3,7 @@
     "croner": "^10.0.1",
     "discord-api-types": "^0.38.48",
     "discord.js": "^14.26.4",
-    "eventsource-parser": "^3.0.8",
+    "eventsource-parser": "^3.1.0",
     "fuse.js": "^7.3.0",
     "winston": "^3.19.0",
     "winston-transport": "^4.9.0",
