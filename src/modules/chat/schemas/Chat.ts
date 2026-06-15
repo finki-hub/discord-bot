@@ -2,9 +2,17 @@
 
 import { z } from 'zod';
 
+export const ConversationTurnSchema = z.object({
+  content: z.string(),
+  role: z.enum(['assistant', 'user']),
+});
+
+export type ConversationTurn = z.infer<typeof ConversationTurnSchema>;
+
 export const SendPromptOptionsSchema = z
   .object({
     embeddingsModel: z.string().optional(),
+    history: z.array(ConversationTurnSchema).optional(),
     inferenceModel: z.string().optional(),
     maxTokens: z.number().min(1).max(4_096).optional(),
     prompt: z.string().min(1, 'Query must not be empty'),
@@ -16,7 +24,10 @@ export const SendPromptOptionsSchema = z
     embeddings_model: data.embeddingsModel,
     inference_model: data.inferenceModel,
     max_tokens: data.maxTokens,
-    prompt: data.prompt,
+    messages: [
+      ...(data.history ?? []),
+      { content: data.prompt, role: 'user' as const },
+    ],
     system_prompt: data.systemPrompt,
     temperature: data.temperature,
     top_p: data.topP,

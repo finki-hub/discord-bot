@@ -1,11 +1,27 @@
 import {
   type ChatInputCommandInteraction,
   codeBlock,
+  type Message,
   type MessageContextMenuCommandInteraction,
   type UserContextMenuCommandInteraction,
 } from 'discord.js';
 
 import { labels } from '@/translations/labels.js';
+
+type ChunkProducer = (
+  callback: (chunk: string) => Promise<void>,
+) => Promise<void>;
+
+type StreamableInteraction =
+  | ChatInputCommandInteraction
+  | MessageContextMenuCommandInteraction
+  | UserContextMenuCommandInteraction;
+
+type StreamReplyOptions = {
+  language?: string;
+  mentionUsers?: boolean;
+  useCodeBlock?: boolean;
+};
 
 const splitMessage = function* (message: string) {
   if (message === '') {
@@ -126,85 +142,13 @@ const smartSplit = (text: string, maxLength: number): [string, string] => {
   return [text.slice(0, splitIdx), text.slice(splitIdx + 1)];
 };
 
-export const safeStreamReplyToInteraction = async (
-  interaction:
-    | ChatInputCommandInteraction
-    | MessageContextMenuCommandInteraction
-    | UserContextMenuCommandInteraction,
-  onChunk: (callback: (chunk: string) => Promise<void>) => Promise<void>,
-  options?: {
-    language?: string;
-    mentionUsers?: boolean;
-    useCodeBlock?: boolean;
-  },
+const MAX_STREAM_LENGTH = 2_000;
+
+const runStreaming = async (
+  produce: ChunkProducer,
+  flush: (index: number, content: string) => Promise<void>,
 ) => {
-  const {
-    language = '',
-    mentionUsers = false,
-    useCodeBlock = false,
-  } = options ?? {};
-
-  const MAX_LENGTH = 2_000;
   const buffers: string[] = [''];
-  const streamState = {
-    isFirst: true,
-    messageIds: [] as string[],
-  };
-
-  const formatContent = (text: string) =>
-    useCodeBlock ? codeBlock(language, text) : text;
-  const setFirstMessageId = (messageId: string) => {
-    streamState.messageIds[0] = messageId;
-  };
-  const setMessageId = (index: number, messageId: string) => {
-    streamState.messageIds[index] = messageId;
-  };
-  const markFirstReplySent = () => {
-    streamState.isFirst = false;
-  };
-
-  const sendOrEdit = async (index: number, content: string) => {
-    if (content.length === 0) {
-      return;
-    }
-
-    const baseOptions = mentionUsers ? {} : { allowedMentions: { users: [] } };
-
-    if (index === 0) {
-      if (streamState.isFirst) {
-        if (interaction.deferred) {
-          const msg = await interaction.editReply({
-            ...baseOptions,
-            content: formatContent(content),
-          });
-          setFirstMessageId(msg.id);
-        } else {
-          const msg = await interaction.reply({
-            ...baseOptions,
-            content: formatContent(content),
-          });
-          setFirstMessageId(msg.id);
-        }
-        markFirstReplySent();
-      } else {
-        await interaction.editReply({
-          ...baseOptions,
-          content: formatContent(content),
-        });
-      }
-    } else if (streamState.messageIds[index]) {
-      await interaction.channel?.messages.edit(streamState.messageIds[index], {
-        content: formatContent(content),
-      });
-    } else {
-      const msg = await interaction.followUp({
-        ...baseOptions,
-        content: formatContent(content),
-      });
-      setMessageId(index, msg.id);
-    }
-  };
-
   let lastEdit = Date.now();
 
   const handleChunk = async (chunk: string) => {
@@ -212,9 +156,9 @@ export const safeStreamReplyToInteraction = async (
     buffers[bufferIndex] += chunk;
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bufferIndex is derived from buffers.length and always points at an existing entry here
-    while (buffers[bufferIndex]!.length > MAX_LENGTH) {
+    while (buffers[bufferIndex]!.length > MAX_STREAM_LENGTH) {
       // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bufferIndex is guaranteed to point to the current buffer while splitting
-      const [head, tail] = smartSplit(buffers[bufferIndex]!, MAX_LENGTH);
+      const [head, tail] = smartSplit(buffers[bufferIndex]!, MAX_STREAM_LENGTH);
       buffers[bufferIndex] = head;
       buffers.push(tail);
       bufferIndex++;
@@ -223,15 +167,141 @@ export const safeStreamReplyToInteraction = async (
     const now = Date.now();
     if (now - lastEdit > 1_000) {
       lastEdit = now;
-      for (const [i, buffer] of buffers.entries()) {
-        await sendOrEdit(i, buffer);
+      for (const [index, buffer] of buffers.entries()) {
+        await flush(index, buffer);
       }
     }
   };
 
-  await onChunk(handleChunk);
+  await produce(handleChunk);
 
-  for (const [i, buffer] of buffers.entries()) {
-    await sendOrEdit(i, buffer);
+  for (const [index, buffer] of buffers.entries()) {
+    await flush(index, buffer);
   }
+};
+
+export const safeStreamReplyToInteraction = async (
+  interaction: StreamableInteraction,
+  produce: ChunkProducer,
+  options?: StreamReplyOptions,
+): Promise<string[]> => {
+  const {
+    language = '',
+    mentionUsers = false,
+    useCodeBlock = false,
+  } = options ?? {};
+
+  const baseOptions = mentionUsers ? {} : { allowedMentions: { users: [] } };
+  const formatContent = (text: string) =>
+    useCodeBlock ? codeBlock(language, text) : text;
+
+  const messageIds: string[] = [];
+  const followUps: Message[] = [];
+
+  // Assignments go through these synchronous setters so the streaming awaits in
+  // `flush` do not trip the require-atomic-updates rule.
+  const rememberReply = (id: string) => {
+    messageIds[0] = id;
+  };
+  const rememberFollowUp = (index: number, sent: Message) => {
+    followUps[index] = sent;
+    messageIds[index] = sent.id;
+  };
+
+  const flush = async (index: number, content: string) => {
+    if (content.length === 0) {
+      return;
+    }
+
+    if (index === 0) {
+      if (messageIds[0] === undefined) {
+        const first =
+          interaction.deferred || interaction.replied
+            ? await interaction.editReply({
+                ...baseOptions,
+                content: formatContent(content),
+              })
+            : await interaction
+                .reply({ ...baseOptions, content: formatContent(content) })
+                .then(() => interaction.fetchReply());
+        rememberReply(first.id);
+      } else {
+        await interaction.editReply({
+          ...baseOptions,
+          content: formatContent(content),
+        });
+      }
+
+      return;
+    }
+
+    const existing = followUps[index];
+    if (existing !== undefined) {
+      await existing.edit({ content: formatContent(content) });
+
+      return;
+    }
+
+    const sent = await interaction.followUp({
+      ...baseOptions,
+      content: formatContent(content),
+    });
+    rememberFollowUp(index, sent);
+  };
+
+  await runStreaming(produce, flush);
+
+  return messageIds;
+};
+
+export const safeStreamReplyToMessage = async (
+  message: Message,
+  produce: ChunkProducer,
+  options?: StreamReplyOptions,
+): Promise<string[]> => {
+  const {
+    language = '',
+    mentionUsers = false,
+    useCodeBlock = false,
+  } = options ?? {};
+
+  const baseOptions = {
+    allowedMentions: {
+      repliedUser: false,
+      ...(mentionUsers ? {} : { users: [] }),
+    },
+  };
+  const formatContent = (text: string) =>
+    useCodeBlock ? codeBlock(language, text) : text;
+
+  const messageIds: string[] = [];
+  const sentMessages: Message[] = [];
+
+  const remember = (index: number, sent: Message) => {
+    sentMessages[index] = sent;
+    messageIds[index] = sent.id;
+  };
+
+  const flush = async (index: number, content: string) => {
+    if (content.length === 0) {
+      return;
+    }
+
+    const existing = sentMessages[index];
+    if (existing !== undefined) {
+      await existing.edit({ content: formatContent(content) });
+
+      return;
+    }
+
+    const sent = await message.reply({
+      ...baseOptions,
+      content: formatContent(content),
+    });
+    remember(index, sent);
+  };
+
+  await runStreaming(produce, flush);
+
+  return messageIds;
 };

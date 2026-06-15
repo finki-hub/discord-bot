@@ -12,6 +12,7 @@ import { commandErrors } from '@/translations/commands.js';
 import type { SendPromptOptions } from '../schemas/Chat.js';
 
 import { LLM_ERRORS } from './constants.js';
+import { registerConversation } from './conversation.js';
 import { sendPrompt } from './requests.js';
 
 export const handlePromptWithStreaming = async (
@@ -23,11 +24,24 @@ export const handlePromptWithStreaming = async (
   commandLabel: string,
 ) => {
   try {
-    await safeStreamReplyToInteraction(interaction, async (onChunk) => {
-      await sendPrompt(options, async (chunk) => {
-        await onChunk(chunk);
-      });
-    });
+    let answer = '';
+
+    const messageIds = await safeStreamReplyToInteraction(
+      interaction,
+      async (onChunk) => {
+        await sendPrompt(options, async (chunk) => {
+          answer += chunk;
+          await onChunk(chunk);
+        });
+      },
+    );
+
+    if (answer.length > 0) {
+      registerConversation(messageIds, [
+        ...options.messages,
+        { content: answer, role: 'assistant' },
+      ]);
+    }
   } catch (error) {
     if (!Error.isError(error)) {
       throw error;

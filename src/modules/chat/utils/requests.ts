@@ -74,7 +74,7 @@ export const sendPrompt = async (
     throw new Error('LLM_UNAVAILABLE');
   }
 
-  logger.info(`Prompt answered: ${options.prompt}`);
+  logger.info(`Prompt answered: ${options.messages.at(-1)?.content ?? ''}`);
 };
 
 export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {
