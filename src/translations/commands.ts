@@ -1,4 +1,5 @@
 import {
+  channelMention,
   codeBlock,
   type GuildPremiumTier,
   italic,
@@ -13,6 +14,7 @@ export const commandDescriptions = {
   'chat embed': 'Ембедирај ги документите',
   'chat models': 'Преземи листа на јазични модели',
   'chat query': 'Испрати промпт до LLM агентот',
+  'chat thread': 'Креирај своја приватна нишка за разговор со агентот',
   'chat unembedded': 'Преземи неембедирани документи',
   'config data': 'Освежи ги податоците од складиштето',
   'config get': 'Преземи конфигурација',
@@ -37,6 +39,8 @@ export const commandDescriptions = {
 };
 
 export const commandResponses = {
+  chatThreadWelcome:
+    'Ова е твојот личен простор за разговор со агентот. Слободно постави прашање тука и ќе ти одговорам. 🤖',
   configurationReloaded: 'Конфигурацијата е освежена.',
   configurationReloading: 'Се освежува конфигурацијата...',
   dataReloaded: 'Податоците се освежени.',
@@ -47,6 +51,12 @@ export const commandResponses = {
 };
 
 export const commandResponseFunctions = {
+  chatThreadCreated: (threadId: string) =>
+    `Креирана е твојата приватна нишка: ${channelMention(threadId)}`,
+
+  chatThreadExisting: (threadId: string) =>
+    `Веќе имаш активна нишка за разговор: ${channelMention(threadId)}`,
+
   commandFor: (userId: string) => italic(`за ${userMention(userId)}`),
 
   serverAnimatedEmojiStat: (emojiCount: number, maxCount: number) =>
@@ -83,6 +93,10 @@ export const commandErrors = {
   botMissingPermissions:
     'Ботот нема потребни дозволи за да ја изврши оваа команда. Контактирајте ги администраторите.',
   buttonNoPermission: 'Командата не е ваша.',
+  chatThreadCreationFailed:
+    'Креирањето на нишката беше неуспешно. Обидете се повторно.',
+  chatThreadInvalidChannel:
+    'Приватна нишка може да се креира само во текстуален канал.',
   commandError:
     'Настана грешка при извршување на командата. Обидете се повторно, или пријавете ја грешката.',
   commandGuildOnly: 'Оваа команда може да се користи само на сервер.',

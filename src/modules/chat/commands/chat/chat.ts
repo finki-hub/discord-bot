@@ -32,6 +32,7 @@ import {
   getSupportedModels,
   getUnembeddedQuestions,
 } from '@/modules/chat/utils/requests.js';
+import { handleChatThread } from '@/modules/chat/utils/thread.js';
 import { generateModelChoices } from '@/modules/chat/utils/utils.js';
 import { commandDescriptions, commandErrors } from '@/translations/commands.js';
 import { labels } from '@/translations/labels.js';
@@ -195,6 +196,11 @@ export const data = new SlashCommandBuilder()
           .setMinValue(1)
           .setMaxValue(4_096),
       ),
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName('thread')
+      .setDescription(commandDescriptions['chat thread']),
   );
 
 const handleChatClosest = async (interaction: ChatInputCommandInteraction) => {
@@ -373,6 +379,7 @@ const chatHandlers = {
   embed: handleChatEmbed,
   models: handleChatModels,
   query: handleChatQuery,
+  thread: handleChatThread,
   unembedded: handleChatUnembedded,
 };
 

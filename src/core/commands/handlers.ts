@@ -13,6 +13,7 @@ import {
 import { getFullCommandName } from '@/common/commands/utils.js';
 import { logger } from '@/common/logger/index.js';
 import { getMemberFromGuild } from '@/common/utils/guild.js';
+import { name as chatCommandId } from '@/modules/chat/commands/chat/chat.js';
 import { name as helpCommandId } from '@/modules/help/commands/chat/help.js';
 import { name as listCommandsButtonId } from '@/modules/list/commands/button/listCommands.js';
 import { name as listLinksButtonId } from '@/modules/list/commands/button/listLinks.js';
@@ -34,6 +35,7 @@ import {
 } from './modules.js';
 
 const nonDeferredCommands = new Set<string>([
+  `${chatCommandId} thread`,
   `${ticketCommandId} list`,
   helpCommandId,
   listCommandId,
