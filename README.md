@@ -27,7 +27,7 @@ There is also a dev container available. To use it, just clone the repository, d
 2. Install dependencies: `npm i`
 3. Prepare env. variables by copying `.env.sample` to `.env` - minimum setup requires `TOKEN` and `APPLICATION_ID`
 4. Build the project: `npm run build`
-5. Run it: `npm run start:env` or `npm run dev` (for hot reloading)
+5. Run it: `npm run start:env` or `npm run dev` (runs directly from TypeScript source, no build step)
 
 ## Configuration
 
