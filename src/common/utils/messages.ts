@@ -150,6 +150,20 @@ const runStreaming = async (
   const buffers: string[] = [''];
   let lastEdit = Date.now();
 
+  // Serialize flushes so an in-flight reply is always recorded before the next
+  // flush runs; overlapping flushes would otherwise each create a reply and
+  // post duplicate messages.
+  let flushChain: Promise<void> = Promise.resolve();
+  const flushSerial = (index: number, content: string) => {
+    const previous = flushChain;
+    const next = (async () => {
+      await previous;
+      await flush(index, content);
+    })();
+    flushChain = next;
+    return next;
+  };
+
   const handleChunk = async (chunk: string) => {
     let bufferIndex = buffers.length - 1;
     buffers[bufferIndex] += chunk;
@@ -167,7 +181,7 @@ const runStreaming = async (
     if (now - lastEdit > 1_000) {
       lastEdit = now;
       for (const [index, buffer] of buffers.entries()) {
-        await flush(index, buffer);
+        await flushSerial(index, buffer);
       }
     }
   };
@@ -175,7 +189,7 @@ const runStreaming = async (
   await produce(handleChunk);
 
   for (const [index, buffer] of buffers.entries()) {
-    await flush(index, buffer);
+    await flushSerial(index, buffer);
   }
 };
 
