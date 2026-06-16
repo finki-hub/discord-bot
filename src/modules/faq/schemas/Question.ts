@@ -2,6 +2,8 @@
 
 import { z } from 'zod';
 
+import { parseInstant } from '@/common/utils/temporal.js';
+
 export const QuestionSchema = z
   .object({
     content: z.string(),
@@ -15,12 +17,12 @@ export const QuestionSchema = z
   })
   .transform((data) => ({
     content: data.content,
-    createdAt: Temporal.Instant.from(data.created_at),
+    createdAt: parseInstant(data.created_at),
     distance: data.distance ?? undefined,
     id: data.id,
     links: data.links,
     name: data.name,
-    updatedAt: Temporal.Instant.from(data.updated_at),
+    updatedAt: parseInstant(data.updated_at),
     userId: data.user_id,
   }));
 

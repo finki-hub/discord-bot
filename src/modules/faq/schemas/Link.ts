@@ -2,6 +2,8 @@
 
 import { z } from 'zod';
 
+import { parseInstant } from '@/common/utils/temporal.js';
+
 export const LinkSchema = z
   .object({
     created_at: z.string(),
@@ -13,11 +15,11 @@ export const LinkSchema = z
     user_id: z.string().nullable(),
   })
   .transform((data) => ({
-    createdAt: Temporal.Instant.from(data.created_at),
+    createdAt: parseInstant(data.created_at),
     description: data.description,
     id: data.id,
     name: data.name,
-    updatedAt: Temporal.Instant.from(data.updated_at),
+    updatedAt: parseInstant(data.updated_at),
     url: data.url,
     userId: data.user_id,
   }));
