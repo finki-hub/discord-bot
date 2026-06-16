@@ -8,7 +8,7 @@ export const getCommandMention = (name: string | undefined) => {
   }
 
   const command = client.application?.commands.cache.find(
-    (cmd) => cmd.name === (name.includes(' ') ? name.split(' ')[0] : name),
+    (cmd) => cmd.name === (name.includes(' ') ? name.split(' ', 1)[0] : name),
   );
 
   if (command === undefined) {

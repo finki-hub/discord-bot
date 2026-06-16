@@ -69,7 +69,7 @@ const transform = (word: string) => {
   const transformed: string[] = [];
 
   // @ts-expect-error -- indexing by runtime character may return undefined; nullish coalescing intentionally falls back to the original character
-  for (const letter of transformations[word[0]] ?? word[0]) {
+  for (const letter of transformations[word.at(0)] ?? word.at(0)) {
     for (const suffix of suffixes) {
       transformed.push(letter + suffix);
     }

@@ -20,28 +20,37 @@ const dateFormatter = new Intl.DateTimeFormat('mk-MK', {
   timeStyle: 'short',
 });
 
+const buildTicketCreateButtons = (
+  ticketTypes: Ticket[],
+  startIndex: number,
+) => {
+  const buttons = [];
+
+  for (let index = startIndex; index < startIndex + 5; index++) {
+    const ticketType = ticketTypes[index];
+
+    if (ticketType === undefined) {
+      break;
+    }
+
+    const button = new ButtonBuilder()
+      .setCustomId(`ticketCreate:${ticketType.id}`)
+      .setLabel(`${index + 1} ${ticketType.name}`)
+      .setStyle(ButtonStyle.Success)
+      .setEmoji(emojis[(index + 1).toString()] ?? '🔒');
+
+    buttons.push(button);
+  }
+
+  return buttons;
+};
+
 export const getTicketCreateComponents = (ticketTypes: Ticket[]) => {
   const components = [];
 
-  for (let index1 = 0; index1 < ticketTypes.length; index1 += 5) {
+  for (let index = 0; index < ticketTypes.length; index += 5) {
     const row = new ActionRowBuilder<ButtonBuilder>();
-    const buttons = [];
-
-    for (let index2 = index1; index2 < index1 + 5; index2++) {
-      const ticketType = ticketTypes[index2];
-
-      if (ticketType === undefined) {
-        break;
-      }
-
-      const button = new ButtonBuilder()
-        .setCustomId(`ticketCreate:${ticketType.id}`)
-        .setLabel(`${index2 + 1} ${ticketType.name}`)
-        .setStyle(ButtonStyle.Success)
-        .setEmoji(emojis[(index2 + 1).toString()] ?? '🔒');
-
-      buttons.push(button);
-    }
+    const buttons = buildTicketCreateButtons(ticketTypes, index);
 
     row.addComponents(buttons);
     components.push(row);

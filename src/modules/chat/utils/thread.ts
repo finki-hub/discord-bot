@@ -1,6 +1,7 @@
 import {
   ChannelType,
   type ChatInputCommandInteraction,
+  type Guild,
   MessageFlags,
   ThreadAutoArchiveDuration,
 } from 'discord.js';
@@ -29,6 +30,14 @@ const armThread = (threadId: string) => {
   }
 };
 
+const fetchExistingThread = async (guild: Guild, threadId: string) => {
+  try {
+    return await guild.channels.fetch(threadId);
+  } catch {
+    return null;
+  }
+};
+
 export const handleChatThread = async (
   interaction: ChatInputCommandInteraction,
 ) => {
@@ -46,11 +55,15 @@ export const handleChatThread = async (
   const existingId = userThreads.get(key);
 
   if (existingId !== undefined) {
-    const existing = await guild.channels.fetch(existingId).catch(() => null);
+    const existing = await fetchExistingThread(guild, existingId);
 
     if (existing !== null && existing.isThread() && !existing.locked) {
       if (existing.archived) {
-        await existing.setArchived(false).catch(() => {});
+        try {
+          await existing.setArchived(false);
+        } catch {
+          // Unarchiving the thread is best-effort; ignore failures.
+        }
       }
 
       armThread(existing.id);

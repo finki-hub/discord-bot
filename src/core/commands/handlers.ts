@@ -7,6 +7,7 @@ import {
   type MessageContextMenuCommandInteraction,
   MessageFlags,
   type ModalSubmitInteraction,
+  type RepliableInteraction,
   type UserContextMenuCommandInteraction,
 } from 'discord.js';
 
@@ -59,6 +60,24 @@ const isMissingPermissionsError = (error: unknown): boolean =>
     error.code === 50_013 ||
     error.message.includes('Missing Permissions') ||
     error.message.includes('Missing Access'));
+
+const notifyInteractionError = async (
+  interaction: RepliableInteraction,
+  errorMessage: string,
+) => {
+  try {
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply({ content: errorMessage });
+    } else {
+      await interaction.reply({
+        content: errorMessage,
+        flags: MessageFlags.Ephemeral,
+      });
+    }
+  } catch {
+    // Notifying the user can fail if the interaction expired; ignore it.
+  }
+};
 
 export const handleChatInputCommand = async (
   interaction: ChatInputCommandInteraction,
@@ -231,18 +250,7 @@ export const handleButton = async (interaction: ButtonInteraction) => {
       ? commandErrors.botMissingPermissions
       : commandErrors.commandError;
 
-    await (interaction.deferred || interaction.replied
-      ? interaction
-          .editReply({
-            content: errorMessage,
-          })
-          .catch(() => {})
-      : interaction
-          .reply({
-            content: errorMessage,
-            flags: MessageFlags.Ephemeral,
-          })
-          .catch(() => {}));
+    await notifyInteractionError(interaction, errorMessage);
   }
 };
 
@@ -256,7 +264,11 @@ export const handleAutocomplete = async (
   const command = getAutocompleteCommand(interaction.commandName);
 
   if (command === undefined) {
-    await interaction.respond([]).catch(() => {});
+    try {
+      await interaction.respond([]);
+    } catch {
+      // Autocomplete responses fail silently if the interaction expired.
+    }
 
     return;
   }
@@ -273,7 +285,11 @@ export const handleAutocomplete = async (
       );
     }
   } finally {
-    await interaction.respond([]).catch(() => {});
+    try {
+      await interaction.respond([]);
+    } catch {
+      // Autocomplete responses fail silently if the interaction expired.
+    }
   }
 };
 

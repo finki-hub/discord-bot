@@ -31,7 +31,7 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
 
     const parsedKeyword = Number(keyword);
     const question = await getClosestQuestion(
-      Number.isInteger(parsedKeyword) && parsedKeyword > 0
+      Number.isSafeInteger(parsedKeyword) && parsedKeyword > 0
         ? parsedKeyword
         : keyword,
     );

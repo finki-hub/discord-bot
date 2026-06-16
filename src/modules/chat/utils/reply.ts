@@ -40,9 +40,14 @@ const handleConversationError = async (message: Message, error: unknown) => {
   const errorMessage =
     LLM_ERRORS[error.message] ?? commandErrors.unknownChatError;
 
-  await message
-    .reply({ allowedMentions: { repliedUser: false }, content: errorMessage })
-    .catch(() => {});
+  try {
+    await message.reply({
+      allowedMentions: { repliedUser: false },
+      content: errorMessage,
+    });
+  } catch {
+    // Replying with the error is best-effort; ignore failures.
+  }
 };
 
 export const handleChatMessage = async (message: Message) => {

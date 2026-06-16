@@ -32,26 +32,25 @@ const splitMessage = function* (message: string) {
 
   const delimiters = ['\n'];
   const length = 1_999;
+
+  const findSplitIndex = (text: string) => {
+    for (const char of delimiters) {
+      const delimiterIndex = text.slice(0, length).lastIndexOf(char) + 1;
+
+      if (delimiterIndex) {
+        return delimiterIndex;
+      }
+    }
+
+    return length;
+  };
+
   let output;
-  let index = message.length;
-  let split;
   let currentMessage = message;
 
   while (currentMessage) {
     if (currentMessage.length > length) {
-      split = true;
-      for (const char of delimiters) {
-        index = currentMessage.slice(0, length).lastIndexOf(char) + 1;
-
-        if (index) {
-          split = false;
-          break;
-        }
-      }
-
-      if (split) {
-        index = length;
-      }
+      const index = findSplitIndex(currentMessage);
 
       output = currentMessage.slice(0, Math.max(0, index));
       currentMessage = currentMessage.slice(index);
@@ -215,15 +214,23 @@ export const safeStreamReplyToInteraction = async (
 
     if (index === 0) {
       if (messageIds[0] === undefined) {
-        const first =
-          interaction.deferred || interaction.replied
-            ? await interaction.editReply({
-                ...baseOptions,
-                content: formatContent(content),
-              })
-            : await interaction
-                .reply({ ...baseOptions, content: formatContent(content) })
-                .then(() => interaction.fetchReply());
+        const sendReply = async () => {
+          if (interaction.deferred || interaction.replied) {
+            return interaction.editReply({
+              ...baseOptions,
+              content: formatContent(content),
+            });
+          }
+
+          await interaction.reply({
+            ...baseOptions,
+            content: formatContent(content),
+          });
+
+          return interaction.fetchReply();
+        };
+
+        const first = await sendReply();
         rememberReply(first.id);
       } else {
         await interaction.editReply({
@@ -268,7 +275,7 @@ export const safeStreamReplyToMessage = async (
   const baseOptions = {
     allowedMentions: {
       repliedUser: false,
-      ...(mentionUsers ? {} : { users: [] }),
+      ...(!mentionUsers && { users: [] }),
     },
   };
   const formatContent = (text: string) =>

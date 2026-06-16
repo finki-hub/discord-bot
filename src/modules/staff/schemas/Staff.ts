@@ -14,7 +14,7 @@ export const StaffSchema = z
   })
   .transform((data) => ({
     ...data,
-    active: data.active === 'TRUE' || data.active === '1' || data.active === 1,
+    active: ['1', 1, 'TRUE'].includes(data.active),
   }));
 
 export type Staff = z.infer<typeof StaffSchema>;

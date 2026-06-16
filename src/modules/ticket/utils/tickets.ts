@@ -48,7 +48,7 @@ export const getActiveTicketsSorted = async (
   const ticketThreads =
     ticketThreadsCollection === undefined
       ? []
-      : [...ticketThreadsCollection.values()];
+      : ticketThreadsCollection.values().toArray();
 
   ticketThreads.sort((a: AnyThreadChannel, b: AnyThreadChannel) => {
     if (a.createdTimestamp === null || b.createdTimestamp === null) {
@@ -153,6 +153,29 @@ export const closeTicket = async (ticketId: string, guildId: string) => {
   logger.info(`Closed ticket ${ticketId}`);
 };
 
+const closeInactiveThreads = async (
+  ticketThreads: Collection<string, AnyThreadChannel>,
+  guildId: string,
+) => {
+  for (const thread of ticketThreads.values()) {
+    await thread.messages.fetch();
+    const lastMessage = thread.lastMessage;
+
+    if (lastMessage === null) {
+      continue;
+    }
+
+    const lastMessageDate = lastMessage.createdAt;
+
+    if (
+      Date.now() - lastMessageDate.getTime() >
+      MAX_TICKET_INACTIVITY_MILLISECONDS
+    ) {
+      await closeTicket(thread.id, guildId);
+    }
+  }
+};
+
 export const closeInactiveTickets = async () => {
   await client.guilds.fetch();
 
@@ -177,22 +200,6 @@ export const closeInactiveTickets = async () => {
       continue;
     }
 
-    for (const thread of ticketThreads.values()) {
-      await thread.messages.fetch();
-      const lastMessage = thread.lastMessage;
-
-      if (lastMessage === null) {
-        continue;
-      }
-
-      const lastMessageDate = lastMessage.createdAt;
-
-      if (
-        Date.now() - lastMessageDate.getTime() >
-        MAX_TICKET_INACTIVITY_MILLISECONDS
-      ) {
-        await closeTicket(thread.id, guild.id);
-      }
-    }
+    await closeInactiveThreads(ticketThreads, guild.id);
   }
 };

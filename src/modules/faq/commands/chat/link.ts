@@ -36,7 +36,7 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
 
   const parsedKeyword = Number(keyword);
   const link = await getClosestLink(
-    Number.isInteger(parsedKeyword) && parsedKeyword > 0
+    Number.isSafeInteger(parsedKeyword) && parsedKeyword > 0
       ? parsedKeyword
       : keyword,
   );

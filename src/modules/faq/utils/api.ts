@@ -263,11 +263,11 @@ export const getLink = async (name?: string) => {
 };
 
 export const getNthLink = async (index?: number) => {
-  const chatbotUrl = getChatbotUrl();
-
   if (index === undefined) {
     return null;
   }
+
+  const chatbotUrl = getChatbotUrl();
 
   try {
     const result = await fetch(`${chatbotUrl}/links/nth/${index}`);

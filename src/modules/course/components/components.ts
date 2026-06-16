@@ -92,7 +92,9 @@ export const getCourseComponent = (course: Course) => {
       separator.setSpacing(SeparatorSpacingSize.Large),
     );
 
-    if (course[`${year}-available`]) {
+    const isAvailable = course[`${year}-available`];
+
+    if (isAvailable) {
       addCurriculumSection(containerBuilder, course, year);
     } else {
       addUnavailableSection(containerBuilder, year);

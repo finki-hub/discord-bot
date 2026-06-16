@@ -98,9 +98,11 @@ const ParticipantSchema = z
 
 type Participant = z.infer<typeof ParticipantSchema>;
 
+const yearCollator = new Intl.Collator();
+
 export const extractParticipants = (course: Course): Participant[] =>
   Object.entries(course)
     .map((entry) => ParticipantSchema.safeParse(entry))
     .filter((result) => result.success)
     .map((result) => result.data)
-    .sort((a, b) => b.year.localeCompare(a.year));
+    .sort((a, b) => yearCollator.compare(b.year, a.year));

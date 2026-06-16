@@ -16,8 +16,11 @@ export const commandRequiresPermissions = (command: string): boolean => {
 
   const permissions = commandObj.permissions;
 
-  if (subcommand && permissions.subcommands?.[subcommand]) {
-    const subcommandPerms = permissions.subcommands[subcommand];
+  const subcommandPerms = subcommand
+    ? permissions.subcommands?.[subcommand]
+    : undefined;
+
+  if (subcommandPerms !== undefined) {
     return (
       (subcommandPerms.permissions?.length ?? 0) > 0 ||
       (subcommandPerms.roles?.length ?? 0) > 0
@@ -45,9 +48,11 @@ const getCommandPermission = async (
 
   const permissions = commandObj.permissions;
 
-  if (subcommand && permissions.subcommands?.[subcommand]) {
-    const subcommandPerms = permissions.subcommands[subcommand];
+  const subcommandPerms = subcommand
+    ? permissions.subcommands?.[subcommand]
+    : undefined;
 
+  if (subcommandPerms !== undefined) {
     const subcommandPermissions = subcommandPerms.permissions ?? [];
 
     const subcommandRoles = await Promise.all(

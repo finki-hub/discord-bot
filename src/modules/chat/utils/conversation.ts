@@ -16,7 +16,7 @@ const conversations = new Map<string, ConversationEntry>();
 const evictOldest = () => {
   while (conversations.size > MAX_TRACKED_MESSAGES) {
     let oldestKey: string | undefined;
-    let oldestAt = Number.POSITIVE_INFINITY;
+    let oldestAt = Infinity;
 
     for (const [key, entry] of conversations) {
       if (entry.updatedAt < oldestAt) {
