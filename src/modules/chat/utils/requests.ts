@@ -17,7 +17,7 @@ import { sanitizeOptions } from './utils.js';
 
 export const sendPrompt = async (
   options: SendPromptOptions,
-  onChunk: (chunk: string) => void,
+  onChunk: (chunk: string) => Promise<void>,
 ) => {
   const chatbotUrl = getChatbotUrl();
 
@@ -49,12 +49,12 @@ export const sendPrompt = async (
   }
 
   let receivedEvents = 0;
+  const pendingChunks: string[] = [];
 
   const parser = createParser({
     onEvent: (event) => {
       receivedEvents++;
-      const restoredChunk = event.data.replaceAll(String.raw`\n`, '\n');
-      onChunk(restoredChunk);
+      pendingChunks.push(event.data.replaceAll(String.raw`\n`, '\n'));
     },
   });
 
@@ -66,8 +66,17 @@ export const sendPrompt = async (
     if (done) {
       break;
     }
-    const decoded = decoder.decode(value, { stream: true });
-    parser.feed(decoded);
+    parser.feed(decoder.decode(value, { stream: true }));
+
+    // Await each chunk so the consumer finishes sending/editing its reply before
+    // the stream ends; firing them off unawaited lets the final flush race the
+    // in-flight reply and post a duplicate message.
+    while (pendingChunks.length > 0) {
+      const chunk = pendingChunks.shift();
+      if (chunk !== undefined) {
+        await onChunk(chunk);
+      }
+    }
   }
 
   if (receivedEvents === 0) {
@@ -139,7 +148,7 @@ export const getSupportedModels = async () => {
 
 export const fillEmbeddings = async (
   options: FillEmbeddingsOptions,
-  onChunk: (chunk: string) => void,
+  onChunk: (chunk: string) => Promise<void>,
 ) => {
   const chatbotUrl = getChatbotUrl();
   const apiKey = getApiKey();
@@ -162,11 +171,21 @@ export const fillEmbeddings = async (
     throw new Error('LLM_UNAVAILABLE');
   }
 
+  const pendingChunks: string[] = [];
   const parser = createParser({
     onEvent: (event) => {
-      onChunk(event.data);
+      pendingChunks.push(event.data);
     },
   });
+
+  const drainChunks = async () => {
+    while (pendingChunks.length > 0) {
+      const chunk = pendingChunks.shift();
+      if (chunk !== undefined) {
+        await onChunk(chunk);
+      }
+    }
+  };
 
   let hasChunks = false;
 
@@ -180,10 +199,12 @@ export const fillEmbeddings = async (
     }
     hasChunks = true;
     parser.feed(decoder.decode(value, { stream: true }));
+    await drainChunks();
   }
 
   if (!hasChunks) {
     parser.feed(`data: ${labels.none}\n\n`);
+    await drainChunks();
   }
 
   logger.info(
