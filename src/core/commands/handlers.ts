@@ -66,14 +66,12 @@ const notifyInteractionError = async (
   errorMessage: string,
 ) => {
   try {
-    if (interaction.deferred || interaction.replied) {
-      await interaction.editReply({ content: errorMessage });
-    } else {
-      await interaction.reply({
-        content: errorMessage,
-        flags: MessageFlags.Ephemeral,
-      });
-    }
+    await (interaction.deferred || interaction.replied
+      ? interaction.editReply({ content: errorMessage })
+      : interaction.reply({
+          content: errorMessage,
+          flags: MessageFlags.Ephemeral,
+        }));
   } catch {
     // Notifying the user can fail if the interaction expired; ignore it.
   }
