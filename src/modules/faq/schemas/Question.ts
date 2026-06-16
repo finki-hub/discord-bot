@@ -15,12 +15,12 @@ export const QuestionSchema = z
   })
   .transform((data) => ({
     content: data.content,
-    createdAt: new Date(data.created_at),
+    createdAt: Temporal.Instant.from(data.created_at),
     distance: data.distance ?? undefined,
     id: data.id,
     links: data.links,
     name: data.name,
-    updatedAt: new Date(data.updated_at),
+    updatedAt: Temporal.Instant.from(data.updated_at),
     userId: data.user_id,
   }));
 

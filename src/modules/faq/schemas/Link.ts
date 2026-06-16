@@ -13,11 +13,11 @@ export const LinkSchema = z
     user_id: z.string().nullable(),
   })
   .transform((data) => ({
-    createdAt: new Date(data.created_at),
+    createdAt: Temporal.Instant.from(data.created_at),
     description: data.description,
     id: data.id,
     name: data.name,
-    updatedAt: new Date(data.updated_at),
+    updatedAt: Temporal.Instant.from(data.updated_at),
     url: data.url,
     userId: data.user_id,
   }));

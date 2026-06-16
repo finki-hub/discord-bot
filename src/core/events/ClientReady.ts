@@ -20,5 +20,7 @@ export const execute = async (...[client]: ClientEvents[typeof name]) => {
   logger.info(
     `Bot is ready! Logged in as ${bot.user?.tag ?? 'an unknown user'}`,
   );
-  logger.info(`Bot successfully started at ${new Date().toUTCString()}`);
+  logger.info(
+    `Bot successfully started at ${Temporal.Now.instant().toString()}`,
+  );
 };

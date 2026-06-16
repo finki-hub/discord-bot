@@ -37,7 +37,7 @@ export class WebhookTransport extends TransportStream {
     const timestamp =
       typeof info['timestamp'] === 'string'
         ? info['timestamp']
-        : new Date().toISOString().replace('T', ' ').slice(0, 19);
+        : Temporal.Now.instant().toString().replace('T', ' ').slice(0, 19);
     const level = info.level;
     const message = info.message;
     const stack =
@@ -110,7 +110,7 @@ export class WebhookTransport extends TransportStream {
     } catch (error) {
       // eslint-disable-next-line no-console -- logger transport send failures must avoid recursive logging through the same transport
       console.error('Failed sending to error webhook:', error);
-      for (const [url, cachedClient] of this.webhookClients.entries()) {
+      for (const [url, cachedClient] of this.webhookClients) {
         if (cachedClient === webhookClient) {
           this.webhookClients.delete(url);
           break;
