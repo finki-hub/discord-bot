@@ -15,6 +15,21 @@ import type {
 
 import { sanitizeOptions } from './utils.js';
 
+// Await each chunk so the consumer finishes sending/editing its reply before the
+// stream ends; firing them off unawaited lets the final flush race the in-flight
+// reply and post a duplicate message.
+const drainChunks = async (
+  pending: string[],
+  onChunk: (chunk: string) => Promise<void>,
+) => {
+  while (pending.length > 0) {
+    const chunk = pending.shift();
+    if (chunk !== undefined) {
+      await onChunk(chunk);
+    }
+  }
+};
+
 export const sendPrompt = async (
   options: SendPromptOptions,
   onChunk: (chunk: string) => Promise<void>,
@@ -67,16 +82,7 @@ export const sendPrompt = async (
       break;
     }
     parser.feed(decoder.decode(value, { stream: true }));
-
-    // Await each chunk so the consumer finishes sending/editing its reply before
-    // the stream ends; firing them off unawaited lets the final flush race the
-    // in-flight reply and post a duplicate message.
-    while (pendingChunks.length > 0) {
-      const chunk = pendingChunks.shift();
-      if (chunk !== undefined) {
-        await onChunk(chunk);
-      }
-    }
+    await drainChunks(pendingChunks, onChunk);
   }
 
   if (receivedEvents === 0) {
@@ -178,15 +184,6 @@ export const fillEmbeddings = async (
     },
   });
 
-  const drainChunks = async () => {
-    while (pendingChunks.length > 0) {
-      const chunk = pendingChunks.shift();
-      if (chunk !== undefined) {
-        await onChunk(chunk);
-      }
-    }
-  };
-
   let hasChunks = false;
 
   const reader: ReadableStreamDefaultReader<Uint8Array> =
@@ -199,12 +196,12 @@ export const fillEmbeddings = async (
     }
     hasChunks = true;
     parser.feed(decoder.decode(value, { stream: true }));
-    await drainChunks();
+    await drainChunks(pendingChunks, onChunk);
   }
 
   if (!hasChunks) {
     parser.feed(`data: ${labels.none}\n\n`);
-    await drainChunks();
+    await drainChunks(pendingChunks, onChunk);
   }
 
   logger.info(
