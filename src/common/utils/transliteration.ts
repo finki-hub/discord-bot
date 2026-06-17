@@ -1,4 +1,4 @@
-const transformations = {
+const transformations: Record<string, string[]> = {
   а: ['a'],
   А: ['A'],
   б: ['b'],
@@ -68,8 +68,13 @@ const transform = (word: string) => {
 
   const transformed: string[] = [];
 
-  // @ts-expect-error -- indexing by runtime character may return undefined; nullish coalescing intentionally falls back to the original character
-  for (const letter of transformations[word.at(0)] ?? word.at(0)) {
+  const firstCharacter = word.at(0);
+  const letters =
+    firstCharacter === undefined
+      ? []
+      : (transformations[firstCharacter] ?? [firstCharacter]);
+
+  for (const letter of letters) {
     for (const suffix of suffixes) {
       transformed.push(letter + suffix);
     }
