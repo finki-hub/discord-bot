@@ -1,14 +1,16 @@
-let transformedProfessors: Array<[string, string]> | null = null;
+const state: { transformedProfessors: Array<[string, string]> | null } = {
+  transformedProfessors: null,
+};
 
 export const getTransformedProfessors = (): Array<[string, string]> | null =>
-  transformedProfessors;
+  state.transformedProfessors;
 
 export const setTransformedProfessors = (
   professors: Array<[string, string]>,
 ): void => {
-  transformedProfessors = professors;
+  state.transformedProfessors = professors;
 };
 
 export const clearTransformedProfessors = (): void => {
-  transformedProfessors = null;
+  state.transformedProfessors = null;
 };

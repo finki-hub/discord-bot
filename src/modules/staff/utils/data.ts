@@ -6,13 +6,15 @@ import {
 import { type Staff, StaffSchema } from '../schemas/Staff.js';
 import { clearTransformedProfessors } from './cache.js';
 
-let staff: Staff[] = [];
+const state: { staff: Staff[] } = {
+  staff: [],
+};
 
 export const reloadStaff = async () => {
   await loadJsonResource({
     label: 'staff',
     onLoaded: (data: Staff[]) => {
-      staff = data;
+      state.staff = data;
       clearTransformedProfessors();
     },
     resource: 'staff.json',
@@ -24,4 +26,4 @@ export const startPeriodicReload = () => {
   schedulePeriodicReload({ label: 'staff', reload: reloadStaff });
 };
 
-export const getStaff = (): Staff[] => staff;
+export const getStaff = (): Staff[] => state.staff;

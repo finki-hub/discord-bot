@@ -1,14 +1,16 @@
-let transformedSessions: Array<[string, string]> | null = null;
+const state: { transformedSessions: Array<[string, string]> | null } = {
+  transformedSessions: null,
+};
 
 export const getTransformedSessions = (): Array<[string, string]> | null =>
-  transformedSessions;
+  state.transformedSessions;
 
 export const setTransformedSessions = (
   sessions: Array<[string, string]>,
 ): void => {
-  transformedSessions = sessions;
+  state.transformedSessions = sessions;
 };
 
 export const clearTransformedSessions = (): void => {
-  transformedSessions = null;
+  state.transformedSessions = null;
 };

@@ -6,13 +6,15 @@ import { type Room, RoomSchema } from '@/modules/room/schemas/Room.js';
 
 import { clearTransformedRooms } from './cache.js';
 
-let rooms: Room[] = [];
+const state: { rooms: Room[] } = {
+  rooms: [],
+};
 
 export const reloadRooms = async () => {
   await loadJsonResource({
     label: 'rooms',
     onLoaded: (data: Room[]) => {
-      rooms = data;
+      state.rooms = data;
       clearTransformedRooms();
     },
     resource: 'rooms.json',
@@ -24,4 +26,4 @@ export const startPeriodicReload = () => {
   schedulePeriodicReload({ label: 'rooms', reload: reloadRooms });
 };
 
-export const getRooms = (): Room[] => rooms;
+export const getRooms = (): Room[] => state.rooms;

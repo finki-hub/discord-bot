@@ -7,13 +7,15 @@ import { ACCREDITATION_YEARS } from '../constants.js';
 import { type Course, CourseSchema } from '../schemas/Course.js';
 import { clearTransformedCourses } from './cache.js';
 
-let courses: Course[] = [];
+const state: { courses: Course[] } = {
+  courses: [],
+};
 
 export const reloadCourses = async () => {
   await loadJsonResource({
     label: 'courses',
     onLoaded: (data: Course[]) => {
-      courses = data;
+      state.courses = data;
       clearTransformedCourses();
     },
     resource: 'courses.json',
@@ -25,10 +27,11 @@ export const startPeriodicReload = () => {
   schedulePeriodicReload({ label: 'courses', reload: reloadCourses });
 };
 
-export const getCourses = (): string[] => courses.map((course) => course.name);
+export const getCourses = (): string[] =>
+  state.courses.map((course) => course.name);
 
 export const getCourseNameVariants = (): Array<[string, string]> =>
-  courses.flatMap((course) => {
+  state.courses.flatMap((course) => {
     const variants: Array<[string, string]> = [[course.name, course.name]];
 
     for (const year of ACCREDITATION_YEARS) {
@@ -46,4 +49,6 @@ export const getCourseNameVariants = (): Array<[string, string]> =>
   });
 
 export const getCourse = (name: string): Course | undefined =>
-  courses.find((course) => course.name.toLowerCase() === name.toLowerCase());
+  state.courses.find(
+    (course) => course.name.toLowerCase() === name.toLowerCase(),
+  );

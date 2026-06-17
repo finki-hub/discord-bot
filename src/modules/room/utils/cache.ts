@@ -1,12 +1,14 @@
-let transformedRooms: Array<[string, string]> | null = null;
+const state: { transformedRooms: Array<[string, string]> | null } = {
+  transformedRooms: null,
+};
 
 export const getTransformedRooms = (): Array<[string, string]> | null =>
-  transformedRooms;
+  state.transformedRooms;
 
 export const setTransformedRooms = (rooms: Array<[string, string]>): void => {
-  transformedRooms = rooms;
+  state.transformedRooms = rooms;
 };
 
 export const clearTransformedRooms = (): void => {
-  transformedRooms = null;
+  state.transformedRooms = null;
 };

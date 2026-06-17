@@ -7,7 +7,9 @@ import {
 
 import { clearTransformedSessions } from './cache.js';
 
-let sessions: Record<string, string> = {};
+const state: { sessions: Record<string, string> } = {
+  sessions: {},
+};
 
 const SessionsSchema = z.record(z.string(), z.string());
 
@@ -15,7 +17,7 @@ export const reloadSessions = async () => {
   await loadJsonResource({
     label: 'sessions',
     onLoaded: (data: Record<string, string>) => {
-      sessions = data;
+      state.sessions = data;
       clearTransformedSessions();
     },
     parseFallback: {},
@@ -28,4 +30,4 @@ export const startPeriodicReload = () => {
   schedulePeriodicReload({ label: 'sessions', reload: reloadSessions });
 };
 
-export const getSessions = (): Record<string, string> => sessions;
+export const getSessions = (): Record<string, string> => state.sessions;
