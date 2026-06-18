@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/restrict-template-expressions -- winston formatter values are stringified for logging output */
 
 import { createLogger, format, transports } from 'winston';
+import DailyRotateFile from 'winston-daily-rotate-file';
 
 import { WebhookTransport } from './webhookTransport.js';
 
@@ -33,8 +34,9 @@ export const logger = createLogger({
       handleExceptions: true,
       level: 'info',
     }),
-    new transports.File({
-      filename: 'logs/bot.log',
+    new DailyRotateFile({
+      datePattern: 'YYYY-MM-DD',
+      filename: 'logs/bot-%DATE%.log',
       format: format.combine(
         format.timestamp({
           format: 'YYYY-MM-DD HH:mm:ss',
@@ -49,9 +51,8 @@ export const logger = createLogger({
       ),
       handleExceptions: true,
       level: 'debug',
-      options: {
-        flags: 'w',
-      },
+      maxFiles: '30d',
+      maxSize: '20m',
     }),
     new WebhookTransport(),
   ],
