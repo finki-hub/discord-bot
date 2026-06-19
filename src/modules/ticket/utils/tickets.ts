@@ -5,6 +5,7 @@ import {
   type ChatInputCommandInteraction,
   type Collection,
   type Guild,
+  MessageFlags,
   roleMention,
   ThreadAutoArchiveDuration,
 } from 'discord.js';
@@ -134,7 +135,11 @@ export const createTicket = async (
   });
 };
 
-export const closeTicket = async (ticketId: string, guildId: string) => {
+export const closeTicket = async (
+  ticketId: string,
+  guildId: string,
+  closedBy?: string,
+) => {
   const ticketsChannel = getChannel(Channel.Tickets, guildId);
 
   if (ticketsChannel?.type !== ChannelType.GuildText) {
@@ -145,6 +150,24 @@ export const closeTicket = async (ticketId: string, guildId: string) => {
 
   if (ticketChannel === undefined) {
     return;
+  }
+
+  try {
+    await ticketChannel.send({
+      allowedMentions: {
+        parse: [],
+      },
+      content:
+        closedBy === undefined
+          ? ticketMessages.ticketClosedInactivity
+          : ticketMessageFunctions.ticketClosedBy(closedBy),
+      flags: MessageFlags.SuppressNotifications,
+    });
+  } catch (error: unknown) {
+    logger.error(
+      `Failed sending close message for ticket ${ticketId}\n${String(error)}`,
+      { guildId },
+    );
   }
 
   await ticketChannel.setLocked(true);

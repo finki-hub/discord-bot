@@ -23,6 +23,6 @@ export const execute = async (
     return;
   }
 
-  await closeTicket(ticketId, interaction.guild.id);
+  await closeTicket(ticketId, interaction.guild.id, interaction.user.id);
   await interaction.editReply({ content: commandResponses.ticketClosed });
 };
