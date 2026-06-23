@@ -82,13 +82,13 @@ const handleTicketClose = async (interaction: ChatInputCommandInteraction) => {
     return;
   }
 
-  await interaction.editReply(commandResponses.ticketClosed);
-
   await closeTicket(
     interaction.channel.id,
     interaction.guild.id,
     interaction.user.id,
   );
+
+  await interaction.editReply(commandResponses.ticketClosed);
 };
 
 const handleTicketList = async (interaction: ChatInputCommandInteraction) => {
