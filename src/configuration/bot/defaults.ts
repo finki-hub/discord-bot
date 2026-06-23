@@ -12,8 +12,8 @@ export const DEFAULT_CONFIGURATION = {
   },
   errorWebhook: undefined,
   models: {
-    embeddings: Model.BGE_M3,
-    inference: Model.LLAMA_3_3_70B,
+    embeddings: Model.BGE_M3_LOCAL,
+    inference: Model.CLAUDE_SONNET_4_6,
   },
   roles: undefined,
   ticketing: {
