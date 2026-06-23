@@ -19,6 +19,11 @@ export const RequiredBotConfigSchema = z.object({
     })
     .optional(),
   errorWebhook: z.url().optional(),
+  feedback: z
+    .object({
+      enabled: z.boolean().optional(),
+    })
+    .optional(),
   models: ModelsSchema.optional(),
   roles: z.record(RoleSchema, z.string()).optional(),
   ticketing: z

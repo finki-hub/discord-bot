@@ -128,6 +128,16 @@ export const getCrosspostingProperty = async <
   return config.crossposting?.[key];
 };
 
+export const getFeedbackProperty = async <
+  T extends keyof FullyRequiredBotConfig['feedback'],
+>(
+  key: T,
+  guildId: string,
+) => {
+  const config = await getGuildConfig(guildId);
+  return config.feedback?.[key] ?? DEFAULT_CONFIGURATION.feedback[key];
+};
+
 export const getRolesProperty = async (
   key: keyof FullyRequiredBotConfig['roles'],
   guildId: string,

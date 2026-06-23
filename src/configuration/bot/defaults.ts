@@ -11,6 +11,9 @@ export const DEFAULT_CONFIGURATION = {
     enabled: false,
   },
   errorWebhook: undefined,
+  feedback: {
+    enabled: true,
+  },
   models: {
     embeddings: Model.BGE_M3_LOCAL,
     inference: Model.CLAUDE_SONNET_4_6,
