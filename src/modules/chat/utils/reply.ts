@@ -12,6 +12,7 @@ import {
   getConversationHistory,
   registerConversation,
 } from './conversation.js';
+import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
 import { sendPrompt } from './requests.js';
 
 const COMMAND_LABEL = 'chat conversation continuation';
@@ -95,11 +96,12 @@ export const handleChatMessage = async (message: Message) => {
 
   try {
     let answer = '';
+    const capture: { responseId: null | string } = { responseId: null };
 
-    const messageIds = await safeStreamReplyToMessage(
+    const messages = await safeStreamReplyToMessage(
       message,
       async (onChunk) => {
-        await sendPrompt(options, async (chunk) => {
+        capture.responseId = await sendPrompt(options, async (chunk) => {
           answer += chunk;
           await onChunk(chunk);
         });
@@ -107,11 +109,23 @@ export const handleChatMessage = async (message: Message) => {
     );
 
     if (answer.length > 0) {
+      const messageIds = messages.map((sent) => sent.id);
       registerConversation(inChatThread ? [message.channelId] : messageIds, [
         ...history,
         { content: prompt, role: 'user' },
         { content: answer, role: 'assistant' },
       ]);
+
+      const { responseId } = capture;
+      if (responseId !== null) {
+        rememberFeedbackContext(responseId, { answer, question: prompt });
+        await attachFeedbackButtons({
+          askerId: message.author.id,
+          guildId: message.guild?.id ?? null,
+          message: messages.at(-1),
+          responseId,
+        });
+      }
     }
   } catch (error) {
     await handleConversationError(message, error);

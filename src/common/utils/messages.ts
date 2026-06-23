@@ -183,7 +183,7 @@ export const safeStreamReplyToInteraction = async (
   interaction: StreamableInteraction,
   produce: ChunkProducer,
   options?: StreamReplyOptions,
-): Promise<string[]> => {
+): Promise<Message[]> => {
   const {
     language = '',
     mentionUsers = false,
@@ -194,17 +194,15 @@ export const safeStreamReplyToInteraction = async (
   const formatContent = (text: string) =>
     useCodeBlock ? codeBlock(language, text) : text;
 
-  const messageIds: string[] = [];
-  const followUps: Message[] = [];
+  const sentMessages: Message[] = [];
 
   // Assignments go through these synchronous setters so the streaming awaits in
   // `flush` do not trip the require-atomic-updates rule.
-  const rememberReply = (id: string) => {
-    messageIds[0] = id;
+  const rememberReply = (sent: Message) => {
+    sentMessages[0] = sent;
   };
   const rememberFollowUp = (index: number, sent: Message) => {
-    followUps[index] = sent;
-    messageIds[index] = sent.id;
+    sentMessages[index] = sent;
   };
 
   const flush = async (index: number, content: string) => {
@@ -213,7 +211,7 @@ export const safeStreamReplyToInteraction = async (
     }
 
     if (index === 0) {
-      if (messageIds[0] === undefined) {
+      if (sentMessages[0] === undefined) {
         const sendReply = async () => {
           if (interaction.deferred || interaction.replied) {
             return interaction.editReply({
@@ -231,7 +229,7 @@ export const safeStreamReplyToInteraction = async (
         };
 
         const first = await sendReply();
-        rememberReply(first.id);
+        rememberReply(first);
       } else {
         await interaction.editReply({
           ...baseOptions,
@@ -242,7 +240,7 @@ export const safeStreamReplyToInteraction = async (
       return;
     }
 
-    const existing = followUps[index];
+    const existing = sentMessages[index];
     if (existing !== undefined) {
       await existing.edit({ content: formatContent(content) });
 
@@ -258,14 +256,14 @@ export const safeStreamReplyToInteraction = async (
 
   await runStreaming(produce, flush);
 
-  return messageIds;
+  return sentMessages;
 };
 
 export const safeStreamReplyToMessage = async (
   message: Message,
   produce: ChunkProducer,
   options?: StreamReplyOptions,
-): Promise<string[]> => {
+): Promise<Message[]> => {
   const {
     language = '',
     mentionUsers = false,
@@ -281,12 +279,10 @@ export const safeStreamReplyToMessage = async (
   const formatContent = (text: string) =>
     useCodeBlock ? codeBlock(language, text) : text;
 
-  const messageIds: string[] = [];
   const sentMessages: Message[] = [];
 
   const remember = (index: number, sent: Message) => {
     sentMessages[index] = sent;
-    messageIds[index] = sent.id;
   };
 
   const flush = async (index: number, content: string) => {
@@ -310,5 +306,5 @@ export const safeStreamReplyToMessage = async (
 
   await runStreaming(produce, flush);
 
-  return messageIds;
+  return sentMessages;
 };

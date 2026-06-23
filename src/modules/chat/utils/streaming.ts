@@ -13,6 +13,7 @@ import type { SendPromptOptions } from '../schemas/Chat.js';
 
 import { LLM_ERRORS } from './constants.js';
 import { registerConversation } from './conversation.js';
+import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
 import { sendPrompt } from './requests.js';
 
 export const handlePromptWithStreaming = async (
@@ -25,11 +26,12 @@ export const handlePromptWithStreaming = async (
 ) => {
   try {
     let answer = '';
+    const capture: { responseId: null | string } = { responseId: null };
 
-    const messageIds = await safeStreamReplyToInteraction(
+    const messages = await safeStreamReplyToInteraction(
       interaction,
       async (onChunk) => {
-        await sendPrompt(options, async (chunk) => {
+        capture.responseId = await sendPrompt(options, async (chunk) => {
           answer += chunk;
           await onChunk(chunk);
         });
@@ -37,10 +39,25 @@ export const handlePromptWithStreaming = async (
     );
 
     if (answer.length > 0) {
+      const messageIds = messages.map((message) => message.id);
       registerConversation(messageIds, [
         ...options.messages,
         { content: answer, role: 'assistant' },
       ]);
+
+      const { responseId } = capture;
+      if (responseId !== null) {
+        rememberFeedbackContext(responseId, {
+          answer,
+          question: options.messages.at(-1)?.content,
+        });
+        await attachFeedbackButtons({
+          askerId: interaction.user.id,
+          guildId: interaction.guild?.id ?? null,
+          message: messages.at(-1),
+          responseId,
+        });
+      }
     }
   } catch (error) {
     if (!Error.isError(error)) {

@@ -45,6 +45,7 @@ export const commandResponses = {
   configurationReloading: 'Се освежува конфигурацијата...',
   dataReloaded: 'Податоците се освежени.',
   dataReloading: 'Се освежуваат податоците...',
+  feedbackRecorded: 'Ви благодариме на повратната информација!',
   home: 'https://github.com/finki-hub/discord-bot',
   ticketClosed: 'Тикетот е затворен.',
   ticketMessageSent: 'Пораката за тикети е испратена.',
@@ -108,6 +109,7 @@ export const commandErrors = {
   dataReloadFailed:
     'Неуспешно освежување на податоците. Проверете ги логите за повеќе детали.',
   faqNotFound: 'Прашањето не постои.',
+  feedbackDisabled: 'Повратните информации не се овозможени.',
   invalidChannel: 'Каналот е невалиден.',
   invalidTicket: 'Тикетот не е валиден.',
   invalidTicketType: 'Дадениот тип на тикетот не е валиден.',
