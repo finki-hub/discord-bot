@@ -8,7 +8,6 @@ import {
 } from 'discord.js';
 
 import { executeSubcommand } from '@/common/commands/subcommands.js';
-import { logger } from '@/common/logger/index.js';
 import { Channel } from '@/common/schemas/Channel.js';
 import { Role } from '@/common/schemas/Role.js';
 import {
@@ -19,7 +18,10 @@ import {
   getTicketCreateComponents,
   getTicketListComponent,
 } from '@/modules/ticket/components/components.js';
-import { getActiveTicketsSorted } from '@/modules/ticket/utils/tickets.js';
+import {
+  closeTicket,
+  getActiveTicketsSorted,
+} from '@/modules/ticket/utils/tickets.js';
 import {
   commandDescriptions,
   commandErrors,
@@ -82,21 +84,11 @@ const handleTicketClose = async (interaction: ChatInputCommandInteraction) => {
 
   await interaction.editReply(commandResponses.ticketClosed);
 
-  try {
-    await interaction.channel.send({
-      allowedMentions: { parse: [] },
-      content: ticketMessageFunctions.ticketClosedBy(interaction.user.id),
-      flags: MessageFlags.SuppressNotifications,
-    });
-  } catch (error: unknown) {
-    logger.error(
-      `Failed sending close message for ticket ${interaction.channel.id}\n${String(error)}`,
-      { guildId: interaction.guild.id },
-    );
-  }
-
-  await interaction.channel.setLocked(true);
-  await interaction.channel.setArchived(true);
+  await closeTicket(
+    interaction.channel.id,
+    interaction.guild.id,
+    interaction.user.id,
+  );
 };
 
 const handleTicketList = async (interaction: ChatInputCommandInteraction) => {
