@@ -8,6 +8,7 @@ import { labels } from '@/translations/labels.js';
 
 import type {
   ClosestQuestionsOptions,
+  FeedbackOptions,
   FillEmbeddingsOptions,
   SendPromptOptions,
   UnembeddedQuestionsOptions,
@@ -63,6 +64,8 @@ export const sendPrompt = async (
     throw new Error('LLM_UNAVAILABLE');
   }
 
+  const responseId = result.headers.get('x-response-id');
+
   let receivedEvents = 0;
   const pendingChunks: string[] = [];
 
@@ -90,6 +93,44 @@ export const sendPrompt = async (
   }
 
   logger.info(`Prompt answered: ${options.messages.at(-1)?.content ?? ''}`);
+
+  return responseId;
+};
+
+export const sendFeedback = async (
+  options: FeedbackOptions,
+): Promise<boolean> => {
+  const chatbotUrl = getChatbotUrl();
+  const apiKey = getApiKey();
+
+  if (chatbotUrl === null || apiKey === null) {
+    logger.error('Cannot send feedback: chatbot URL or API key not configured');
+
+    return false;
+  }
+
+  try {
+    const result = await fetch(`${chatbotUrl}/chat/feedback`, {
+      body: JSON.stringify(sanitizeOptions(options)),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+      method: 'POST',
+    });
+
+    if (!result.ok) {
+      logger.error(`Failed sending feedback: HTTP ${result.status}`);
+
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    logger.error(`Failed sending feedback\n${String(error)}`);
+
+    return false;
+  }
 };
 
 export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {

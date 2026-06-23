@@ -35,6 +35,36 @@ export const SendPromptOptionsSchema = z
 
 export type SendPromptOptions = z.infer<typeof SendPromptOptionsSchema>;
 
+export const FeedbackOptionsSchema = z
+  .object({
+    answerText: z.string().optional(),
+    channelId: z.string().optional(),
+    client: z.enum(['discord', 'web']),
+    clientRef: z.string().optional(),
+    embeddingsModel: z.string().optional(),
+    feedbackType: z.enum(['like', 'dislike']),
+    guildId: z.string().optional(),
+    inferenceModel: z.string().optional(),
+    questionText: z.string().optional(),
+    responseId: z.string(),
+    userId: z.string(),
+  })
+  .transform((data) => ({
+    answer_text: data.answerText,
+    channel_id: data.channelId,
+    client: data.client,
+    client_ref: data.clientRef,
+    embeddings_model: data.embeddingsModel,
+    feedback_type: data.feedbackType,
+    guild_id: data.guildId,
+    inference_model: data.inferenceModel,
+    question_text: data.questionText,
+    response_id: data.responseId,
+    user_id: data.userId,
+  }));
+
+export type FeedbackOptions = z.infer<typeof FeedbackOptionsSchema>;
+
 export const ClosestQuestionsOptionsSchema = z
   .object({
     embeddingsModel: z.string().optional(),
