@@ -4,7 +4,7 @@ import { logger } from '@/common/logger/index.js';
 import { labels } from '@/translations/labels.js';
 
 import { DATE_FORMATTER, TICKETS_CHECK_INTERVAL } from './utils/constants.js';
-import { closeInactiveTickets } from './utils/tickets.js';
+import { maintainTickets } from './utils/tickets.js';
 
 const convertMillisecondsToCronJob = (ms: number) => {
   if (ms < 60_000) {
@@ -34,8 +34,8 @@ export const init = () => {
   const cronJobs: Cron[] = [
     new Cron(
       convertMillisecondsToCronJob(TICKETS_CHECK_INTERVAL),
-      { name: 'closeInactiveTickets' },
-      closeInactiveTickets,
+      { name: 'maintainTickets' },
+      maintainTickets,
     ),
   ];
 

@@ -11,6 +11,8 @@ export const DATE_FORMATTER = new Intl.DateTimeFormat('en-CA', {
 
 export const TICKETS_CHECK_INTERVAL = 900_000; // 15 minutes
 
+export const TICKET_ABANDON_TIMEOUT_MILLISECONDS = 1_800_000; // 30 minutes
+
 export const ALLOWED_INACTIVITY_DAYS = 10;
 export const MAX_TICKET_INACTIVITY_MILLISECONDS =
   ALLOWED_INACTIVITY_DAYS * 86_400_000;

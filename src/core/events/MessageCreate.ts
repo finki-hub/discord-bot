@@ -3,6 +3,7 @@ import { type ClientEvents, Events, type Message } from 'discord.js';
 import { logger } from '@/common/logger/index.js';
 import { getCrosspostingProperty } from '@/configuration/bot/index.js';
 import { handleChatMessage } from '@/modules/chat/utils/reply.js';
+import { handleTicketMessage } from '@/modules/ticket/utils/tickets.js';
 
 export const name = Events.MessageCreate;
 
@@ -41,5 +42,9 @@ const crosspost = async (message: Message) => {
 };
 
 export const execute = async (...[message]: ClientEvents[typeof name]) => {
-  await Promise.all([crosspost(message), handleChatMessage(message)]);
+  await Promise.all([
+    crosspost(message),
+    handleChatMessage(message),
+    handleTicketMessage(message),
+  ]);
 };

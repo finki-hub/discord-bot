@@ -5,15 +5,20 @@ import {
   type ChatInputCommandInteraction,
   type Collection,
   type Guild,
+  type Message,
   MessageFlags,
   roleMention,
+  type TextChannel,
   ThreadAutoArchiveDuration,
 } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
 import { Channel } from '@/common/schemas/Channel.js';
 import { getChannel } from '@/common/services/channels.js';
-import { getChannelsProperty } from '@/configuration/bot/index.js';
+import {
+  getChannelsProperty,
+  getTicketingProperty,
+} from '@/configuration/bot/index.js';
 import { client } from '@/core/client.js';
 import {
   ticketMessageFunctions,
@@ -22,7 +27,45 @@ import {
 
 import { getTicketCloseComponents } from '../components/components.js';
 import { type Ticket } from '../schemas/Ticket.js';
-import { MAX_TICKET_INACTIVITY_MILLISECONDS } from './constants.js';
+import {
+  MAX_TICKET_INACTIVITY_MILLISECONDS,
+  TICKET_ABANDON_TIMEOUT_MILLISECONDS,
+} from './constants.js';
+
+const TICKET_NAME_SEPARATOR = ' - ';
+
+const isHumanMessage = (message: Message): boolean =>
+  !message.author.bot && !message.system;
+
+// Recent messages may all be the bot on a long ticket; the first user message
+// is near the start.
+const hasHumanMessageAtStart = async (
+  thread: AnyThreadChannel,
+): Promise<boolean> => {
+  const earliestMessages = await thread.messages.fetch({
+    after: thread.id,
+    limit: 10,
+  });
+
+  return earliestMessages.some((message) => isHumanMessage(message));
+};
+
+const resolveTicketThread = async (
+  ticketsChannel: TextChannel,
+  ticketId: string,
+): Promise<AnyThreadChannel | null> => {
+  const cachedThread = ticketsChannel.threads.cache.get(ticketId);
+
+  if (cachedThread !== undefined) {
+    return cachedThread;
+  }
+
+  try {
+    return await ticketsChannel.threads.fetch(ticketId);
+  } catch {
+    return null;
+  }
+};
 
 export const getActiveTickets = async (
   guild: Guild,
@@ -87,7 +130,7 @@ export const createTicket = async (
   const ticketChannel = await ticketsChannel.threads.create({
     autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
     invitable: false,
-    name: `${interaction.user.tag} - ${ticketMetadata.name}`,
+    name: `${interaction.user.tag}${TICKET_NAME_SEPARATOR}${ticketMetadata.name}`,
     type: ChannelType.PrivateThread,
   });
 
@@ -104,35 +147,87 @@ export const createTicket = async (
   await interaction.editReply(
     ticketMessageFunctions.ticketLink(ticketChannel.url),
   );
+};
 
-  const collector = ticketChannel.createMessageCollector({
-    time: 1_800_000,
-  });
+const getTicketType = async (
+  thread: AnyThreadChannel,
+  guildId: string,
+): Promise<Ticket | undefined> => {
+  const separatorIndex = thread.name.indexOf(TICKET_NAME_SEPARATOR);
 
-  collector.once('collect', async () => {
-    await ticketChannel.send(
-      ticketMessageFunctions.ticketStarted(
-        ticketMetadata.roles.map((role) => roleMention(role)).join(' '),
-      ),
+  if (separatorIndex === -1) {
+    return undefined;
+  }
+
+  const ticketTypeName = thread.name.slice(
+    separatorIndex + TICKET_NAME_SEPARATOR.length,
+  );
+  const tickets = await getTicketingProperty('tickets', guildId);
+
+  return tickets?.find((ticket) => ticket.name === ticketTypeName);
+};
+
+const startTicket = async (
+  thread: AnyThreadChannel,
+  guildId: string,
+): Promise<void> => {
+  const ticketType = await getTicketType(thread, guildId);
+
+  if (ticketType === undefined) {
+    logger.warn(`Could not resolve the ticket type for thread ${thread.id}`, {
+      guildId,
+    });
+
+    return;
+  }
+
+  await thread.send(
+    ticketMessageFunctions.ticketStarted(
+      ticketType.roles.map((role) => roleMention(role)).join(' '),
+    ),
+  );
+};
+
+export const handleTicketMessage = async (message: Message): Promise<void> => {
+  if (message.guild === null || !isHumanMessage(message)) {
+    return;
+  }
+
+  const { channel } = message;
+
+  if (!channel.isThread()) {
+    return;
+  }
+
+  try {
+    const ticketsChannelId = await getChannelsProperty(
+      Channel.Tickets,
+      message.guild.id,
     );
 
-    collector.stop();
-  });
-
-  collector.on('end', async (messages) => {
-    if (messages.size > 0) {
+    if (
+      ticketsChannelId === undefined ||
+      channel.parentId !== ticketsChannelId
+    ) {
       return;
     }
 
-    try {
-      await ticketChannel.delete();
-    } catch (error: unknown) {
-      logger.error(
-        `Failed deleting ticket channel ${ticketChannel.id}\n${String(error)}`,
-        { guildId: interaction.guild?.id },
-      );
+    const previousMessages = await channel.messages.fetch({
+      before: message.id,
+      limit: 50,
+    });
+
+    if (previousMessages.some((previous) => isHumanMessage(previous))) {
+      return;
     }
-  });
+
+    await startTicket(channel, message.guild.id);
+  } catch (error: unknown) {
+    logger.error(
+      `Failed handling ticket message in thread ${channel.id}\n${String(error)}`,
+      { guildId: message.guild.id },
+    );
+  }
 };
 
 export const closeTicket = async (
@@ -146,9 +241,9 @@ export const closeTicket = async (
     return;
   }
 
-  const ticketChannel = ticketsChannel.threads.cache.get(ticketId);
+  const ticketChannel = await resolveTicketThread(ticketsChannel, ticketId);
 
-  if (ticketChannel === undefined) {
+  if (ticketChannel === null) {
     return;
   }
 
@@ -176,22 +271,50 @@ export const closeTicket = async (
   logger.info(`Closed ticket ${ticketId}`);
 };
 
-const closeInactiveThreads = async (
+const deleteTicketThread = async (
+  thread: AnyThreadChannel,
+  guildId: string,
+): Promise<void> => {
+  try {
+    await thread.delete();
+  } catch (error: unknown) {
+    logger.error(
+      `Failed deleting ticket channel ${thread.id}\n${String(error)}`,
+      { guildId },
+    );
+  }
+};
+
+const maintainTicketThreads = async (
   ticketThreads: Collection<string, AnyThreadChannel>,
   guildId: string,
 ) => {
   for (const thread of ticketThreads.values()) {
-    await thread.messages.fetch();
+    const messages = await thread.messages.fetch();
+    const isStarted =
+      messages.some((message) => isHumanMessage(message)) ||
+      (await hasHumanMessageAtStart(thread));
+
+    if (!isStarted) {
+      if (
+        thread.createdTimestamp !== null &&
+        Date.now() - thread.createdTimestamp >
+          TICKET_ABANDON_TIMEOUT_MILLISECONDS
+      ) {
+        await deleteTicketThread(thread, guildId);
+      }
+
+      continue;
+    }
+
     const lastMessage = thread.lastMessage;
 
     if (lastMessage === null) {
       continue;
     }
 
-    const lastMessageDate = lastMessage.createdAt;
-
     if (
-      Date.now() - lastMessageDate.getTime() >
+      Date.now() - lastMessage.createdAt.getTime() >
       MAX_TICKET_INACTIVITY_MILLISECONDS
     ) {
       await closeTicket(thread.id, guildId);
@@ -199,7 +322,7 @@ const closeInactiveThreads = async (
   }
 };
 
-export const closeInactiveTickets = async () => {
+export const maintainTickets = async () => {
   await client.guilds.fetch();
 
   for (const guild of client.guilds.cache.values()) {
@@ -207,6 +330,7 @@ export const closeInactiveTickets = async () => {
       Channel.Tickets,
       guild.id,
     );
+
     if (ticketsChannelId === undefined) {
       continue;
     }
@@ -223,6 +347,6 @@ export const closeInactiveTickets = async () => {
       continue;
     }
 
-    await closeInactiveThreads(ticketThreads, guild.id);
+    await maintainTicketThreads(ticketThreads, guild.id);
   }
 };
