@@ -7,7 +7,6 @@ import {
 
 import { logger } from '@/common/logger/index.js';
 import { getFeedbackProperty } from '@/configuration/bot/index.js';
-import { labels } from '@/translations/labels.js';
 
 const FEEDBACK_BUTTON_ID = 'chatFeedback';
 const MAX_TRACKED_RESPONSES = 1_000;
@@ -79,12 +78,10 @@ export const buildFeedbackRow = (
     new ButtonBuilder()
       .setCustomId(`${FEEDBACK_BUTTON_ID}:like:${responseId}:${askerId}`)
       .setEmoji('👍')
-      .setLabel(labels.like)
       .setStyle(likeStyle),
     new ButtonBuilder()
       .setCustomId(`${FEEDBACK_BUTTON_ID}:dislike:${responseId}:${askerId}`)
       .setEmoji('👎')
-      .setLabel(labels.dislike)
       .setStyle(dislikeStyle),
   );
 };
