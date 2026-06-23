@@ -3,6 +3,10 @@ import { z } from 'zod';
 export enum Model {
   BGE_M3 = 'bge-m3:latest',
   BGE_M3_LOCAL = 'BAAI/bge-m3',
+  CLAUDE_HAIKU_4_5 = 'claude-haiku-4-5',
+  CLAUDE_OPUS_4_7 = 'claude-opus-4-7',
+  CLAUDE_OPUS_4_8 = 'claude-opus-4-8',
+  CLAUDE_SONNET_4_6 = 'claude-sonnet-4-6',
   DEEPSEEK_R1_70B = 'deepseek-r1:70b',
   DOMESTIC_YAK_8B_INSTRUCT_GGUF = 'hf.co/LVSTCK/domestic-yak-8B-instruct-GGUF:Q8_0',
   GEMINI_2_5_FLASH = 'gemini-2.5-flash',
@@ -40,6 +44,10 @@ export const EMBEDDING_MODELS = [
 ] as const;
 
 export const INFERENCE_MODELS = [
+  Model.CLAUDE_HAIKU_4_5,
+  Model.CLAUDE_OPUS_4_7,
+  Model.CLAUDE_OPUS_4_8,
+  Model.CLAUDE_SONNET_4_6,
   Model.DEEPSEEK_R1_70B,
   Model.DOMESTIC_YAK_8B_INSTRUCT_GGUF,
   Model.GEMINI_2_5_FLASH,
