@@ -7,8 +7,8 @@
     },
     "errorWebhook": null,
     "models": {
-      "embeddings": "BGE_M3",
-      "inference": "LLAMA_3_3_70B"
+      "embeddings": "BAAI/bge-m3",
+      "inference": "claude-sonnet-4-6"
     },
     "roles": null,
     "ticketing": {
