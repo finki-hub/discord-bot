@@ -11,6 +11,7 @@ export const labels = {
   description: 'Опис',
   email: 'Електронска пошта',
   enrolledStudents: 'Запишани студенти',
+  firstToken: 'прв токен',
   floor: 'Кат',
   level: 'Ниво',
   link: 'Линк',
