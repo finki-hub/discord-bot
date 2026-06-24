@@ -14,6 +14,7 @@ import {
 } from './conversation.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
 import { sendPrompt } from './requests.js';
+import { appendTimingFootnote } from './timing.js';
 
 const COMMAND_LABEL = 'chat conversation continuation';
 
@@ -96,12 +97,15 @@ export const handleChatMessage = async (message: Message) => {
 
   try {
     let answer = '';
+    let firstChunkAt: null | number = null;
+    const startedAt = Date.now();
     const capture: { responseId: null | string } = { responseId: null };
 
     const messages = await safeStreamReplyToMessage(
       message,
       async (onChunk) => {
         capture.responseId = await sendPrompt(options, async (chunk) => {
+          firstChunkAt ??= Date.now();
           answer += chunk;
           await onChunk(chunk);
         });
@@ -115,6 +119,8 @@ export const handleChatMessage = async (message: Message) => {
         { content: prompt, role: 'user' },
         { content: answer, role: 'assistant' },
       ]);
+
+      await appendTimingFootnote(messages.at(-1), startedAt, firstChunkAt);
 
       const { responseId } = capture;
       if (responseId !== null) {
