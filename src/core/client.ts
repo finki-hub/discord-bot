@@ -1,12 +1,15 @@
 import { GatewayIntentBits } from 'discord-api-types/v10';
-import { Client } from 'discord.js';
+import { Client, Partials } from 'discord.js';
 
 const intents = [
   GatewayIntentBits.Guilds,
   GatewayIntentBits.GuildMessages,
   GatewayIntentBits.GuildMembers,
   GatewayIntentBits.MessageContent,
+  GatewayIntentBits.DirectMessages,
 ];
+
+const partials = [Partials.Channel];
 
 const presence = {
   activities: [
@@ -18,5 +21,6 @@ const presence = {
 
 export const client = new Client({
   intents,
+  partials,
   presence,
 });
