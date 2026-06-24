@@ -6,10 +6,12 @@ import {
   type UserContextMenuCommandInteraction,
 } from 'discord.js';
 
+import type { StreamEvent } from '@/common/types/StreamEvent.js';
+
 import { labels } from '@/translations/labels.js';
 
-type ChunkProducer = (
-  callback: (chunk: string) => Promise<void>,
+type EventProducer = (
+  emit: (event: StreamEvent) => Promise<void>,
 ) => Promise<void>;
 
 type StreamableInteraction =
@@ -144,15 +146,21 @@ const smartSplit = (text: string, maxLength: number): [string, string] => {
 const MAX_STREAM_LENGTH = 2_000;
 
 const runStreaming = async (
-  produce: ChunkProducer,
+  produce: EventProducer,
   flush: (index: number, content: string) => Promise<void>,
 ) => {
   const buffers: string[] = [''];
   let lastEdit = Date.now();
 
-  const handleChunk = async (chunk: string) => {
+  const flushAll = async () => {
+    for (const [index, buffer] of buffers.entries()) {
+      await flush(index, buffer);
+    }
+  };
+
+  const appendText = (text: string) => {
     let bufferIndex = buffers.length - 1;
-    buffers[bufferIndex] += chunk;
+    buffers[bufferIndex] += text;
 
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bufferIndex is derived from buffers.length and always points at an existing entry here
     while (buffers[bufferIndex]!.length > MAX_STREAM_LENGTH) {
@@ -162,26 +170,48 @@ const runStreaming = async (
       buffers.push(tail);
       bufferIndex++;
     }
+  };
 
-    const now = Date.now();
-    if (now - lastEdit > 1_000) {
-      lastEdit = now;
-      for (const [index, buffer] of buffers.entries()) {
-        await flush(index, buffer);
+  const handleEvent = async (event: StreamEvent) => {
+    switch (event.type) {
+      case 'done':
+        return;
+      case 'error': {
+        const current = buffers.at(-1) ?? '';
+        appendText(current ? `\n\n${event.message}` : event.message);
+        lastEdit = Date.now();
+        await flushAll();
+        return;
+      }
+      case 'reset':
+        buffers.length = 1;
+        buffers[0] = '';
+        return;
+      case 'status':
+        buffers.length = 1;
+        buffers[0] = event.label;
+        lastEdit = Date.now();
+        await flushAll();
+        return;
+      case 'token': {
+        appendText(event.text);
+        const now = Date.now();
+        if (now - lastEdit > 1_000) {
+          lastEdit = now;
+          await flushAll();
+        }
       }
     }
   };
 
-  await produce(handleChunk);
+  await produce(handleEvent);
 
-  for (const [index, buffer] of buffers.entries()) {
-    await flush(index, buffer);
-  }
+  await flushAll();
 };
 
 export const safeStreamReplyToInteraction = async (
   interaction: StreamableInteraction,
-  produce: ChunkProducer,
+  produce: EventProducer,
   options?: StreamReplyOptions,
 ): Promise<Message[]> => {
   const {
@@ -261,7 +291,7 @@ export const safeStreamReplyToInteraction = async (
 
 export const safeStreamReplyToMessage = async (
   message: Message,
-  produce: ChunkProducer,
+  produce: EventProducer,
   options?: StreamReplyOptions,
 ): Promise<Message[]> => {
   const {

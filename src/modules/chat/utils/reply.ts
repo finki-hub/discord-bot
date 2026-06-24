@@ -101,16 +101,18 @@ export const handleChatMessage = async (message: Message) => {
     const startedAt = Date.now();
     const capture: { responseId: null | string } = { responseId: null };
 
-    const messages = await safeStreamReplyToMessage(
-      message,
-      async (onChunk) => {
-        capture.responseId = await sendPrompt(options, async (chunk) => {
+    const messages = await safeStreamReplyToMessage(message, async (emit) => {
+      capture.responseId = await sendPrompt(options, async (event) => {
+        if (event.type === 'reset') {
+          answer = '';
+        } else if (event.type === 'token') {
           firstChunkAt ??= Date.now();
-          answer += chunk;
-          await onChunk(chunk);
-        });
-      },
-    );
+          answer += event.text;
+        }
+
+        await emit(event);
+      });
+    });
 
     if (answer.length > 0) {
       const messageIds = messages.map((sent) => sent.id);

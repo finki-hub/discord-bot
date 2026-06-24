@@ -33,11 +33,16 @@ export const handlePromptWithStreaming = async (
 
     const messages = await safeStreamReplyToInteraction(
       interaction,
-      async (onChunk) => {
-        capture.responseId = await sendPrompt(options, async (chunk) => {
-          firstChunkAt ??= Date.now();
-          answer += chunk;
-          await onChunk(chunk);
+      async (emit) => {
+        capture.responseId = await sendPrompt(options, async (event) => {
+          if (event.type === 'reset') {
+            answer = '';
+          } else if (event.type === 'token') {
+            firstChunkAt ??= Date.now();
+            answer += event.text;
+          }
+
+          await emit(event);
         });
       },
     );

@@ -294,10 +294,10 @@ const handleChatEmbed = async (interaction: ChatInputCommandInteraction) => {
   });
 
   try {
-    await safeStreamReplyToInteraction(interaction, async (onChunk) => {
+    await safeStreamReplyToInteraction(interaction, async (emit) => {
       await fillEmbeddings(options, async (chunk) => {
         if (!chunk.includes('{')) {
-          await onChunk(chunk);
+          await emit({ text: chunk, type: 'token' });
           return;
         }
 
@@ -307,9 +307,10 @@ const handleChatEmbed = async (interaction: ChatInputCommandInteraction) => {
           `${event.index} / ${event.total} | ${event.status}`,
         );
 
-        await onChunk(
-          `[${state}] ${event.name} (${inlineCode(event.model)})\n`,
-        );
+        await emit({
+          text: `[${state}] ${event.name} (${inlineCode(event.model)})\n`,
+          type: 'token',
+        });
       });
     });
   } catch (error) {
