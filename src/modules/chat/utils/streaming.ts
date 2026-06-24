@@ -40,12 +40,17 @@ const appendTimingFootnote = async (
       ? `\n-# ⏱ ${total}`
       : `\n-# ⏱ ${total} · ${labels.firstToken} ${ttft}`;
 
-  if (message.content.length + footnote.length > MAX_MESSAGE_LENGTH) {
-    return;
-  }
-
   try {
-    await message.edit({ content: message.content + footnote });
+    // Re-fetch first: the streaming loop edits the reply through the interaction, so the
+    // cached Message still holds its first-flush content. Reading message.content here
+    // would clobber the finished answer with just its first chunk.
+    const current = await message.fetch();
+
+    if (current.content.length + footnote.length > MAX_MESSAGE_LENGTH) {
+      return;
+    }
+
+    await current.edit({ content: current.content + footnote });
   } catch (error) {
     logger.warn(`Failed appending timing footnote\n${String(error)}`, {
       guildId: message.guildId ?? undefined,
