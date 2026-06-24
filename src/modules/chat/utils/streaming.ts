@@ -37,6 +37,7 @@ export const handlePromptWithStreaming = async (
         capture.responseId = await sendPrompt(options, async (event) => {
           if (event.type === 'reset') {
             answer = '';
+            firstChunkAt = null;
           } else if (event.type === 'token') {
             firstChunkAt ??= Date.now();
             answer += event.text;
