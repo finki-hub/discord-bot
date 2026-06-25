@@ -37,3 +37,9 @@ export const labels = {
   type: 'Тип',
   unknown: '?',
 };
+
+// Per-tool override for the transient chat status line, keyed by the (snake_case) tool name
+// the API sends in `status` events. Tools without an entry fall back to the generic label.
+export const toolStatusLabels = new Map<string, string>([
+  ['recommend_thesis_committee', '👥 Составувам комисија…'],
+]);
