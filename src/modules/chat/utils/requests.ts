@@ -106,6 +106,38 @@ const toStreamEvent = (sse: {
   }
 };
 
+export type StreamAccumulator = {
+  answer: string;
+  errored: boolean;
+  firstChunkAt: null | number;
+};
+
+export const applyStreamEvent = (
+  state: StreamAccumulator,
+  event: StreamEvent,
+): void => {
+  switch (event.type) {
+    case 'done':
+      break;
+    case 'error':
+      state.errored = true;
+      break;
+    case 'reset':
+      state.answer = '';
+      state.firstChunkAt = null; // so TTFT tracks the post-tool answer, not a preamble
+      break;
+    case 'status':
+      break;
+    case 'token':
+      state.firstChunkAt ??= Date.now();
+      state.answer += event.text;
+      break;
+  }
+};
+
+export const hasSavableAnswer = (state: StreamAccumulator): boolean =>
+  state.answer.length > 0 && !state.errored;
+
 export const sendPrompt = async (
   options: SendPromptOptions,
   onEvent: (event: StreamEvent) => Promise<void>,
