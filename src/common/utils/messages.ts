@@ -8,7 +8,7 @@ import {
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
 
-import { labels } from '@/translations/labels.js';
+import { labels, toolStatusLabels } from '@/translations/labels.js';
 
 type EventProducer = (
   emit: (event: StreamEvent) => Promise<void>,
@@ -187,12 +187,16 @@ const runStreaming = async (
         buffers.length = 1;
         buffers[0] = '';
         return;
-      case 'status':
+      case 'status': {
         buffers.length = 1;
-        buffers[0] = event.label;
+        const override = event.tool
+          ? toolStatusLabels.get(event.tool)
+          : undefined;
+        buffers[0] = override ?? event.label;
         lastEdit = Date.now();
         await flushAll();
         return;
+      }
       case 'token': {
         appendText(event.text);
         const now = Date.now();

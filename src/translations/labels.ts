@@ -37,3 +37,7 @@ export const labels = {
   type: 'Тип',
   unknown: '?',
 };
+
+export const toolStatusLabels = new Map<string, string>([
+  ['recommend_thesis_committee', '👥 Составувам комисија…'],
+]);
