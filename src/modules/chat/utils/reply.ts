@@ -13,7 +13,12 @@ import {
   registerConversation,
 } from './conversation.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
-import { sendPrompt } from './requests.js';
+import {
+  applyStreamEvent,
+  hasSavableAnswer,
+  sendPrompt,
+  type StreamAccumulator,
+} from './requests.js';
 import { appendTimingFootnote } from './timing.js';
 
 const COMMAND_LABEL = 'chat conversation continuation';
@@ -96,35 +101,41 @@ export const handleChatMessage = async (message: Message) => {
   }
 
   try {
-    let answer = '';
-    let firstChunkAt: null | number = null;
+    const state: StreamAccumulator = {
+      answer: '',
+      errored: false,
+      firstChunkAt: null,
+    };
     const startedAt = Date.now();
     const capture: { responseId: null | string } = { responseId: null };
 
-    const messages = await safeStreamReplyToMessage(
-      message,
-      async (onChunk) => {
-        capture.responseId = await sendPrompt(options, async (chunk) => {
-          firstChunkAt ??= Date.now();
-          answer += chunk;
-          await onChunk(chunk);
-        });
-      },
-    );
+    const messages = await safeStreamReplyToMessage(message, async (emit) => {
+      capture.responseId = await sendPrompt(options, async (event) => {
+        applyStreamEvent(state, event);
+        await emit(event);
+      });
+    });
 
-    if (answer.length > 0) {
+    if (hasSavableAnswer(state)) {
       const messageIds = messages.map((sent) => sent.id);
       registerConversation(inChatThread ? [message.channelId] : messageIds, [
         ...history,
         { content: prompt, role: 'user' },
-        { content: answer, role: 'assistant' },
+        { content: state.answer, role: 'assistant' },
       ]);
 
-      await appendTimingFootnote(messages.at(-1), startedAt, firstChunkAt);
+      await appendTimingFootnote(
+        messages.at(-1),
+        startedAt,
+        state.firstChunkAt,
+      );
 
       const { responseId } = capture;
       if (responseId !== null) {
-        rememberFeedbackContext(responseId, { answer, question: prompt });
+        rememberFeedbackContext(responseId, {
+          answer: state.answer,
+          question: prompt,
+        });
         await attachFeedbackButtons({
           askerId: message.author.id,
           guildId: message.guild?.id ?? null,

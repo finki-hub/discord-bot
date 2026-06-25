@@ -14,7 +14,12 @@ import type { SendPromptOptions } from '../schemas/Chat.js';
 import { LLM_ERRORS } from './constants.js';
 import { registerConversation } from './conversation.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
-import { sendPrompt } from './requests.js';
+import {
+  applyStreamEvent,
+  hasSavableAnswer,
+  sendPrompt,
+  type StreamAccumulator,
+} from './requests.js';
 import { appendTimingFootnote } from './timing.js';
 
 export const handlePromptWithStreaming = async (
@@ -26,35 +31,41 @@ export const handlePromptWithStreaming = async (
   commandLabel: string,
 ) => {
   try {
-    let answer = '';
-    let firstChunkAt: null | number = null;
+    const state: StreamAccumulator = {
+      answer: '',
+      errored: false,
+      firstChunkAt: null,
+    };
     const startedAt = Date.now();
     const capture: { responseId: null | string } = { responseId: null };
 
     const messages = await safeStreamReplyToInteraction(
       interaction,
-      async (onChunk) => {
-        capture.responseId = await sendPrompt(options, async (chunk) => {
-          firstChunkAt ??= Date.now();
-          answer += chunk;
-          await onChunk(chunk);
+      async (emit) => {
+        capture.responseId = await sendPrompt(options, async (event) => {
+          applyStreamEvent(state, event);
+          await emit(event);
         });
       },
     );
 
-    if (answer.length > 0) {
+    if (hasSavableAnswer(state)) {
       const messageIds = messages.map((message) => message.id);
       registerConversation(messageIds, [
         ...options.messages,
-        { content: answer, role: 'assistant' },
+        { content: state.answer, role: 'assistant' },
       ]);
 
-      await appendTimingFootnote(messages.at(-1), startedAt, firstChunkAt);
+      await appendTimingFootnote(
+        messages.at(-1),
+        startedAt,
+        state.firstChunkAt,
+      );
 
       const { responseId } = capture;
       if (responseId !== null) {
         rememberFeedbackContext(responseId, {
-          answer,
+          answer: state.answer,
           question: options.messages.at(-1)?.content,
         });
         await attachFeedbackButtons({

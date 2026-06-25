@@ -1,6 +1,8 @@
 import { createParser } from 'eventsource-parser';
 import { z } from 'zod';
 
+import type { StreamEvent } from '@/common/types/StreamEvent.js';
+
 import { logger } from '@/common/logger/index.js';
 import { getApiKey, getChatbotUrl } from '@/configuration/environment.js';
 import { QuestionsSchema } from '@/modules/faq/schemas/Question.js';
@@ -16,9 +18,22 @@ import type {
 
 import { sanitizeOptions } from './utils.js';
 
-// Await each chunk so the consumer finishes sending/editing its reply before the
+// Await each event so the consumer finishes sending/editing its reply before the
 // stream ends; firing them off unawaited lets the final flush race the in-flight
 // reply and post a duplicate message.
+const drainEvents = async (
+  pending: StreamEvent[],
+  onEvent: (event: StreamEvent) => Promise<void>,
+) => {
+  while (pending.length > 0) {
+    const event = pending.shift();
+    if (event !== undefined) {
+      await onEvent(event);
+    }
+  }
+};
+
+// fillEmbeddings streams plain text (no control events), so it keeps a string drain.
 const drainChunks = async (
   pending: string[],
   onChunk: (chunk: string) => Promise<void>,
@@ -31,9 +46,101 @@ const drainChunks = async (
   }
 };
 
+const asString = (value: unknown, fallback = ''): string =>
+  typeof value === 'string' ? value : fallback;
+
+const toStreamEvent = (sse: {
+  data: string;
+  event?: string | undefined;
+}): null | StreamEvent => {
+  const name = sse.event ?? '';
+  if (name === '' || name === 'message') {
+    // A bare `data:` frame (GPU passthrough) is answer text; the upstream escapes
+    // newlines as a literal "\n".
+    return { text: sse.data.replaceAll(String.raw`\n`, '\n'), type: 'token' };
+  }
+
+  const parsePayload = (): Record<string, unknown> => {
+    try {
+      const parsed = JSON.parse(sse.data) as unknown;
+      return typeof parsed === 'object' && parsed !== null
+        ? (parsed as Record<string, unknown>)
+        : {};
+    } catch {
+      return {};
+    }
+  };
+
+  const payload = parsePayload();
+
+  switch (name) {
+    case 'done':
+      return { type: 'done' };
+    case 'error':
+      return {
+        code: asString(payload['code'], 'error'),
+        message: asString(payload['message']),
+        type: 'error',
+      };
+    case 'reset':
+      return { type: 'reset' };
+    case 'status': {
+      const event: Extract<StreamEvent, { type: 'status' }> = {
+        label: asString(payload['label']),
+        type: 'status',
+      };
+      const state = asString(payload['state']);
+      if (state) {
+        event.state = state;
+      }
+      const tool = asString(payload['tool']);
+      if (tool) {
+        event.tool = tool;
+      }
+      return event;
+    }
+    case 'token':
+      return { text: asString(payload['text']), type: 'token' };
+    default:
+      return null;
+  }
+};
+
+export type StreamAccumulator = {
+  answer: string;
+  errored: boolean;
+  firstChunkAt: null | number;
+};
+
+export const applyStreamEvent = (
+  state: StreamAccumulator,
+  event: StreamEvent,
+): void => {
+  switch (event.type) {
+    case 'done':
+      break;
+    case 'error':
+      state.errored = true;
+      break;
+    case 'reset':
+      state.answer = '';
+      state.firstChunkAt = null; // so TTFT tracks the post-tool answer, not a preamble
+      break;
+    case 'status':
+      break;
+    case 'token':
+      state.firstChunkAt ??= Date.now();
+      state.answer += event.text;
+      break;
+  }
+};
+
+export const hasSavableAnswer = (state: StreamAccumulator): boolean =>
+  state.answer.length > 0 && !state.errored;
+
 export const sendPrompt = async (
   options: SendPromptOptions,
-  onChunk: (chunk: string) => Promise<void>,
+  onEvent: (event: StreamEvent) => Promise<void>,
 ) => {
   const chatbotUrl = getChatbotUrl();
 
@@ -67,12 +174,15 @@ export const sendPrompt = async (
   const responseId = result.headers.get('x-response-id');
 
   let receivedEvents = 0;
-  const pendingChunks: string[] = [];
+  const pendingEvents: StreamEvent[] = [];
 
   const parser = createParser({
-    onEvent: (event) => {
+    onEvent: (sse) => {
       receivedEvents++;
-      pendingChunks.push(event.data.replaceAll(String.raw`\n`, '\n'));
+      const event = toStreamEvent(sse);
+      if (event !== null) {
+        pendingEvents.push(event);
+      }
     },
   });
 
@@ -85,7 +195,7 @@ export const sendPrompt = async (
       break;
     }
     parser.feed(decoder.decode(value, { stream: true }));
-    await drainChunks(pendingChunks, onChunk);
+    await drainEvents(pendingEvents, onEvent);
   }
 
   if (receivedEvents === 0) {
