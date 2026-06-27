@@ -195,6 +195,14 @@ export const data = new SlashCommandBuilder()
           .setRequired(false)
           .setMinValue(1)
           .setMaxValue(4_096),
+      )
+      .addBooleanOption((option) =>
+        option
+          .setName('reasoning')
+          .setDescription(
+            'Овозможи размислување пред одговор (ако моделот поддржува)',
+          )
+          .setRequired(false),
       ),
   )
   .addSubcommand((subcommand) =>
