@@ -1,6 +1,10 @@
 import { type Message } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
+import {
+  trackCommandInvoked,
+  trackMessageAnswered,
+} from '@/common/services/analytics.js';
 import { safeStreamReplyToMessage } from '@/common/utils/messages.js';
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
@@ -22,6 +26,40 @@ import {
 import { appendTimingFootnote } from './timing.js';
 
 const COMMAND_LABEL = 'chat conversation continuation';
+
+const finalizeChatAnswer = async (params: {
+  askerId: string;
+  channelId: string;
+  guildId: null | string;
+  lastMessage: Message | undefined;
+  question: string;
+  responseId: null | string;
+  state: StreamAccumulator;
+  surface: string;
+}) => {
+  const { responseId } = params;
+
+  if (responseId !== null) {
+    trackMessageAnswered(params.askerId, {
+      channelId: params.channelId,
+      command: COMMAND_LABEL,
+      guildId: params.guildId,
+      responseId,
+      surface: params.surface,
+    });
+    rememberFeedbackContext(responseId, {
+      answer: params.state.answer,
+      question: params.question,
+    });
+  }
+
+  await attachFeedbackButtons({
+    askerId: params.askerId,
+    guildId: params.guildId,
+    message: params.lastMessage,
+    responseId,
+  });
+};
 
 const handleConversationError = async (message: Message, error: unknown) => {
   if (!Error.isError(error)) {
@@ -80,6 +118,15 @@ export const handleChatMessage = async (message: Message) => {
     return;
   }
 
+  const surface = inChatThread ? 'thread' : 'reply';
+
+  trackCommandInvoked(message.author.id, {
+    channelId: message.channelId,
+    command: COMMAND_LABEL,
+    guildId: message.guild?.id ?? null,
+    surface,
+  });
+
   const models =
     message.guild === null
       ? DEFAULT_CONFIGURATION.models
@@ -130,19 +177,16 @@ export const handleChatMessage = async (message: Message) => {
         state.firstChunkAt,
       );
 
-      const { responseId } = capture;
-      if (responseId !== null) {
-        rememberFeedbackContext(responseId, {
-          answer: state.answer,
-          question: prompt,
-        });
-        await attachFeedbackButtons({
-          askerId: message.author.id,
-          guildId: message.guild?.id ?? null,
-          message: messages.at(-1),
-          responseId,
-        });
-      }
+      await finalizeChatAnswer({
+        askerId: message.author.id,
+        channelId: message.channelId,
+        guildId: message.guild?.id ?? null,
+        lastMessage: messages.at(-1),
+        question: prompt,
+        responseId: capture.responseId,
+        state,
+        surface,
+      });
     }
   } catch (error) {
     await handleConversationError(message, error);

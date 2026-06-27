@@ -14,6 +14,9 @@ services:
       APPLICATION_ID: ${APPLICATION_ID}
       CHATBOT_URL: ${CHATBOT_URL}
       DATA_STORAGE_URL: ${DATA_STORAGE_URL}
+      POSTHOG_HOST: ${POSTHOG_HOST:-https://eu.i.posthog.com}
+      POSTHOG_KEY: ${POSTHOG_KEY:-phc_xXEqLMnYeDPuXA6HHwuasQMdSufDGryS8vZZuHmu9Qwd}
+      POSTHOG_SALT: ${POSTHOG_SALT}
       TOKEN: ${TOKEN}
       TZ: ${TZ}
     image: ghcr.io/finki-hub/discord-bot:latest

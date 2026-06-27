@@ -42,6 +42,9 @@ The env. variables are stored in `.env.sample`. The following variables are avai
 | `CHATBOT_URL`      | No       | URL of the [`finki-hub/chat-bot`](https://github.com/finki-hub/chat-bot) instance |
 | `API_KEY`          | No       | API key for authenticated chat bot endpoints (e.g. embeddings)                    |
 | `DATA_STORAGE_URL` | No       | Base URL for data storage (without trailing slash)                                |
+| `POSTHOG_KEY`      | No       | PostHog project key; analytics are a no-op when empty                             |
+| `POSTHOG_HOST`     | No       | PostHog ingest host (defaults to `https://eu.i.posthog.com`)                      |
+| `POSTHOG_SALT`     | No       | Salt for hashing Discord user IDs before they are sent to PostHog                 |
 | `TZ`               | No       | Timezone (e.g. `Europe/Berlin`)                                                   |
 
 If `DATA_STORAGE_URL` is not set, data loading features will be disabled. If `CHATBOT_URL` is not set, FAQ, links, and chat features will be disabled.

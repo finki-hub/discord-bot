@@ -6,6 +6,10 @@ import {
 } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
+import {
+  trackCommandInvoked,
+  trackMessageAnswered,
+} from '@/common/services/analytics.js';
 import { safeStreamReplyToInteraction } from '@/common/utils/messages.js';
 import { commandErrors } from '@/translations/commands.js';
 
@@ -30,6 +34,13 @@ export const handlePromptWithStreaming = async (
   options: SendPromptOptions,
   commandLabel: string,
 ) => {
+  trackCommandInvoked(interaction.user.id, {
+    channelId: interaction.channelId,
+    command: commandLabel,
+    guildId: interaction.guild?.id ?? null,
+    surface: 'interaction',
+  });
+
   try {
     const state: StreamAccumulator = {
       answer: '',
@@ -64,6 +75,13 @@ export const handlePromptWithStreaming = async (
 
       const { responseId } = capture;
       if (responseId !== null) {
+        trackMessageAnswered(interaction.user.id, {
+          channelId: interaction.channelId,
+          command: commandLabel,
+          guildId: interaction.guild?.id ?? null,
+          responseId,
+          surface: 'interaction',
+        });
         rememberFeedbackContext(responseId, {
           answer: state.answer,
           question: options.messages.at(-1)?.content,
