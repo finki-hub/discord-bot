@@ -120,7 +120,13 @@ export const applyStreamEvent = (
     case 'done':
       break;
     case 'error':
-      state.errored = true;
+      // An `interrupted` error is emitted only after tokens have already
+      // streamed, so the partial answer is valid and worth keeping (history,
+      // feedback, timing). Other codes (no_answer, agent_error) arrive after a
+      // `reset`, leaving no answer to save.
+      if (event.code !== 'interrupted') {
+        state.errored = true;
+      }
       break;
     case 'reset':
       state.answer = '';
