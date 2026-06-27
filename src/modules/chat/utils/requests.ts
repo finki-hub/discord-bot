@@ -99,6 +99,8 @@ const toStreamEvent = (sse: {
       }
       return event;
     }
+    case 'thinking':
+      return { text: asString(payload['text']), type: 'thinking' };
     case 'token':
       return { text: asString(payload['text']), type: 'token' };
     default:
@@ -127,6 +129,10 @@ export const applyStreamEvent = (
       state.firstChunkAt = null; // so TTFT tracks the post-tool answer, not a preamble
       break;
     case 'status':
+      break;
+    case 'thinking':
+      // Reasoning is display-only: it must not enter the saved answer or count
+      // toward time-to-first-token, which tracks the first answer token.
       break;
     case 'token':
       state.firstChunkAt ??= Date.now();

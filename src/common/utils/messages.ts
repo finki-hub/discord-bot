@@ -145,60 +145,138 @@ const smartSplit = (text: string, maxLength: number): [string, string] => {
 
 const MAX_STREAM_LENGTH = 2_000;
 
+type StreamView = {
+  answer: string;
+  reasoning: string;
+  status: null | string;
+};
+
+// Wrap a single logical line to `width`, breaking on a space where possible so a
+// blockquote line never exceeds the message split window (see formatReasoning).
+const wrapLine = (line: string, width: number): string[] => {
+  if (line.length <= width) {
+    return [line];
+  }
+
+  const wrapped: string[] = [];
+  let rest = line;
+  while (rest.length > width) {
+    const space = rest.lastIndexOf(' ', width);
+    const cut = space > 0 ? space : width;
+    wrapped.push(rest.slice(0, cut));
+    rest = rest.slice(space > 0 ? cut + 1 : cut);
+  }
+  wrapped.push(rest);
+
+  return wrapped;
+};
+
+// Leave room for the longest line prefix ("> 🧠 ", 5 UTF-16 units) so a prefixed
+// reasoning line stays within MAX_STREAM_LENGTH.
+const REASONING_LINE_WIDTH = MAX_STREAM_LENGTH - 6;
+
+// Reasoning streams on a separate channel and renders as a blockquote above the
+// answer, so it reads as the model's thinking rather than part of the answer.
+// Trimmed so a trailing/leading newline does not emit a stray empty `> ` line,
+// and long lines are pre-wrapped so the blockquote prefix survives message
+// splitting (a split then always lands on a newline between `> ` lines).
+const formatReasoning = (reasoning: string): string =>
+  reasoning
+    .trim()
+    .split('\n')
+    .flatMap((line) => wrapLine(line, REASONING_LINE_WIDTH))
+    .map((line, index) => (index === 0 ? `> 🧠 ${line}` : `> ${line}`))
+    .join('\n');
+
+export const composeStreamView = (view: StreamView): string => {
+  const head =
+    view.reasoning.trim() === '' ? '' : formatReasoning(view.reasoning);
+  // Before answer tokens arrive the lower region shows the status (or nothing);
+  // once they stream, the answer takes over that region below the reasoning.
+  const tail = view.answer === '' ? (view.status ?? '') : view.answer;
+
+  return [head, tail].filter((part) => part !== '').join('\n\n');
+};
+
+export const splitStreamMessage = (text: string): string[] => {
+  if (text === '') {
+    return [''];
+  }
+
+  const messages: string[] = [];
+  let rest = text;
+
+  while (rest.length > MAX_STREAM_LENGTH) {
+    const [head, tail] = smartSplit(rest, MAX_STREAM_LENGTH);
+    messages.push(head);
+    rest = tail;
+  }
+
+  messages.push(rest);
+
+  return messages;
+};
+
 const runStreaming = async (
   produce: EventProducer,
   flush: (index: number, content: string) => Promise<void>,
+  prune?: (keepCount: number) => Promise<void>,
 ) => {
-  const buffers: string[] = [''];
+  const view: StreamView = { answer: '', reasoning: '', status: null };
   let lastEdit = Date.now();
 
   const flushAll = async () => {
+    const buffers = splitStreamMessage(composeStreamView(view));
     for (const [index, buffer] of buffers.entries()) {
       await flush(index, buffer);
     }
-  };
-
-  const appendText = (text: string) => {
-    let bufferIndex = buffers.length - 1;
-    buffers[bufferIndex] += text;
-
-    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bufferIndex is derived from buffers.length and always points at an existing entry here
-    while (buffers[bufferIndex]!.length > MAX_STREAM_LENGTH) {
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- bufferIndex is guaranteed to point to the current buffer while splitting
-      const [head, tail] = smartSplit(buffers[bufferIndex]!, MAX_STREAM_LENGTH);
-      buffers[bufferIndex] = head;
-      buffers.push(tail);
-      bufferIndex++;
-    }
+    // Drop messages left over from a previously longer view (e.g. a pre-tool
+    // preamble cleared by `reset`) so stale content does not linger in the channel.
+    await prune?.(buffers.length);
   };
 
   const handleEvent = async (event: StreamEvent) => {
     switch (event.type) {
       case 'done':
         return;
-      case 'error': {
-        const current = buffers.at(-1) ?? '';
-        appendText(current ? `\n\n${event.message}` : event.message);
+      case 'error':
+        view.status = null;
+        view.answer =
+          view.answer === ''
+            ? event.message
+            : `${view.answer}\n\n${event.message}`;
         lastEdit = Date.now();
         await flushAll();
         return;
-      }
       case 'reset':
-        buffers.length = 1;
-        buffers[0] = '';
+        // Drop any pre-tool answer preamble so TTFT tracks the real answer;
+        // accumulated reasoning is preserved so it stays above the answer.
+        view.answer = '';
+        view.status = null;
         return;
       case 'status': {
-        buffers.length = 1;
         const override = event.tool
           ? toolStatusLabels.get(event.tool)
           : undefined;
-        buffers[0] = override ?? event.label;
+        view.answer = '';
+        view.status = override ?? event.label;
         lastEdit = Date.now();
         await flushAll();
         return;
       }
+      case 'thinking': {
+        view.status = null;
+        view.reasoning += event.text;
+        const now = Date.now();
+        if (now - lastEdit > 1_000) {
+          lastEdit = now;
+          await flushAll();
+        }
+        return;
+      }
       case 'token': {
-        appendText(event.text);
+        view.status = null;
+        view.answer += event.text;
         const now = Date.now();
         if (now - lastEdit > 1_000) {
           lastEdit = now;
@@ -211,6 +289,28 @@ const runStreaming = async (
   await produce(handleEvent);
 
   await flushAll();
+};
+
+// Delete tracked messages beyond `keepCount` when a streamed view shrinks to
+// fewer messages than were already sent. Truncates the caller's array first so
+// later flushes recreate from a clean state; deletion is best-effort.
+const pruneSurplusMessages = async (
+  sentMessages: Message[],
+  keepCount: number,
+): Promise<void> => {
+  const surplus = sentMessages.slice(keepCount);
+  if (surplus.length === 0) {
+    return;
+  }
+
+  sentMessages.length = keepCount;
+  for (const surplusMessage of surplus) {
+    try {
+      await surplusMessage.delete();
+    } catch {
+      // Best-effort: the follow-up may already be gone.
+    }
+  }
 };
 
 export const safeStreamReplyToInteraction = async (
@@ -288,7 +388,9 @@ export const safeStreamReplyToInteraction = async (
     rememberFollowUp(index, sent);
   };
 
-  await runStreaming(produce, flush);
+  await runStreaming(produce, flush, (keepCount) =>
+    pruneSurplusMessages(sentMessages, keepCount),
+  );
 
   return sentMessages;
 };
@@ -338,7 +440,9 @@ export const safeStreamReplyToMessage = async (
     remember(index, sent);
   };
 
-  await runStreaming(produce, flush);
+  await runStreaming(produce, flush, (keepCount) =>
+    pruneSurplusMessages(sentMessages, keepCount),
+  );
 
   return sentMessages;
 };

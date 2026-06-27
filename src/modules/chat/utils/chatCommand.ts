@@ -19,6 +19,14 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
         .setName('prompt')
         .setDescription('Промпт за LLM агентот')
         .setRequired(true),
+    )
+    .addBooleanOption((option) =>
+      option
+        .setName('reasoning')
+        .setDescription(
+          'Овозможи размислување пред одговор (ако моделот поддржува)',
+        )
+        .setRequired(false),
     ),
 
   execute: async (interaction: ChatInputCommandInteraction) => {
@@ -33,6 +41,7 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
       interaction.options.getNumber('temperature') ?? undefined;
     const topP = interaction.options.getNumber('top-p') ?? undefined;
     const maxTokens = interaction.options.getNumber('max-tokens') ?? undefined;
+    const reasoning = interaction.options.getBoolean('reasoning') ?? undefined;
 
     const models =
       interaction.guild === null
@@ -44,6 +53,7 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
       inferenceModel: inferenceModel ?? models.inference,
       maxTokens,
       prompt,
+      reasoning,
       systemPrompt,
       temperature,
       topP,
