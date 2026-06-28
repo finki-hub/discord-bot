@@ -2,6 +2,7 @@ import { type Message } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
 import {
+  captureException,
   trackCommandInvoked,
   trackMessageAnswered,
 } from '@/common/services/analytics.js';
@@ -61,7 +62,11 @@ const finalizeChatAnswer = async (params: {
   });
 };
 
-const handleConversationError = async (message: Message, error: unknown) => {
+const handleConversationError = async (
+  message: Message,
+  error: unknown,
+  surface: string,
+) => {
   if (!Error.isError(error)) {
     throw error;
   }
@@ -79,6 +84,11 @@ const handleConversationError = async (message: Message, error: unknown) => {
 
     logger.error(messageParts.join('\n'), {
       guildId: message.guild?.id,
+    });
+
+    captureException(error, message.author.id, {
+      command: COMMAND_LABEL,
+      surface,
     });
   }
 
@@ -189,6 +199,6 @@ export const handleChatMessage = async (message: Message) => {
       });
     }
   } catch (error) {
-    await handleConversationError(message, error);
+    await handleConversationError(message, error, surface);
   }
 };

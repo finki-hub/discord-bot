@@ -7,6 +7,7 @@ import {
 
 import { logger } from '@/common/logger/index.js';
 import {
+  captureException,
   trackCommandInvoked,
   trackMessageAnswered,
 } from '@/common/services/analytics.js';
@@ -112,6 +113,11 @@ export const handlePromptWithStreaming = async (
 
       logger.error(messageParts.join('\n'), {
         guildId: interaction.guild?.id,
+      });
+
+      captureException(error, interaction.user.id, {
+        command: commandLabel,
+        surface: 'interaction',
       });
     }
 

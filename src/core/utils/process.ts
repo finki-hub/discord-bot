@@ -1,5 +1,8 @@
 import { logger } from '@/common/logger/index.js';
-import { shutdownAnalytics } from '@/common/services/analytics.js';
+import {
+  captureException,
+  shutdownAnalytics,
+} from '@/common/services/analytics.js';
 
 const shutdown = async () => {
   logger.info('Shutting down gracefully...');
@@ -25,6 +28,11 @@ export const attachProcessListeners = () => {
 
   process.on('uncaughtException', (error) => {
     logger.error(`Bot has been shut down with error ${error.message}`);
+
+    captureException(error, null, {
+      command: 'uncaughtException',
+      surface: 'process',
+    });
   });
 
   process.on('warning', (warning) => {
