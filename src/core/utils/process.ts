@@ -22,8 +22,15 @@ export const attachProcessListeners = () => {
 
   process.on('SIGTERM', shutdown);
 
-  process.on('uncaughtException', (error) => {
+  process.on('uncaughtException', async (error) => {
     logger.error(`Bot has been shut down with error ${error.message}`);
+
+    try {
+      await shutdownAnalytics();
+    } finally {
+      // eslint-disable-next-line n/no-process-exit -- the bot intentionally exits after flushing analytics for uncaught exceptions
+      process.exit(1);
+    }
   });
 
   process.on('warning', (warning) => {
