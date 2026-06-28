@@ -28,9 +28,10 @@ export const initAnalytics = () => {
   }
 
   state.client = new PostHog(key, {
-    // Macedonian prompts/answers are sovereign data: never let PostHog scrape
-    // exception stacks that could embed message text.
-    enableExceptionAutocapture: false,
+    // Exception autocapture is intentionally ON per project decision: errors are
+    // surfaced fleet-wide so every unhandled exception/rejection reaches PostHog.
+    // Event message content (prompts/answers) is kept metadata-only elsewhere.
+    enableExceptionAutocapture: true,
     host: getPostHogHost(),
   });
 
