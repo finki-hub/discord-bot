@@ -27,10 +27,17 @@ export const initAnalytics = () => {
     return;
   }
 
+  if (getPostHogSalt() === '') {
+    logger.warn(
+      'PostHog analytics disabled: set POSTHOG_SALT to a non-empty value to enable analytics with privacy-safe hashed user IDs.',
+    );
+
+    return;
+  }
+
   state.client = new PostHog(key, {
-    // Exception autocapture is intentionally ON per project decision: errors are
-    // surfaced fleet-wide so every unhandled exception/rejection reaches PostHog.
-    // Event message content (prompts/answers) is kept metadata-only elsewhere.
+    // Exception autocapture is intentionally ON: every unhandled exception/rejection
+    // is captured fleet-wide. Event text (prompts/answers) is never forwarded.
     enableExceptionAutocapture: true,
     host: getPostHogHost(),
   });
