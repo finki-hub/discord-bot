@@ -18,6 +18,7 @@ const chatCommands = new Collection<string, ChatCommand>();
 const buttonCommands = new Collection<string, ButtonCommand>();
 const autocompleteCommands = new Collection<string, AutocompleteCommand>();
 const contextCommands = new Collection<string, ContextMenuCommand>();
+const commandModules = new Collection<string, string>();
 
 const getCommandImportPath = (dirent: Dirent) => {
   if (dirent.isDirectory()) {
@@ -126,39 +127,50 @@ const registerCommand = (params: {
 }): boolean => {
   const { commandData, commandName, commandType, module } = params;
 
-  if (commandType === 'autocomplete') {
-    return checkAndSetCommand({
-      collection: autocompleteCommands,
-      commandData: commandData as AutocompleteCommand,
-      commandName,
-      module,
-    });
+  let registered: boolean;
+
+  switch (commandType) {
+    case 'autocomplete':
+      registered = checkAndSetCommand({
+        collection: autocompleteCommands,
+        commandData: commandData as AutocompleteCommand,
+        commandName,
+        module,
+      });
+      break;
+
+    case 'button':
+      registered = checkAndSetCommand({
+        collection: buttonCommands,
+        commandData: commandData as ButtonCommand,
+        commandName,
+        module,
+      });
+      break;
+
+    case 'chat':
+      registered = checkAndSetCommand({
+        collection: chatCommands,
+        commandData: commandData as ChatCommand,
+        commandName,
+        module,
+      });
+      break;
+
+    case 'context':
+      registered = checkAndSetCommand({
+        collection: contextCommands,
+        commandData: commandData as ContextMenuCommand,
+        commandName,
+        module,
+      });
   }
 
-  if (commandType === 'button') {
-    return checkAndSetCommand({
-      collection: buttonCommands,
-      commandData: commandData as ButtonCommand,
-      commandName,
-      module,
-    });
+  if (registered) {
+    commandModules.set(commandName, module);
   }
 
-  if (commandType === 'chat') {
-    return checkAndSetCommand({
-      collection: chatCommands,
-      commandData: commandData as ChatCommand,
-      commandName,
-      module,
-    });
-  }
-
-  return checkAndSetCommand({
-    collection: contextCommands,
-    commandData: commandData as ContextMenuCommand,
-    commandName,
-    module,
-  });
+  return registered;
 };
 
 const loadCommand = async (
@@ -208,6 +220,7 @@ const refreshCommands = async () => {
   buttonCommands.clear();
   autocompleteCommands.clear();
   contextCommands.clear();
+  commandModules.clear();
 
   const modules = await getModules();
   logger.debug(`Loading commands from ${modules.length} module(s)...`);
@@ -240,6 +253,7 @@ export const getAutocompleteCommand = (name: string) =>
   autocompleteCommands.get(name);
 export const getContextMenuCommand = (name: string) =>
   contextCommands.get(name);
+export const getCommandModule = (name: string) => commandModules.get(name);
 
 export const registerCommands = async () => {
   await refreshCommands();

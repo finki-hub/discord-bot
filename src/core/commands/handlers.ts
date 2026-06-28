@@ -13,6 +13,7 @@ import {
 
 import { getFullCommandName } from '@/common/commands/utils.js';
 import { logger } from '@/common/logger/index.js';
+import { trackInteraction } from '@/common/services/analytics.js';
 import { getMemberFromGuild } from '@/common/utils/guild.js';
 import { name as chatFeedbackButtonId } from '@/modules/chat/commands/button/chatFeedback.js';
 import { name as chatCommandId } from '@/modules/chat/commands/chat/chat.js';
@@ -33,6 +34,7 @@ import {
   getAutocompleteCommand,
   getButtonCommand,
   getChatCommand,
+  getCommandModule,
   getContextMenuCommand,
 } from './modules.js';
 
@@ -78,6 +80,12 @@ const notifyInteractionError = async (
     // Notifying the user can fail if the interaction expired; ignore it.
   }
 };
+
+const getSurface = (guildId: null | string) =>
+  guildId === null ? ('dm' as const) : ('guild' as const);
+
+const errorName = (error: unknown) =>
+  Error.isError(error) ? error.name : 'Error';
 
 export const handleChatInputCommand = async (
   interaction: ChatInputCommandInteraction,
@@ -153,8 +161,18 @@ export const handleChatInputCommand = async (
     }
   }
 
+  const startedAt = Date.now();
+
   try {
     await command.execute(interaction);
+    trackInteraction(interaction.user.id, {
+      command: commandWithSubcommand,
+      durationMs: Date.now() - startedAt,
+      module: getCommandModule(interaction.commandName),
+      outcome: 'ok',
+      surface: getSurface(interaction.guildId),
+      type: 'chat',
+    });
   } catch (error) {
     logger.error(
       `Failed executing chat input command ${inlineCode(commandWithSubcommand)}\n${String(error)}`,
@@ -171,6 +189,16 @@ export const handleChatInputCommand = async (
           content: errorMessage,
           flags: MessageFlags.Ephemeral,
         }));
+
+    trackInteraction(interaction.user.id, {
+      command: commandWithSubcommand,
+      durationMs: Date.now() - startedAt,
+      errorType: errorName(error),
+      module: getCommandModule(interaction.commandName),
+      outcome: 'error',
+      surface: getSurface(interaction.guildId),
+      type: 'chat',
+    });
   }
 };
 
@@ -233,11 +261,21 @@ export const handleButton = async (interaction: ButtonInteraction) => {
     return;
   }
 
+  const startedAt = Date.now();
+
   try {
     if (!nonDeferredCommands.has(command.name)) {
       await interaction.deferReply({ flags: MessageFlags.Ephemeral });
     }
     await command.execute(interaction, args);
+    trackInteraction(interaction.user.id, {
+      command: command.name,
+      durationMs: Date.now() - startedAt,
+      module: getCommandModule(command.name),
+      outcome: 'ok',
+      surface: getSurface(interaction.guildId),
+      type: 'button',
+    });
   } catch (error) {
     logger.error(
       `Failed executing button interaction ${interaction.customId}\n${String(error)}`,
@@ -251,6 +289,16 @@ export const handleButton = async (interaction: ButtonInteraction) => {
       : commandErrors.commandError;
 
     await notifyInteractionError(interaction, errorMessage);
+
+    trackInteraction(interaction.user.id, {
+      command: command.name,
+      durationMs: Date.now() - startedAt,
+      errorType: errorName(error),
+      module: getCommandModule(command.name),
+      outcome: 'error',
+      surface: getSurface(interaction.guildId),
+      type: 'button',
+    });
   }
 };
 
@@ -273,6 +321,10 @@ export const handleAutocomplete = async (
     return;
   }
 
+  const startedAt = Date.now();
+  let outcome: 'error' | 'ok' = 'ok';
+  let errorType: string | undefined;
+
   try {
     await command.execute(interaction);
   } catch (error) {
@@ -283,6 +335,8 @@ export const handleAutocomplete = async (
           guildId: interaction.guild?.id,
         },
       );
+      outcome = 'error';
+      errorType = errorName(error);
     }
   } finally {
     try {
@@ -291,6 +345,16 @@ export const handleAutocomplete = async (
       // Autocomplete responses fail silently if the interaction expired.
     }
   }
+
+  trackInteraction(interaction.user.id, {
+    command: interaction.commandName,
+    durationMs: Date.now() - startedAt,
+    ...(errorType !== undefined && { errorType }),
+    module: getCommandModule(interaction.commandName),
+    outcome,
+    surface: getSurface(interaction.guildId),
+    type: 'autocomplete',
+  });
 };
 
 const executeContextMenuCommand = async (
@@ -346,12 +410,22 @@ const executeContextMenuCommand = async (
     return;
   }
 
+  const startedAt = Date.now();
+
   try {
     if (!nonDeferredCommands.has(command.name)) {
       await interaction.deferReply();
     }
 
     await command.execute(interaction);
+    trackInteraction(interaction.user.id, {
+      command: interaction.commandName,
+      durationMs: Date.now() - startedAt,
+      module: getCommandModule(interaction.commandName),
+      outcome: 'ok',
+      surface: getSurface(interaction.guildId),
+      type: 'context',
+    });
   } catch (error) {
     logger.error(
       `Failed executing context menu command ${inlineCode(interaction.commandName)}\n${String(error)}`,
@@ -372,6 +446,16 @@ const executeContextMenuCommand = async (
           content: errorMessage,
           flags: MessageFlags.Ephemeral,
         }));
+
+    trackInteraction(interaction.user.id, {
+      command: interaction.commandName,
+      durationMs: Date.now() - startedAt,
+      errorType: errorName(error),
+      module: getCommandModule(interaction.commandName),
+      outcome: 'error',
+      surface: getSurface(interaction.guildId),
+      type: 'context',
+    });
   }
 };
 
@@ -395,6 +479,17 @@ export const handleModalSubmit = async (
       guildId: interaction.guild?.id,
     },
   );
+
+  const command = interaction.customId.split(':', 1)[0] ?? interaction.customId;
+
+  trackInteraction(interaction.user.id, {
+    command,
+    durationMs: 0,
+    outcome: 'error',
+    surface: getSurface(interaction.guildId),
+    type: 'modal',
+  });
+
   await interaction.reply({
     content: commandErrors.commandError,
     flags: MessageFlags.Ephemeral,

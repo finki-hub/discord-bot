@@ -1,6 +1,7 @@
 import { type ClientEvents, Events } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
+import { trackLifecycle } from '@/common/services/analytics.js';
 import { initializeChannels } from '@/common/services/channels.js';
 
 import { client as bot } from '../client.js';
@@ -16,6 +17,8 @@ export const execute = async (...[client]: ClientEvents[typeof name]) => {
   }
 
   await client.application.commands.fetch();
+
+  trackLifecycle('bot_ready', { guildCount: client.guilds.cache.size });
 
   logger.info(
     `Bot is ready! Logged in as ${bot.user?.tag ?? 'an unknown user'}`,

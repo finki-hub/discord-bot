@@ -6,6 +6,10 @@ import {
 } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
+import {
+  captureException,
+  trackMessageAnswered,
+} from '@/common/services/analytics.js';
 import { safeStreamReplyToInteraction } from '@/common/utils/messages.js';
 import { commandErrors } from '@/translations/commands.js';
 
@@ -64,6 +68,13 @@ export const handlePromptWithStreaming = async (
 
       const { responseId } = capture;
       if (responseId !== null) {
+        trackMessageAnswered(interaction.user.id, {
+          channelId: interaction.channelId,
+          command: commandLabel,
+          guildId: interaction.guild?.id ?? null,
+          responseId,
+          surface: 'interaction',
+        });
         rememberFeedbackContext(responseId, {
           answer: state.answer,
           question: options.messages.at(-1)?.content,
@@ -94,6 +105,11 @@ export const handlePromptWithStreaming = async (
 
       logger.error(messageParts.join('\n'), {
         guildId: interaction.guild?.id,
+      });
+
+      captureException(error, interaction.user.id, {
+        command: commandLabel,
+        surface: 'interaction',
       });
     }
 

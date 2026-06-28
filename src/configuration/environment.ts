@@ -50,3 +50,27 @@ export const getDataStorageUrl = () => {
     return null;
   }
 };
+
+export const getPostHogKey = () => {
+  try {
+    return z.string().min(1).parse(env['POSTHOG_KEY']);
+  } catch {
+    return null;
+  }
+};
+
+export const getPostHogHost = () => {
+  try {
+    return z.string().min(1).parse(env['POSTHOG_HOST']);
+  } catch {
+    return 'https://eu.i.posthog.com';
+  }
+};
+
+export const getPostHogSalt = () => {
+  try {
+    return z.string().parse(env['POSTHOG_SALT']);
+  } catch {
+    return '';
+  }
+};

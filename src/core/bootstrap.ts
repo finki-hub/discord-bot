@@ -1,4 +1,5 @@
 import { logger } from '@/common/logger/index.js';
+import { initAnalytics } from '@/common/services/analytics.js';
 import { reloadConfig } from '@/configuration/bot/index.js';
 import { getToken } from '@/configuration/environment.js';
 
@@ -28,6 +29,8 @@ export const bootstrap = async () => {
 
   attachProcessListeners();
   logger.debug('Process listeners attached');
+
+  initAnalytics();
 
   await Promise.all([
     reloadConfig(),
