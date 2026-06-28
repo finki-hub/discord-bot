@@ -111,6 +111,72 @@ export const trackMessageAnswered = (
   });
 };
 
+type InteractionEventProps = {
+  command: string;
+  durationMs: number;
+  errorType?: string | undefined;
+  module?: string | undefined;
+  outcome: 'error' | 'ok';
+  surface: 'dm' | 'guild';
+  type: 'autocomplete' | 'button' | 'chat' | 'context' | 'modal';
+};
+
+export const trackInteraction = (
+  userId: string,
+  props: InteractionEventProps,
+): void => {
+  const { client } = state;
+
+  if (client === null) {
+    return;
+  }
+
+  client.capture({
+    distinctId: hashUserId(userId),
+    event: 'interaction',
+    properties: {
+      command: props.command,
+      duration_ms: props.durationMs,
+      ...(props.errorType !== undefined && { error_type: props.errorType }),
+      ...(props.module !== undefined && { module: props.module }),
+      outcome: props.outcome,
+      service: SERVICE,
+      surface: props.surface,
+      type: props.type,
+    },
+  });
+};
+
+type LifecycleEventProps = {
+  guildCount?: number;
+  guildId?: string;
+  memberCount?: number;
+};
+
+export const trackLifecycle = (
+  event: string,
+  props: LifecycleEventProps = {},
+): void => {
+  const { client } = state;
+
+  if (client === null) {
+    return;
+  }
+
+  client.capture({
+    distinctId: FALLBACK_DISTINCT_ID,
+    event,
+    properties: {
+      ...(props.guildCount !== undefined && { guild_count: props.guildCount }),
+      ...(props.guildId !== undefined && { guild_id: props.guildId }),
+      ...(props.memberCount !== undefined && {
+        member_count: props.memberCount,
+      }),
+      service: SERVICE,
+    },
+  });
+};
+
 type ExceptionProps = {
   command?: string;
   surface?: string;

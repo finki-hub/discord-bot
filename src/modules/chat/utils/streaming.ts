@@ -8,7 +8,6 @@ import {
 import { logger } from '@/common/logger/index.js';
 import {
   captureException,
-  trackCommandInvoked,
   trackMessageAnswered,
 } from '@/common/services/analytics.js';
 import { safeStreamReplyToInteraction } from '@/common/utils/messages.js';
@@ -35,13 +34,6 @@ export const handlePromptWithStreaming = async (
   options: SendPromptOptions,
   commandLabel: string,
 ) => {
-  trackCommandInvoked(interaction.user.id, {
-    channelId: interaction.channelId,
-    command: commandLabel,
-    guildId: interaction.guild?.id ?? null,
-    surface: 'interaction',
-  });
-
   try {
     const state: StreamAccumulator = {
       answer: '',
