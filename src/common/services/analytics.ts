@@ -10,10 +10,8 @@ import {
   getPostHogSalt,
 } from '@/configuration/environment.js';
 
-// Every event carries this so the shared PostHog project can tell fleet services apart.
 const SERVICE = 'discord-bot';
 
-// Stable distinct_id for exceptions that arise without a known user (process/client level).
 const FALLBACK_DISTINCT_ID = 'discord-bot';
 
 const state: { client: null | PostHog } = { client: null };
@@ -36,8 +34,6 @@ export const initAnalytics = () => {
   }
 
   state.client = new PostHog(key, {
-    // Exception autocapture is intentionally ON: every unhandled exception/rejection
-    // is captured fleet-wide. Event text (prompts/answers) is never forwarded.
     enableExceptionAutocapture: true,
     host: getPostHogHost(),
   });
@@ -52,12 +48,10 @@ export const shutdownAnalytics = async () => {
     return;
   }
 
-  // Detach before awaiting so a concurrent capture cannot use a draining client.
   state.client = null;
   await client.shutdown();
 };
 
-// distinct_id is a salted hash so a raw Discord snowflake never leaves the bot.
 const hashUserId = (userId: string): string =>
   createHash('sha256')
     .update(getPostHogSalt() + userId)
@@ -80,7 +74,6 @@ export const trackCommandInvoked = (
     return;
   }
 
-  // Build a fresh, metadata-only payload; never spread request/options objects.
   client.capture({
     distinctId: hashUserId(userId),
     event: 'command_invoked',
@@ -123,11 +116,8 @@ type ExceptionProps = {
   surface?: string;
 };
 
-// Surface errors to PostHog with metadata only; never throws so it is safe in
-// catch blocks and process-level handlers.
 export const captureException = (
   error: unknown,
-  // Raw user id when known (hashed here) or null to use the service fallback.
   userId: null | string,
   props: ExceptionProps = {},
 ): void => {
@@ -144,7 +134,6 @@ export const captureException = (
     : new Error(String(error));
 
   try {
-    // Residency: metadata only, never the user question or answer text.
     client.captureException(normalizedError, distinctId, {
       command: props.command ?? null,
       error_type: normalizedError.name,
@@ -152,7 +141,6 @@ export const captureException = (
       surface: props.surface ?? null,
     });
   } catch (captureError) {
-    // Telemetry must never break the error handling it observes.
     logger.debug(
       `Failed capturing exception in PostHog\n${String(captureError)}`,
     );

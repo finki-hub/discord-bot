@@ -7,7 +7,6 @@ const shutdown = async () => {
   let code = 0;
 
   try {
-    // Drain any queued PostHog events before the process exits.
     await shutdownAnalytics();
   } catch (error) {
     logger.error(`Failed shutting down gracefully\n${String(error)}`);
