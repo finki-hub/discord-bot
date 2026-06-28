@@ -33,6 +33,19 @@ export const attachProcessListeners = () => {
     }
   });
 
+  process.on('unhandledRejection', async (reason) => {
+    logger.error(
+      `Bot has been shut down with unhandled rejection: ${String(reason)}`,
+    );
+
+    try {
+      await shutdownAnalytics();
+    } finally {
+      // eslint-disable-next-line n/no-process-exit -- the bot intentionally exits after flushing analytics for unhandled rejections
+      process.exit(1);
+    }
+  });
+
   process.on('warning', (warning) => {
     logger.warn(warning);
   });
