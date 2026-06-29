@@ -24,6 +24,7 @@ export const SendPromptOptionsSchema = z
   .transform((data) => ({
     embeddings_model: data.embeddingsModel,
     inference_model: data.inferenceModel,
+    interface: 'discord' as const,
     max_tokens: data.maxTokens,
     messages: [
       ...(data.history ?? []),
