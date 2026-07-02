@@ -1,5 +1,4 @@
 import {
-  bold,
   type ChatInputCommandInteraction,
   MessageFlags,
   SlashCommandBuilder,
@@ -12,7 +11,6 @@ import {
   commandErrors,
   commandResponseFunctions,
 } from '@/translations/commands.js';
-import { labels } from '@/translations/labels.js';
 
 export const name = 'link';
 
@@ -48,14 +46,11 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
   }
 
   const normalizedUrl = getNormalizedUrl(link.url);
-  const noteLabel = `${labels.note}:`;
-  const note =
-    link.description === null ? '' : `\n${bold(noteLabel)} ${link.description}`;
 
   await interaction.editReply({
     content: user
-      ? `${commandResponseFunctions.commandFor(user.id)}\n${normalizedUrl}${note}`
-      : `${normalizedUrl}${note}`,
+      ? `${commandResponseFunctions.commandFor(user.id)}\n${normalizedUrl}`
+      : normalizedUrl,
     flags: MessageFlags.SuppressEmbeds,
   });
 };
