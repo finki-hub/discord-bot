@@ -6,6 +6,9 @@
       "enabled": false
     },
     "errorWebhook": null,
+    "feedback": {
+      "enabled": true
+    },
     "models": {
       "embeddings": "BAAI/bge-m3",
       "inference": "claude-sonnet-4-6"
