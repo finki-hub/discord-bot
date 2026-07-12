@@ -17,6 +17,7 @@ import { trackInteraction } from '@/common/services/analytics.js';
 import { getMemberFromGuild } from '@/common/utils/guild.js';
 import { name as chatFeedbackButtonId } from '@/modules/chat/commands/button/chatFeedback.js';
 import { name as chatCommandId } from '@/modules/chat/commands/chat/chat.js';
+import { name as credentialsCommandId } from '@/modules/chat/commands/chat/credentials.js';
 import { name as helpCommandId } from '@/modules/help/commands/chat/help.js';
 import { name as listCommandsButtonId } from '@/modules/list/commands/button/listCommands.js';
 import { name as listLinksButtonId } from '@/modules/list/commands/button/listLinks.js';
@@ -36,10 +37,14 @@ import {
   getChatCommand,
   getCommandModule,
   getContextMenuCommand,
+  getModalCommand,
 } from './modules.js';
 
 const nonDeferredCommands = new Set<string>([
   `${chatCommandId} thread`,
+  `${credentialsCommandId} delete`,
+  `${credentialsCommandId} list`,
+  `${credentialsCommandId} set`,
   `${ticketCommandId} list`,
   chatFeedbackButtonId,
   helpCommandId,
@@ -473,25 +478,91 @@ export const handleModalSubmit = async (
   logger.info(
     `[Modal] ${interaction.user.tag}: ${interaction.customId} [${interaction.guild?.name ?? 'DM'}]`,
   );
-  logger.warn(
-    `Received unhandled modal submit interaction: ${interaction.customId}`,
-    {
+
+  const [commandName, ...args] = interaction.customId.split(':');
+
+  if (!commandName) {
+    logger.error(`Command for modal interaction ${interaction.id} not found`, {
       guildId: interaction.guild?.id,
-    },
-  );
+    });
+    await interaction.reply({
+      content: commandErrors.commandError,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
-  const command = interaction.customId.split(':', 1)[0] ?? interaction.customId;
+  const command = getModalCommand(commandName);
 
-  trackInteraction(interaction.user.id, {
-    command,
-    durationMs: 0,
-    outcome: 'error',
-    surface: getSurface(interaction.guildId),
-    type: 'modal',
-  });
+  if (command === undefined) {
+    logger.error(`Command for modal interaction ${interaction.id} not found`, {
+      guildId: interaction.guild?.id,
+    });
+    await interaction.reply({
+      content: commandErrors.commandError,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
-  await interaction.reply({
-    content: commandErrors.commandError,
-    flags: MessageFlags.Ephemeral,
-  });
+  const member =
+    interaction.guild === null
+      ? null
+      : await getMemberFromGuild(interaction.user.id, interaction.guild);
+
+  if (member === null) {
+    if (commandRequiresPermissions(command.name)) {
+      logger.warn('Guild-only command used in DMs', {
+        guildId: interaction.guild?.id,
+      });
+      await interaction.reply({
+        content: commandErrors.commandGuildOnly,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+  } else if (!(await hasCommandPermission(member, command.name))) {
+    await interaction.reply({
+      content: commandErrors.commandNoPermission,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  const startedAt = Date.now();
+
+  try {
+    await command.execute(interaction, args);
+    trackInteraction(interaction.user.id, {
+      command: command.name,
+      durationMs: Date.now() - startedAt,
+      module: getCommandModule(command.name),
+      outcome: 'ok',
+      surface: getSurface(interaction.guildId),
+      type: 'modal',
+    });
+  } catch (error) {
+    logger.error(
+      `Failed executing modal submit interaction ${interaction.customId}\n${String(error)}`,
+      {
+        guildId: interaction.guild?.id,
+      },
+    );
+
+    const errorMessage = isMissingPermissionsError(error)
+      ? commandErrors.botMissingPermissions
+      : commandErrors.commandError;
+
+    await notifyInteractionError(interaction, errorMessage);
+
+    trackInteraction(interaction.user.id, {
+      command: command.name,
+      durationMs: Date.now() - startedAt,
+      errorType: errorName(error),
+      module: getCommandModule(command.name),
+      outcome: 'error',
+      surface: getSurface(interaction.guildId),
+      type: 'modal',
+    });
+  }
 };

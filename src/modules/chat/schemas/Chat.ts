@@ -3,7 +3,7 @@
 import { z } from 'zod';
 
 export const ConversationTurnSchema = z.object({
-  content: z.string(),
+  content: z.string().max(2_000),
   role: z.enum(['assistant', 'user']),
 });
 
@@ -12,14 +12,14 @@ export type ConversationTurn = z.infer<typeof ConversationTurnSchema>;
 export const SendPromptOptionsSchema = z
   .object({
     embeddingsModel: z.string().optional(),
-    history: z.array(ConversationTurnSchema).optional(),
+    history: z.array(ConversationTurnSchema).max(9).optional(),
     inferenceModel: z.string().optional(),
     maxTokens: z.number().min(1).max(4_096).optional(),
-    prompt: z.string().min(1, 'Query must not be empty'),
+    prompt: z.string().min(1, 'Query must not be empty').max(2_000),
     reasoning: z.boolean().optional(),
-    systemPrompt: z.string().optional(),
     temperature: z.number().min(0).max(1).optional(),
     topP: z.number().min(0).max(1).optional(),
+    userId: z.uuid(),
   })
   .transform((data) => ({
     embeddings_model: data.embeddingsModel,
@@ -27,13 +27,13 @@ export const SendPromptOptionsSchema = z
     interface: 'discord' as const,
     max_tokens: data.maxTokens,
     messages: [
-      ...(data.history ?? []),
+      ...(data.history ?? []).slice(-9),
       { content: data.prompt, role: 'user' as const },
-    ],
+    ].slice(-10),
     reasoning: data.reasoning,
-    system_prompt: data.systemPrompt,
     temperature: data.temperature,
     top_p: data.topP,
+    user_id: data.userId,
   }));
 
 export type SendPromptOptions = z.infer<typeof SendPromptOptionsSchema>;

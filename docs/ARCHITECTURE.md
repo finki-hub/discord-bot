@@ -75,12 +75,13 @@ The **core** layer is the framework responsible for bootstrapping the bot, loadi
 
 ### Command Types
 
-The framework supports four types of commands:
+The framework supports five types of commands:
 
 - **ChatCommand** - Slash commands (`/command`)
 - **ButtonCommand** - Button interaction handlers
 - **AutocompleteCommand** - Autocomplete suggestion handlers
 - **ContextMenuCommand** - Right-click context menu commands
+- **ModalCommand** - Modal submit interaction handlers
 
 Commands are automatically discovered from module directories based on their folder structure:
 
@@ -88,6 +89,7 @@ Commands are automatically discovered from module directories based on their fol
 - `commands/button/` - Button handlers
 - `commands/autocomplete/` - Autocomplete handlers
 - `commands/context/` - Context menu commands
+- `commands/modal/` - Modal submit handlers
 
 ### Event System
 
@@ -544,7 +546,8 @@ modules/myfeature/
 │   ├── chat/             # Slash commands
 │   ├── button/           # Button handlers
 │   ├── autocomplete/     # Autocomplete handlers
-│   └── context/          # Context menu commands
+│   ├── context/          # Context menu commands
+│   └── modal/             # Modal submit handlers
 ├── components/           # UI component builders
 ├── schemas/              # Zod validation schemas
 └── utils/                # Module-specific utilities

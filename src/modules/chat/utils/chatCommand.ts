@@ -1,13 +1,17 @@
 import {
   type ChatInputCommandInteraction,
+  MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
 
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
-import { commandDescriptions } from '@/translations/commands.js';
+import { commandDescriptions, commandErrors } from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
+import { ChatApiError } from '../schemas/Credentials.js';
+import { resolveChatUser } from './identity.js';
+import { getValidatedInferenceModel } from './requests.js';
 import { handlePromptWithStreaming } from './streaming.js';
 
 export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
@@ -31,8 +35,6 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
 
   execute: async (interaction: ChatInputCommandInteraction) => {
     const prompt = interaction.options.getString('prompt', true);
-    const systemPrompt =
-      interaction.options.getString('system-prompt') ?? undefined;
     const embeddingsModel =
       interaction.options.getString('embeddings-model') ?? undefined;
     const inferenceModel =
@@ -48,15 +50,35 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
         ? DEFAULT_CONFIGURATION.models
         : await getConfigProperty('models', interaction.guild.id);
 
+    let chatUser;
+    try {
+      chatUser = await resolveChatUser(interaction.user);
+    } catch (error) {
+      if (!(error instanceof ChatApiError)) {
+        throw error;
+      }
+      await (interaction.deferred || interaction.replied
+        ? interaction.editReply(commandErrors.llmUnavailable)
+        : interaction.reply({
+            content: commandErrors.llmUnavailable,
+            flags: MessageFlags.Ephemeral,
+          }));
+      return;
+    }
+    const validatedInferenceModel = await getValidatedInferenceModel(
+      chatUser.id,
+      inferenceModel ?? models.inference,
+    );
+
     const options = SendPromptOptionsSchema.parse({
       embeddingsModel: embeddingsModel ?? models.embeddings,
-      inferenceModel: inferenceModel ?? models.inference,
+      inferenceModel: validatedInferenceModel,
       maxTokens,
       prompt,
       reasoning,
-      systemPrompt,
       temperature,
       topP,
+      userId: chatUser.id,
     });
 
     await handlePromptWithStreaming(interaction, options, 'chat query command');

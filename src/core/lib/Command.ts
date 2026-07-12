@@ -4,6 +4,7 @@ import type {
   ChatInputCommandInteraction,
   ContextMenuCommandBuilder,
   ContextMenuCommandInteraction,
+  ModalSubmitInteraction,
   SlashCommandBuilder,
 } from 'discord.js';
 
@@ -32,7 +33,8 @@ export type Command =
   | AutocompleteCommand
   | ButtonCommand
   | ChatCommand
-  | ContextMenuCommand;
+  | ContextMenuCommand
+  | ModalCommand;
 
 export type CommandPermissions = {
   permissions?: bigint[];
@@ -43,5 +45,14 @@ export type CommandPermissions = {
 export type ContextMenuCommand = {
   data: ContextMenuCommandBuilder;
   execute: (interaction: ContextMenuCommandInteraction) => Promise<void>;
+  name: string;
+};
+
+export type ModalCommand = {
+  data?: undefined;
+  execute: (
+    interaction: ModalSubmitInteraction,
+    args: string[],
+  ) => Promise<void>;
   name: string;
 };

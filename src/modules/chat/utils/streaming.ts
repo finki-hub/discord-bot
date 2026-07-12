@@ -57,7 +57,7 @@ export const handlePromptWithStreaming = async (
       const messageIds = messages.map((message) => message.id);
       registerConversation(messageIds, [
         ...options.messages,
-        { content: state.answer, role: 'assistant' },
+        { content: state.answer.slice(0, 2_000), role: 'assistant' },
       ]);
 
       await appendTimingFootnote(

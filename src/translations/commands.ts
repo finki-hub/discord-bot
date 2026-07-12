@@ -21,6 +21,9 @@ export const commandDescriptions = {
   'config reload': 'Освежи ги конфигурациите',
   'config set': 'Измени конфигурација',
   course: 'Преземи информации за предмет',
+  'credentials delete': 'Избриши API клуч за провајдер',
+  'credentials list': 'Прикажи поставени API клучеви',
+  'credentials set': 'Постави API клуч за провајдер',
   faq: 'Преземи најчесто поставувано прашање',
   help: 'Преземи листа од сите достапни команди',
   home: 'Преземи линк до изворниот код',
@@ -105,6 +108,8 @@ export const commandErrors = {
   commandNotFound: 'Командата не постои.',
   configurationSavingFailed: 'Зачувувањето на конфигурацијата беше неуспешно.',
   courseNotFound: 'Предметот не постои.',
+  credentialRequired:
+    'Немате поставено API клуч за овој провајдер. Користете /credentials set за да поставите.',
   dataFetchFailed: 'Преземањето на податоците беше неуспешно.',
   dataReloadFailed:
     'Неуспешно освежување на податоците. Проверете ги логите за повеќе детали.',

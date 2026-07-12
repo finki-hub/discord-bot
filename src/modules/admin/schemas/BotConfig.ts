@@ -2,12 +2,12 @@ import { z } from 'zod';
 
 import { ChannelSchema } from '@/common/schemas/Channel.js';
 import { RoleSchema } from '@/common/schemas/Role.js';
-import { ModelSchema } from '@/modules/chat/schemas/Model.js';
+import { EMBEDDING_MODELS } from '@/modules/chat/schemas/Model.js';
 import { TicketSchema } from '@/modules/ticket/schemas/Ticket.js';
 
 const ModelsSchema = z.object({
-  embeddings: ModelSchema.optional(),
-  inference: ModelSchema.optional(),
+  embeddings: z.enum(EMBEDDING_MODELS).optional(),
+  inference: z.string().optional(),
 });
 
 export const RequiredBotConfigSchema = z.object({

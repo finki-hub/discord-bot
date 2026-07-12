@@ -21,11 +21,9 @@ import {
   FillProgressSchema,
   UnembeddedQuestionsOptionsSchema,
 } from '@/modules/chat/schemas/Chat.js';
-import {
-  EMBEDDING_MODELS,
-  INFERENCE_MODELS,
-} from '@/modules/chat/schemas/Model.js';
+import { EMBEDDING_MODELS } from '@/modules/chat/schemas/Model.js';
 import { getCommonCommand } from '@/modules/chat/utils/chatCommand.js';
+import { resolveChatUser } from '@/modules/chat/utils/identity.js';
 import {
   fillEmbeddings,
   getClosestQuestions,
@@ -154,12 +152,6 @@ export const data = new SlashCommandBuilder()
       )
       .addStringOption((option) =>
         option
-          .setName('system-prompt')
-          .setDescription('Системски промпт за LLM агентот')
-          .setRequired(false),
-      )
-      .addStringOption((option) =>
-        option
           .setName(EMBEDDINGS_MODEL_OPTION_NAME)
           .setDescription('Моделот за ембедирање')
           .setRequired(false)
@@ -170,7 +162,7 @@ export const data = new SlashCommandBuilder()
           .setName('inference-model')
           .setDescription('Моделот за инференца')
           .setRequired(false)
-          .setChoices(generateModelChoices(INFERENCE_MODELS)),
+          .setAutocomplete(true),
       )
       .addNumberOption((option) =>
         option
@@ -263,19 +255,24 @@ const handleChatClosest = async (interaction: ChatInputCommandInteraction) => {
 };
 
 const handleChatModels = async (interaction: ChatInputCommandInteraction) => {
-  const models = await getSupportedModels();
+  const chatUser = await resolveChatUser(interaction.user);
+  const models = await getSupportedModels(chatUser.id);
 
   if (models === null) {
     await interaction.editReply(commandErrors.dataFetchFailed);
     return;
   }
 
-  if (models.length === 0) {
+  if (models.models.length === 0) {
     await interaction.editReply(labels.none);
     return;
   }
 
-  const content = models.map((model) => `- ${inlineCode(model)}`).join('\n');
+  const content = models.models
+    .map(
+      (model) => `- ${model.name} (${model.provider}): ${inlineCode(model.id)}`,
+    )
+    .join('\n');
   await safeReplyToInteraction(interaction, content);
 };
 

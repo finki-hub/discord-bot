@@ -66,7 +66,7 @@ Use `.env.sample` as a starting point for local development. The runtime also re
 | `TOKEN`            | Yes      | Discord bot token                                                                            |
 | `APPLICATION_ID`   | Yes      | Discord application ID                                                                       |
 | `CHATBOT_URL`      | No       | URL of the [`finki-hub/chat-bot`](https://github.com/finki-hub/chat-bot) instance            |
-| `API_KEY`          | No       | API key for authenticated chat bot endpoints, such as embedding endpoints                    |
+| `API_KEY`          | No       | API key for authenticated chat bot endpoints, including `/ask` and credential management     |
 | `DATA_STORAGE_URL` | No       | Base URL for data storage, without a trailing slash                                           |
 | `POSTHOG_KEY`      | No       | PostHog project key. Analytics are disabled when this is empty                               |
 | `POSTHOG_HOST`     | No       | PostHog ingest host. Defaults to `https://eu.i.posthog.com`                                  |
@@ -118,7 +118,7 @@ All the session schedule files should be placed in the `sessions` folder in your
 
 This project features integration with [`finki-hub/chat-bot`](https://github.com/finki-hub/chat-bot) for enabling FAQ, links, and LLM chat functionality. The Discord bot communicates with the chat bot using REST endpoints. If they are deployed in Docker, they should be on the same network to be able to communicate.
 
-Set the `CHATBOT_URL` env. variable to the URL of the chat bot, and optionally `API_KEY` for authenticated endpoints (such as filling embeddings).
+Set both `CHATBOT_URL` and `API_KEY` to enable chat. Each Discord user can manage their provider credentials with `/credentials list`, `/credentials set`, and `/credentials delete`; provider keys are sent directly to the chat backend and are never stored by this bot. Hosted and Ollama models require the corresponding user credential.
 
 ## Architecture
 

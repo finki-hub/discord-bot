@@ -12,14 +12,17 @@ import { getConfigProperty } from '@/configuration/bot/index.js';
 import { commandErrors } from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
+import { ChatApiError } from '../schemas/Credentials.js';
 import { LLM_ERRORS } from './constants.js';
 import {
   getConversationHistory,
   registerConversation,
 } from './conversation.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
+import { resolveChatUser } from './identity.js';
 import {
   applyStreamEvent,
+  getValidatedInferenceModel,
   hasSavableAnswer,
   sendPrompt,
   type StreamAccumulator,
@@ -93,7 +96,9 @@ const handleConversationError = async (
   }
 
   const errorMessage =
-    LLM_ERRORS[error.message] ?? commandErrors.unknownChatError;
+    error instanceof ChatApiError
+      ? commandErrors.llmUnavailable
+      : (LLM_ERRORS[error.message] ?? commandErrors.unknownChatError);
 
   try {
     await message.reply({
@@ -137,27 +142,32 @@ export const handleChatMessage = async (message: Message) => {
     surface,
   });
 
-  const models =
-    message.guild === null
-      ? DEFAULT_CONFIGURATION.models
-      : await getConfigProperty('models', message.guild.id);
-
-  const options = SendPromptOptionsSchema.parse({
-    embeddingsModel: models.embeddings,
-    history,
-    inferenceModel: models.inference,
-    prompt,
-  });
-
   try {
-    if (message.channel.isSendable()) {
-      await message.channel.sendTyping();
+    const models =
+      message.guild === null
+        ? DEFAULT_CONFIGURATION.models
+        : await getConfigProperty('models', message.guild.id);
+    const chatUser = await resolveChatUser(message.author);
+    const inferenceModel = await getValidatedInferenceModel(
+      chatUser.id,
+      models.inference,
+    );
+    const options = SendPromptOptionsSchema.parse({
+      embeddingsModel: models.embeddings,
+      history,
+      inferenceModel,
+      prompt,
+      userId: chatUser.id,
+    });
+
+    try {
+      if (message.channel.isSendable()) {
+        await message.channel.sendTyping();
+      }
+    } catch {
+      // The typing indicator is best-effort and must never break the reply.
     }
-  } catch {
-    // The typing indicator is best-effort and must never break the reply.
-  }
 
-  try {
     const state: StreamAccumulator = {
       answer: '',
       errored: false,
@@ -178,7 +188,7 @@ export const handleChatMessage = async (message: Message) => {
       registerConversation(inChatThread ? [message.channelId] : messageIds, [
         ...history,
         { content: prompt, role: 'user' },
-        { content: state.answer, role: 'assistant' },
+        { content: state.answer.slice(0, 2_000), role: 'assistant' },
       ]);
 
       await appendTimingFootnote(

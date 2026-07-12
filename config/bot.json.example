@@ -11,7 +11,7 @@
     },
     "models": {
       "embeddings": "BAAI/bge-m3",
-      "inference": "claude-sonnet-4-6"
+      "inference": "claude-sonnet-5"
     },
     "roles": null,
     "ticketing": {
