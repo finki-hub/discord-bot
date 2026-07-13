@@ -4,7 +4,7 @@
     "discord-api-types": "^0.38.49",
     "discord.js": "^14.26.5",
     "eventsource-parser": "^3.1.0",
-    "fuse.js": "^7.4.2",
+    "fuse.js": "^7.5.0",
     "posthog-node": "^5.41.0",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
