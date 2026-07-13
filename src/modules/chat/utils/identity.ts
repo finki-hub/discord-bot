@@ -7,6 +7,7 @@ import {
   ChatApiError,
   type ChatUser,
   ChatUserSchema,
+  type ChatUserUpsert,
   ChatUserUpsertSchema,
   SafeErrorDetailSchema,
 } from '../schemas/Credentials.js';
@@ -22,7 +23,12 @@ const parseSafeDetail = async (response: Response): Promise<string> => {
   }
 };
 
-const userCache = new Map<string, ChatUser>();
+type CachedChatUser = {
+  readonly profile: ChatUserUpsert;
+  readonly user: ChatUser;
+};
+
+const userCache = new Map<string, CachedChatUser>();
 
 const authHeaders = (): Record<string, string> => {
   const apiKey = getApiKey();
@@ -36,9 +42,19 @@ const authHeaders = (): Record<string, string> => {
 };
 
 export const resolveChatUser = async (discordUser: User): Promise<ChatUser> => {
+  const body = ChatUserUpsertSchema.parse({
+    avatar_url: discordUser.avatarURL({ size: 256 }) ?? undefined,
+    name: discordUser.displayName,
+    provider: 'discord',
+    provider_subject: discordUser.id,
+  });
   const cached = userCache.get(discordUser.id);
-  if (cached !== undefined) {
-    return cached;
+  if (
+    cached !== undefined &&
+    cached.profile.avatar_url === body.avatar_url &&
+    cached.profile.name === body.name
+  ) {
+    return cached.user;
   }
 
   const chatbotUrl = getChatbotUrl();
@@ -46,18 +62,19 @@ export const resolveChatUser = async (discordUser: User): Promise<ChatUser> => {
     throw new ChatApiError(503, 'Chatbot URL not configured');
   }
 
-  const body = ChatUserUpsertSchema.parse({
-    avatar_url: discordUser.avatarURL({ size: 256 }) ?? undefined,
-    name: discordUser.displayName,
-    provider: 'discord',
-    provider_subject: discordUser.id,
-  });
-
-  const result = await fetch(`${chatbotUrl}/chat/state/users`, {
-    body: JSON.stringify(body),
-    headers: authHeaders(),
-    method: 'POST',
-  });
+  let result: Response;
+  try {
+    result = await fetch(`${chatbotUrl}/chat/state/users`, {
+      body: JSON.stringify(body),
+      headers: authHeaders(),
+      method: 'POST',
+    });
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ChatApiError(503, 'Chatbot request failed');
+    }
+    throw error;
+  }
 
   if (!result.ok) {
     const detail = await parseSafeDetail(result);
@@ -65,7 +82,7 @@ export const resolveChatUser = async (discordUser: User): Promise<ChatUser> => {
   }
 
   const user = ChatUserSchema.parse(await result.json());
-  userCache.set(discordUser.id, user);
+  userCache.set(discordUser.id, { profile: body, user });
   return user;
 };
 

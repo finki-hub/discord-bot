@@ -1,6 +1,5 @@
 import {
   type ChatInputCommandInteraction,
-  MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
 
@@ -9,9 +8,8 @@ import { getConfigProperty } from '@/configuration/bot/index.js';
 import { commandDescriptions, commandErrors } from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
-import { ChatApiError } from '../schemas/Credentials.js';
-import { resolveChatUser } from './identity.js';
-import { getValidatedInferenceModel } from './requests.js';
+import { resolveInteractionChatUser } from './interaction.js';
+import { getSupportedModels, getValidatedInferenceModel } from './requests.js';
 import { handlePromptWithStreaming } from './streaming.js';
 
 export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
@@ -51,25 +49,29 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
         ? DEFAULT_CONFIGURATION.models
         : await getConfigProperty('models', interaction.guild.id);
 
-    let chatUser;
-    try {
-      chatUser = await resolveChatUser(interaction.user);
-    } catch (error) {
-      if (!(error instanceof ChatApiError)) {
-        throw error;
-      }
-      await (interaction.deferred || interaction.replied
-        ? interaction.editReply(commandErrors.llmUnavailable)
-        : interaction.reply({
-            content: commandErrors.llmUnavailable,
-            flags: MessageFlags.Ephemeral,
-          }));
+    const chatUser = await resolveInteractionChatUser(interaction);
+    if (chatUser === null) {
       return;
     }
-    const validatedInferenceModel = await getValidatedInferenceModel(
-      chatUser.id,
-      inferenceModel ?? models.inference,
-    );
+
+    let validatedInferenceModel: string | undefined;
+    if (inferenceModel === undefined) {
+      validatedInferenceModel = await getValidatedInferenceModel(
+        chatUser.id,
+        models.inference,
+      );
+    } else {
+      const catalog = await getSupportedModels(chatUser.id);
+      if (catalog === null) {
+        await interaction.editReply(commandErrors.llmUnavailable);
+        return;
+      }
+      if (catalog.models.every(({ id }) => id !== inferenceModel)) {
+        await interaction.editReply(commandErrors.invalidInferenceModel);
+        return;
+      }
+      validatedInferenceModel = inferenceModel;
+    }
 
     const options = SendPromptOptionsSchema.parse({
       embeddingsModel: embeddingsModel ?? models.embeddings,

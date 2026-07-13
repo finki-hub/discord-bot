@@ -116,6 +116,8 @@ export const commandErrors = {
   faqNotFound: 'Прашањето не постои.',
   feedbackDisabled: 'Повратните информации не се овозможени.',
   invalidChannel: 'Каналот е невалиден.',
+  invalidInferenceModel:
+    'Избраниот модел не е достапен. Изберете модел од предложената листа.',
   invalidTicket: 'Тикетот не е валиден.',
   invalidTicketType: 'Дадениот тип на тикетот не е валиден.',
   linkNotFound: 'Линкот не постои.',

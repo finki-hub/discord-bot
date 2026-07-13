@@ -23,7 +23,7 @@ import {
 } from '@/modules/chat/schemas/Chat.js';
 import { EMBEDDING_MODELS } from '@/modules/chat/schemas/Model.js';
 import { getCommonCommand } from '@/modules/chat/utils/chatCommand.js';
-import { resolveChatUser } from '@/modules/chat/utils/identity.js';
+import { resolveInteractionChatUser } from '@/modules/chat/utils/interaction.js';
 import {
   fillEmbeddings,
   getClosestQuestions,
@@ -256,7 +256,11 @@ const handleChatClosest = async (interaction: ChatInputCommandInteraction) => {
 };
 
 const handleChatModels = async (interaction: ChatInputCommandInteraction) => {
-  const chatUser = await resolveChatUser(interaction.user);
+  const chatUser = await resolveInteractionChatUser(interaction);
+  if (chatUser === null) {
+    return;
+  }
+
   const models = await getSupportedModels(chatUser.id);
 
   if (models === null) {

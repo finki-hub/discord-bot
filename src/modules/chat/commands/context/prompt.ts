@@ -8,8 +8,7 @@ import {
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
 import { SendPromptOptionsSchema } from '@/modules/chat/schemas/Chat.js';
-import { ChatApiError } from '@/modules/chat/schemas/Credentials.js';
-import { resolveChatUser } from '@/modules/chat/utils/identity.js';
+import { resolveInteractionChatUser } from '@/modules/chat/utils/interaction.js';
 import { getValidatedInferenceModel } from '@/modules/chat/utils/requests.js';
 import { handlePromptWithStreaming } from '@/modules/chat/utils/streaming.js';
 import { commandErrors } from '@/translations/commands.js';
@@ -38,21 +37,11 @@ export const execute = async (
       ? DEFAULT_CONFIGURATION.models
       : await getConfigProperty('models', interaction.guild.id);
 
-  let chatUser;
-  try {
-    chatUser = await resolveChatUser(interaction.user);
-  } catch (error) {
-    if (!(error instanceof ChatApiError)) {
-      throw error;
-    }
-    await (interaction.deferred || interaction.replied
-      ? interaction.editReply(commandErrors.llmUnavailable)
-      : interaction.reply({
-          content: commandErrors.llmUnavailable,
-          flags: MessageFlags.Ephemeral,
-        }));
+  const chatUser = await resolveInteractionChatUser(interaction);
+  if (chatUser === null) {
     return;
   }
+
   const inferenceModel = await getValidatedInferenceModel(
     chatUser.id,
     models.inference,
