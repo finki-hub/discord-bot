@@ -22,7 +22,8 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
       option
         .setName('prompt')
         .setDescription('Промпт за LLM агентот')
-        .setRequired(true),
+        .setRequired(true)
+        .setMaxLength(2_000),
     )
     .addBooleanOption((option) =>
       option

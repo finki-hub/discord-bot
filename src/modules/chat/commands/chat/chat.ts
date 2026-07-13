@@ -148,7 +148,8 @@ export const data = new SlashCommandBuilder()
         option
           .setName('prompt')
           .setDescription('Промпт за LLM агентот')
-          .setRequired(true),
+          .setRequired(true)
+          .setMaxLength(2_000),
       )
       .addStringOption((option) =>
         option

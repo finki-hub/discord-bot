@@ -1,5 +1,6 @@
 /* eslint-disable camelcase, sonarjs/no-nested-template-literals, sonarjs/no-nested-conditional -- API payload uses snake_case; nested ternary is readable here */
 import { MessageFlags, type ModalSubmitInteraction } from 'discord.js';
+import { ZodError } from 'zod';
 
 import { logger } from '@/common/logger/index.js';
 import {
@@ -17,6 +18,8 @@ import {
 import { commandErrors } from '@/translations/commands.js';
 
 export const name = 'credentialSet';
+const INVALID_CREDENTIAL_MESSAGE =
+  'Внесениот API клуч или base URL не е валиден.';
 
 const parseProvider = (args: string[]): CredentialProvider => {
   const provider = args[0];
@@ -31,19 +34,17 @@ export const execute = async (
   args: string[],
 ) => {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
-  const provider = parseProvider(args);
-  const apiKey = interaction.fields.getTextInputValue('api-key');
-  const baseUrlRaw = interaction.fields.getTextInputValue('base-url');
-
-  const baseUrl = baseUrlRaw.trim() === '' ? undefined : baseUrlRaw.trim();
-
-  const credential: CredentialUpsert = CredentialUpsertSchema.parse({
-    api_key: apiKey,
-    base_url: baseUrl,
-    provider,
-  });
 
   try {
+    const provider = parseProvider(args);
+    const apiKey = interaction.fields.getTextInputValue('api-key');
+    const baseUrlRaw = interaction.fields.getTextInputValue('base-url');
+    const baseUrl = baseUrlRaw.trim() === '' ? undefined : baseUrlRaw.trim();
+    const credential: CredentialUpsert = CredentialUpsertSchema.parse({
+      api_key: apiKey,
+      base_url: baseUrl,
+      provider,
+    });
     const chatUser = await resolveChatUser(interaction.user);
     const result = await upsertCredential(chatUser.id, provider, credential);
     invalidateModelCatalog(chatUser.id);
@@ -52,6 +53,11 @@ export const execute = async (
       `Зачуван е API клучот за ${provider}${result.base_url ? ` (${result.base_url})` : ''}.`,
     );
   } catch (error) {
+    if (error instanceof ZodError) {
+      await interaction.editReply(INVALID_CREDENTIAL_MESSAGE);
+      return;
+    }
+
     if (error instanceof ChatApiError) {
       logger.warn(`Credential upsert failed: HTTP ${error.status}`, {
         guildId: interaction.guild?.id,
@@ -61,7 +67,7 @@ export const execute = async (
         error.status === 401
           ? commandErrors.unknownChatError
           : error.status === 422
-            ? 'Внесениот API клуч или base URL не е валиден.'
+            ? INVALID_CREDENTIAL_MESSAGE
             : commandErrors.unknownChatError;
 
       await interaction.editReply(message);
