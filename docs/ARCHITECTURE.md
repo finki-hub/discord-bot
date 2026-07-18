@@ -58,9 +58,13 @@ The **core** layer is the framework responsible for bootstrapping the bot, loadi
 | `lib/Command.ts`       | Command type definitions (Chat, Button, Autocomplete, Context Menu) |
 | `lib/Module.ts`        | Module interface schema using Zod                                   |
 | `commands/modules.ts`  | Command discovery and registration with Discord API                 |
-| `commands/handlers.ts` | Interaction handlers for all command types                          |
-| `events/`              | Discord event listeners (ClientReady, InteractionCreate, etc.)      |
-| `utils/`               | Utility functions for modules, events, and permissions              |
+| `commands/handlers.ts`                 | Chat input command execution and error handling                         |
+| `commands/autocompleteHandler.ts`      | Autocomplete command execution and response cleanup                     |
+| `commands/componentHandlers.ts`        | Button and modal interaction execution                                   |
+| `commands/contextMenuHandlers.ts`      | User and message context-menu command execution                         |
+| `commands/interactionHandlerUtils.ts`  | Shared permissions, deferral, and interaction error helpers              |
+| `events/`                              | Discord event listeners (ClientReady, InteractionCreate, etc.)          |
+| `utils/`                               | Utility functions for modules, events, and permissions                   |
 
 ### Bootstrap Flow
 
@@ -431,7 +435,10 @@ logger.error("Error - something failed");
 
 ### Command Error Handling
 
-All command handlers are wrapped with try-catch in `core/commands/handlers.ts`:
+Chat input command execution is wrapped with try-catch in `core/commands/handlers.ts`.
+Autocomplete, component, and context-menu interactions use their corresponding
+extracted handlers in `core/commands/`; shared permission, deferral, and error
+helpers are defined in `interactionHandlerUtils.ts`:
 
 1. **Permission errors** - Caught and logged, user sees generic message
 2. **Discord API errors** - Detected via `DiscordAPIError`, handled gracefully
