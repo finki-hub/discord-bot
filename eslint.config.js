@@ -8,7 +8,7 @@ import {
 
 const config = [
   {
-    ignores: ['dist/', '.devcontainer/', 'logs/'],
+    ignores: ['dist/', '.devcontainer/', 'logs/', 'test/'],
   },
   ...base,
   node,
