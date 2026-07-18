@@ -115,6 +115,10 @@ export const commandErrors = {
     'Неуспешно освежување на податоците. Проверете ги логите за повеќе детали.',
   faqNotFound: 'Прашањето не постои.',
   feedbackDisabled: 'Повратните информации не се овозможени.',
+  freeQuotaExhausted:
+    'Го искористивте вашиот дневен бесплатен лимит. Користете /credentials set за OpenAI API клуч или обидете се повторно по ресетирањето.',
+  freeTierUnavailable:
+    'Бесплатниот модел моментално не е достапен. Обидете се повторно подоцна.',
   invalidChannel: 'Каналот е невалиден.',
   invalidInferenceModel:
     'Избраниот модел не е достапен. Изберете модел од предложената листа.',
@@ -131,6 +135,8 @@ export const commandErrors = {
   questionsFetchFailed: 'Преземањето на прашањата беше неуспешно.',
   roomNotFound: 'Просторијата не постои.',
   sessionNotFound: 'Сесијата не постои.',
+  sponsoredRequestInProgress:
+    'Веќе имате активно бесплатно барање. Почекајте да заврши и обидете се повторно.',
   staffNotFound: 'Професорот не постои.',
   ticketingDisabled: 'Тикетите не се овозможени.',
   unknownChatError:
@@ -138,6 +144,27 @@ export const commandErrors = {
 };
 
 export const commandErrorFunctions = {
+  freeQuotaExhausted: (resetsAt?: string) => {
+    if (resetsAt === undefined) {
+      return commandErrors.freeQuotaExhausted;
+    }
+
+    let resetInstant: Temporal.Instant;
+    try {
+      resetInstant = Temporal.Instant.from(resetsAt);
+    } catch {
+      return commandErrors.freeQuotaExhausted;
+    }
+
+    const localizedReset = resetInstant.toLocaleString('mk-MK', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'UTC',
+    });
+
+    return `Го искористивте вашиот дневен бесплатен лимит. Лимитот се ресетира на ${localizedReset} UTC. Користете /credentials set за OpenAI API клуч или почекајте.`;
+  },
+
   invalidConfiguration: (error: unknown) =>
     // @ts-expect-error error is unknown
     `Дадената конфигурација не е валидна: ${codeBlock('json', error)}`,
