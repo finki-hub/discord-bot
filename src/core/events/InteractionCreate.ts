@@ -2,14 +2,16 @@ import { type ClientEvents, Events } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
 
+import { handleAutocomplete } from '../commands/autocompleteHandler.js';
 import {
-  handleAutocomplete,
   handleButton,
-  handleChatInputCommand,
-  handleMessageContextMenuCommand,
   handleModalSubmit,
+} from '../commands/componentHandlers.js';
+import {
+  handleMessageContextMenuCommand,
   handleUserContextMenuCommand,
-} from '../commands/handlers.js';
+} from '../commands/contextMenuHandlers.js';
+import { handleChatInputCommand } from '../commands/handlers.js';
 
 export const name = Events.InteractionCreate;
 
