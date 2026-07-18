@@ -1,3 +1,5 @@
+/* eslint-disable camelcase -- SSE payload fields mirror the backend wire contract. */
+
 import { createParser } from 'eventsource-parser';
 import { z } from 'zod';
 
@@ -24,7 +26,10 @@ import {
   type CredentialUpsert,
   SafeErrorDetailSchema,
 } from '../schemas/Credentials.js';
-import { ModelCatalogResponseSchema } from '../schemas/Model.js';
+import {
+  isModelSelectable,
+  ModelCatalogResponseSchema,
+} from '../schemas/Model.js';
 import { sanitizeOptions } from './utils.js';
 
 // Await each event so the consumer finishes sending/editing its reply before the
@@ -85,12 +90,18 @@ const toStreamEvent = (sse: {
   switch (name) {
     case 'done':
       return { type: 'done' };
-    case 'error':
-      return {
+    case 'error': {
+      const event: Extract<StreamEvent, { type: 'error' }> = {
         code: asString(payload['code'], 'error'),
         message: asString(payload['message']),
         type: 'error',
       };
+      const resetsAt = asString(payload['resets_at']);
+      if (resetsAt) {
+        event.resets_at = resetsAt;
+      }
+      return event;
+    }
     case 'reset':
       return { type: 'reset' };
     case 'status': {
@@ -465,7 +476,12 @@ export const getValidatedInferenceModel = async (
   if (catalog === null) {
     return configuredModel;
   }
-  if (catalog.models.some(({ id }) => id === configuredModel)) {
+  if (
+    catalog.models.some(
+      ({ availability, id }) =>
+        id === configuredModel && isModelSelectable({ availability }),
+    )
+  ) {
     return configuredModel;
   }
   logger.warn(
