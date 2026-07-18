@@ -44,7 +44,9 @@ const handleCredentialsList = async (
     const credentials = await listCredentials(chatUser.id);
 
     if (credentials.length === 0) {
-      await safeReplyToInteraction(interaction, labels.none);
+      await safeReplyToInteraction(interaction, labels.none, {
+        ephemeral: true,
+      });
       return;
     }
 
@@ -55,10 +57,16 @@ const handleCredentialsList = async (
       })
       .join('\n');
 
-    await safeReplyToInteraction(interaction, content);
+    await safeReplyToInteraction(interaction, content, { ephemeral: true });
   } catch (error) {
     if (error instanceof ChatApiError) {
-      await safeReplyToInteraction(interaction, commandErrors.unknownChatError);
+      await safeReplyToInteraction(
+        interaction,
+        commandErrors.unknownChatError,
+        {
+          ephemeral: true,
+        },
+      );
       return;
     }
 
@@ -79,10 +87,17 @@ const handleCredentialsDelete = async (
     await safeReplyToInteraction(
       interaction,
       `Избришана е API клучот за ${inlineCode(parsedProvider)}.`,
+      { ephemeral: true },
     );
   } catch (error) {
     if (error instanceof ChatApiError) {
-      await safeReplyToInteraction(interaction, commandErrors.unknownChatError);
+      await safeReplyToInteraction(
+        interaction,
+        commandErrors.unknownChatError,
+        {
+          ephemeral: true,
+        },
+      );
       return;
     }
 

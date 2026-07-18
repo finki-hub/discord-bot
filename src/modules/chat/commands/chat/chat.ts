@@ -21,7 +21,10 @@ import {
   FillProgressSchema,
   UnembeddedQuestionsOptionsSchema,
 } from '@/modules/chat/schemas/Chat.js';
-import { EMBEDDING_MODELS } from '@/modules/chat/schemas/Model.js';
+import {
+  EMBEDDING_MODELS,
+  formatModelLabel,
+} from '@/modules/chat/schemas/Model.js';
 import { getCommonCommand } from '@/modules/chat/utils/chatCommand.js';
 import { resolveInteractionChatUser } from '@/modules/chat/utils/interaction.js';
 import {
@@ -256,6 +259,7 @@ const handleChatClosest = async (interaction: ChatInputCommandInteraction) => {
 };
 
 const handleChatModels = async (interaction: ChatInputCommandInteraction) => {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
   const chatUser = await resolveInteractionChatUser(interaction);
   if (chatUser === null) {
     return;
@@ -274,11 +278,9 @@ const handleChatModels = async (interaction: ChatInputCommandInteraction) => {
   }
 
   const content = models.models
-    .map(
-      (model) => `- ${model.name} (${model.provider}): ${inlineCode(model.id)}`,
-    )
+    .map((model) => `- ${formatModelLabel(model)}: ${inlineCode(model.id)}`)
     .join('\n');
-  await safeReplyToInteraction(interaction, content);
+  await safeReplyToInteraction(interaction, content, { ephemeral: true });
 };
 
 const { execute: handleChatQuery } = getCommonCommand('ask');
