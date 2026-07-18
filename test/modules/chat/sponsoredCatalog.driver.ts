@@ -119,9 +119,17 @@ const run = async (): Promise<void> => {
     const parsedWithSecrets = ModelCatalogResponseSchema.parse(
       catalogFor('sponsored'),
     );
-    const serialized = JSON.stringify(parsedWithSecrets);
-    assert.equal(serialized.includes(SECRET), false);
-    assert.equal(serialized.includes(ENDPOINT), false);
+    assert.deepEqual(parsedWithSecrets.models[0], {
+      availability: 'sponsored',
+      id: LUNA_ID,
+      name: 'GPT-5.6 Luna',
+      provider: 'openai',
+      sponsored_quota: {
+        limit: 5,
+        remaining: 4,
+        resets_at: '2026-07-19T00:00:00Z',
+      },
+    });
     assert.throws(() =>
       ModelCatalogResponseSchema.parse({
         ...catalogFor('sponsored'),
