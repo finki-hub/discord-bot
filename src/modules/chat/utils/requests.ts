@@ -340,7 +340,7 @@ export const sendPrompt = async (
     throw new Error('LLM_UNAVAILABLE');
   }
 
-  logger.info(`Prompt answered: ${options.messages.at(-1)?.content ?? ''}`);
+  logger.info('Prompt answered', { responseId });
 
   return responseId;
 };
