@@ -34,7 +34,7 @@ export const initAnalytics = () => {
   }
 
   state.client = new PostHog(key, {
-    enableExceptionAutocapture: true,
+    enableExceptionAutocapture: false,
     host: getPostHogHost(),
   });
 
@@ -200,11 +200,15 @@ export const captureException = (
     : new Error(String(error));
 
   try {
-    client.captureException(normalizedError, distinctId, {
-      command: props.command ?? null,
-      error_type: normalizedError.name,
-      service: SERVICE,
-      surface: props.surface ?? null,
+    client.capture({
+      distinctId,
+      event: '$exception',
+      properties: {
+        command: props.command ?? null,
+        error_type: normalizedError.name,
+        service: SERVICE,
+        surface: props.surface ?? null,
+      },
     });
   } catch (captureError) {
     logger.debug(
