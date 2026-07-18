@@ -1,5 +1,6 @@
 import {
   type ChatInputCommandInteraction,
+  MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
 
@@ -8,9 +9,22 @@ import { getConfigProperty } from '@/configuration/bot/index.js';
 import { commandDescriptions, commandErrors } from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
+import { isModelSelectable } from '../schemas/Model.js';
 import { resolveInteractionChatUser } from './interaction.js';
 import { getSupportedModels, getValidatedInferenceModel } from './requests.js';
 import { handlePromptWithStreaming } from './streaming.js';
+
+const replyEphemeral = async (
+  interaction: ChatInputCommandInteraction,
+  content: string,
+): Promise<void> => {
+  if (interaction.deferred || interaction.replied) {
+    await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+};
 
 export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
   data: new SlashCommandBuilder()
@@ -63,11 +77,14 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
     } else {
       const catalog = await getSupportedModels(chatUser.id);
       if (catalog === null) {
-        await interaction.editReply(commandErrors.llmUnavailable);
+        await replyEphemeral(interaction, commandErrors.llmUnavailable);
         return;
       }
-      if (catalog.models.every(({ id }) => id !== inferenceModel)) {
-        await interaction.editReply(commandErrors.invalidInferenceModel);
+      const selectedModel = catalog.models.find(
+        ({ id }) => id === inferenceModel,
+      );
+      if (selectedModel === undefined || !isModelSelectable(selectedModel)) {
+        await replyEphemeral(interaction, commandErrors.invalidInferenceModel);
         return;
       }
       validatedInferenceModel = inferenceModel;
