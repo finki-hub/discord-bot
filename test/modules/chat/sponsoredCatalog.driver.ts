@@ -14,7 +14,7 @@ import {
 } from '../../../src/modules/chat/utils/requests.js';
 
 const USER_ID = '00000000-0000-4000-8000-000000000001';
-const LUNA_ID = 'gpt-5.6-luna';
+const SPONSORED_MODEL_ID = 'gemini-3.1-pro-preview';
 const SECRET = 'sponsored-secret';
 const ENDPOINT = 'https://sponsored.invalid/v1';
 
@@ -30,9 +30,9 @@ const catalogFor = (availability: ModelAvailability): CatalogPayload => ({
       api_key: SECRET,
       availability,
       base_url: ENDPOINT,
-      id: LUNA_ID,
-      name: 'GPT-5.6 Luna',
-      provider: 'openai',
+      id: SPONSORED_MODEL_ID,
+      name: 'Gemini 3.1 Pro Preview',
+      provider: 'google',
       sponsored_quota:
         availability === 'sponsored' || availability === 'both'
           ? {
@@ -45,7 +45,7 @@ const catalogFor = (availability: ModelAvailability): CatalogPayload => ({
     ...Array.from({ length: 29 }, (_, index) => ({
       id: `model-${index}`,
       name: `Model ${index}`,
-      provider: 'openai',
+      provider: 'google',
     })),
   ],
   source: 'live',
@@ -109,7 +109,7 @@ const run = async (): Promise<void> => {
 
   try {
     const legacy = ModelCatalogResponseSchema.parse({
-      models: [{ id: 'legacy-model', name: 'Legacy', provider: 'openai' }],
+      models: [{ id: 'legacy-model', name: 'Legacy', provider: 'google' }],
       source: 'live',
       version: 1,
     });
@@ -121,9 +121,9 @@ const run = async (): Promise<void> => {
     );
     assert.deepEqual(parsedWithSecrets.models[0], {
       availability: 'sponsored',
-      id: LUNA_ID,
-      name: 'GPT-5.6 Luna',
-      provider: 'openai',
+      id: SPONSORED_MODEL_ID,
+      name: 'Gemini 3.1 Pro Preview',
+      provider: 'google',
       sponsored_quota: {
         limit: 5,
         remaining: 4,
@@ -182,7 +182,7 @@ const run = async (): Promise<void> => {
       assert.ok(Array.isArray(choices));
       assert.equal(choices.length, 25);
       assert.equal(
-        choices.some((choice) => choice.value === LUNA_ID),
+        choices.some((choice) => choice.value === SPONSORED_MODEL_ID),
         availability !== 'unavailable',
       );
       assert.equal(formatModelLabel(model).length <= 100, true);
@@ -194,12 +194,12 @@ const run = async (): Promise<void> => {
       }
 
       assert.equal(
-        await getValidatedInferenceModel(USER_ID, LUNA_ID),
-        availability === 'unavailable' ? undefined : LUNA_ID,
+        await getValidatedInferenceModel(USER_ID, SPONSORED_MODEL_ID),
+        availability === 'unavailable' ? undefined : SPONSORED_MODEL_ID,
       );
       variantResults[availability] = {
         choiceCount: choices.length,
-        lunaAccepted: availability !== 'unavailable',
+        sponsoredModelAccepted: availability !== 'unavailable',
         label: formatModelLabel(model),
       };
     }
