@@ -32,7 +32,8 @@
     "format": "eslint . --cache --fix",
     "lint": "eslint . --cache",
     "start": "node dist/index.js",
-    "start:env": "node --env-file=.env dist/index.js"
+    "start:env": "node --env-file=.env dist/index.js",
+    "test": "tsx test/chat-sponsored-errors.ts && tsx test/modules/chat/sponsoredCatalog.driver.ts && tsx test/modules/chat/ephemeralPrivacy.driver.ts"
   },
   "type": "module",
   "version": "0.0.0"
