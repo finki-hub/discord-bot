@@ -116,9 +116,9 @@ export const commandErrors = {
   faqNotFound: 'Прашањето не постои.',
   feedbackDisabled: 'Повратните информации не се овозможени.',
   freeQuotaExhausted:
-    'Го искористивте вашиот дневен бесплатен лимит. Користете /credentials set за OpenAI API клуч или обидете се повторно по ресетирањето.',
+    'Го искористивте вашиот дневен бесплатен лимит. Користете /credentials set за сопствен API клуч или обидете се повторно по ресетирањето.',
   freeTierUnavailable:
-    'Бесплатниот модел моментално не е достапен. Обидете се повторно подоцна.',
+    'Бесплатниот спонзориран модел моментално не е достапен. Обидете се повторно подоцна.',
   invalidChannel: 'Каналот е невалиден.',
   invalidInferenceModel:
     'Избраниот модел не е достапен. Изберете модел од предложената листа.',
@@ -162,7 +162,7 @@ export const commandErrorFunctions = {
       timeZone: 'UTC',
     });
 
-    return `Го искористивте вашиот дневен бесплатен лимит. Лимитот се ресетира на ${localizedReset} UTC. Користете /credentials set за OpenAI API клуч или почекајте.`;
+    return `Го искористивте вашиот дневен бесплатен лимит. Лимитот се ресетира на ${localizedReset} UTC. Користете /credentials set за сопствен API клуч или почекајте.`;
   },
 
   invalidConfiguration: (error: unknown) =>
