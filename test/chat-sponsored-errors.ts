@@ -6,6 +6,7 @@ import type {
 } from 'discord.js';
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
+import { commandErrors } from '@/translations/commands.js';
 import {
   getConversationHistory,
   registerConversation,
@@ -208,7 +209,8 @@ const run = async () => {
     ]);
     await handleChatMessage(messageDriver.message);
     const messageContent = readContent(messageDriver.state.responses[0]);
-    assert.equal(messageContent, interactionContent);
+    assert.equal(messageContent, commandErrors.unknownChatError);
+    assert.notEqual(messageContent, interactionContent);
     assert.equal(messageContent.includes(RAW_MESSAGE), false);
     assert.equal(getConversationHistory('message-response-1'), undefined);
     assert.equal(getConversationHistory('interaction-response-1'), undefined);

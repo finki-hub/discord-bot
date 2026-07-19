@@ -13,7 +13,11 @@ import { commandErrors } from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
 import { ChatApiError } from '../schemas/Credentials.js';
-import { LLM_ERRORS, localizeStreamEvent } from './constants.js';
+import {
+  LLM_ERRORS,
+  localizeStreamEvent,
+  PRIVATE_STREAM_ERROR_CODES,
+} from './constants.js';
 import {
   getConversationHistory,
   registerConversation,
@@ -179,8 +183,13 @@ export const handleChatMessage = async (message: Message) => {
     const messages = await safeStreamReplyToMessage(message, async (emit) => {
       capture.responseId = await sendPrompt(options, async (event) => {
         const localizedEvent = localizeStreamEvent(event);
-        applyStreamEvent(state, localizedEvent);
-        await emit(localizedEvent);
+        const publicEvent =
+          localizedEvent.type === 'error' &&
+          PRIVATE_STREAM_ERROR_CODES.has(localizedEvent.code)
+            ? { ...localizedEvent, message: commandErrors.unknownChatError }
+            : localizedEvent;
+        applyStreamEvent(state, publicEvent);
+        await emit(publicEvent);
       });
     });
 
