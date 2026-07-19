@@ -120,20 +120,20 @@ This project features integration with [`finki-hub/chat-bot`](https://github.com
 
 Set both `CHATBOT_URL` and `API_KEY` to enable chat. Each Discord user can manage their provider credentials with `/credentials list`, `/credentials set`, and `/credentials delete`; provider keys are sent directly to the chat backend and are never stored by this bot. Hosted and Ollama models require the corresponding user credential.
 
-The Discord experience is free-Luna/BYOK-first: when a user has a provider
+The Discord experience is sponsored/BYOK-first: when a user has a provider
 credential, that BYOK credential is used first and is sent directly to the chat
-backend, never stored by this bot. If the chat backend advertises sponsored
-Luna for a user without an OpenAI credential, the backend may serve that free
-fallback and owns the quota accounting. A disabled, unavailable, or exhausted
-sponsored tier must not be worked around by reusing `API_KEY`; the user should
-wait for the next UTC reset or configure their own BYOK credential.
+backend, never stored by this bot. If the chat backend advertises a sponsored
+free tier for a user without a provider credential, the backend may serve that
+free fallback and owns the quota accounting. A disabled, unavailable, or
+exhausted sponsored tier must not be worked around by reusing `API_KEY`; the
+user should wait for the next UTC reset or configure their own BYOK credential.
 
 Use the private `/chat models` view for availability and remaining quota. Do not
 log provider keys, provider URLs, quota internals, or raw provider errors, and do
 not retry an in-progress sponsored request blindly: one active sponsored
 request per user is intentional. Quota reset timestamps are displayed in UTC.
-The Discord bot does not receive or configure `SPONSORED_OPENAI_API_KEY`,
-`SPONSORED_OPENAI_BASE_URL`, or any other `SPONSORED_*` setting.
+The Discord bot does not receive or configure any sponsored-model credential
+variables or any other `SPONSORED_*` setting.
 
 ## Architecture
 
