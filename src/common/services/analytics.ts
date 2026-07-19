@@ -34,7 +34,7 @@ export const initAnalytics = () => {
   }
 
   state.client = new PostHog(key, {
-    enableExceptionAutocapture: false,
+    enableExceptionAutocapture: true,
     host: getPostHogHost(),
   });
 
