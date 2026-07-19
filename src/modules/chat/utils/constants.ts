@@ -15,6 +15,13 @@ export const LLM_ERRORS: Record<string, string> = {
   sponsored_request_in_progress: commandErrors.sponsoredRequestInProgress,
 } as const;
 
+export const PRIVATE_STREAM_ERROR_CODES: ReadonlySet<string> = new Set([
+  'credential_required',
+  'free_quota_exhausted',
+  'free_tier_unavailable',
+  'sponsored_request_in_progress',
+]);
+
 const assertNever = (value: never): never => {
   throw new Error(`Unexpected stream event: ${JSON.stringify(value)}`);
 };

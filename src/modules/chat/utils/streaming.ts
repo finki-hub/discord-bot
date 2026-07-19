@@ -17,7 +17,11 @@ import { commandErrors } from '@/translations/commands.js';
 
 import type { SendPromptOptions } from '../schemas/Chat.js';
 
-import { LLM_ERRORS, localizeStreamEvent } from './constants.js';
+import {
+  LLM_ERRORS,
+  localizeStreamEvent,
+  PRIVATE_STREAM_ERROR_CODES,
+} from './constants.js';
 import { registerConversation } from './conversation.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
 import {
@@ -29,13 +33,10 @@ import {
 import { appendTimingFootnote } from './timing.js';
 
 const EPHEMERAL_ERROR_CODES = new Set([
-  'credential_required',
-  'free_quota_exhausted',
-  'free_tier_unavailable',
+  ...PRIVATE_STREAM_ERROR_CODES,
   'LLM_DISABLED',
   'LLM_NOT_READY',
   'LLM_UNAVAILABLE',
-  'sponsored_request_in_progress',
 ]);
 
 type StreamableInteraction =
@@ -135,6 +136,12 @@ export const handlePromptWithStreaming = async (
     );
 
     if (ephemeralError.message !== null) {
+      if (
+        (interaction.deferred || interaction.replied) &&
+        interaction.ephemeral !== true
+      ) {
+        await interaction.editReply(commandErrors.unknownChatError);
+      }
       await replyEphemeral(interaction, ephemeralError.message);
       return;
     }

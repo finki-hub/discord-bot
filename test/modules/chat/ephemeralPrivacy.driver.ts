@@ -244,6 +244,7 @@ const run = async (): Promise<void> => {
     assertEphemeral(callsOf(modelDriver.state, 'followUp'));
 
     const streamDriver = fakeInteraction('ask', 'query', MODEL_USER_ID);
+    await streamDriver.interaction.deferReply();
     await handlePromptWithStreaming(
       streamDriver.interaction,
       {
@@ -253,9 +254,9 @@ const run = async (): Promise<void> => {
       },
       'ephemeral stream guidance',
     );
-    assertEphemeral(callsOf(streamDriver.state, 'reply'));
-    assert.equal(callsOf(streamDriver.state, 'edit').length, 0);
-    assert.equal(callsOf(streamDriver.state, 'followUp').length, 0);
+    assert.equal(callsOf(streamDriver.state, 'reply').length, 0);
+    assert.equal(callsOf(streamDriver.state, 'edit').length, 1);
+    assertEphemeral(callsOf(streamDriver.state, 'followUp'));
 
     console.log('ephemeralPrivacy driver passed');
   } finally {
