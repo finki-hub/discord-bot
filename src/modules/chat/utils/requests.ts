@@ -269,6 +269,16 @@ export const deleteCredential = async (
   }
 };
 
+const modelCatalogCache = new Map<
+  string,
+  { expiresAt: number; value: z.infer<typeof ModelCatalogResponseSchema> }
+>();
+const MODEL_CATALOG_CACHE_MS = 5 * 60 * 1_000;
+
+export const invalidateModelCatalog = (userId: string): void => {
+  modelCatalogCache.delete(userId);
+};
+
 export const sendPrompt = async (
   options: SendPromptOptions,
   onEvent: (event: StreamEvent) => Promise<void>,
@@ -311,38 +321,42 @@ export const sendPrompt = async (
 
   const responseId = result.headers.get('x-response-id');
 
-  let receivedEvents = 0;
-  const pendingEvents: StreamEvent[] = [];
+  try {
+    let receivedEvents = 0;
+    const pendingEvents: StreamEvent[] = [];
 
-  const parser = createParser({
-    onEvent: (sse) => {
-      receivedEvents++;
-      const event = toStreamEvent(sse);
-      if (event !== null) {
-        pendingEvents.push(event);
+    const parser = createParser({
+      onEvent: (sse) => {
+        receivedEvents++;
+        const event = toStreamEvent(sse);
+        if (event !== null) {
+          pendingEvents.push(event);
+        }
+      },
+    });
+
+    const reader: ReadableStreamDefaultReader<Uint8Array> =
+      result.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
       }
-    },
-  });
-
-  const reader: ReadableStreamDefaultReader<Uint8Array> =
-    result.body.getReader();
-  const decoder = new TextDecoder();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+      parser.feed(decoder.decode(value, { stream: true }));
+      await drainEvents(pendingEvents, onEvent);
     }
-    parser.feed(decoder.decode(value, { stream: true }));
-    await drainEvents(pendingEvents, onEvent);
+
+    if (receivedEvents === 0) {
+      throw new Error('LLM_UNAVAILABLE');
+    }
+
+    logger.info('Prompt answered', { responseId });
+
+    return responseId;
+  } finally {
+    invalidateModelCatalog(options.user_id);
   }
-
-  if (receivedEvents === 0) {
-    throw new Error('LLM_UNAVAILABLE');
-  }
-
-  logger.info('Prompt answered', { responseId });
-
-  return responseId;
 };
 
 export const sendFeedback = async (
@@ -416,16 +430,6 @@ export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {
   }
 };
 
-const modelCatalogCache = new Map<
-  string,
-  { expiresAt: number; value: z.infer<typeof ModelCatalogResponseSchema> }
->();
-const MODEL_CATALOG_CACHE_MS = 5 * 60 * 1_000;
-
-export const invalidateModelCatalog = (userId: string): void => {
-  modelCatalogCache.delete(userId);
-};
-
 export const getSupportedModels = async (userId: string) => {
   const chatbotUrl = getChatbotUrl();
   const apiKey = getApiKey();
@@ -487,7 +491,7 @@ export const getValidatedInferenceModel = async (
   logger.warn(
     `Ignoring unsupported configured inference model: ${configuredModel}`,
   );
-  return undefined;
+  return catalog.models.find(isModelSelectable)?.id;
 };
 
 export const fillEmbeddings = async (

@@ -218,7 +218,7 @@ describe('sponsored model catalog', () => {
       expect(label.includes(QUOTA_LABEL)).toBe(sponsored);
       await expect(
         getValidatedInferenceModel(USER_ID, SPONSORED_MODEL_ID),
-      ).resolves.toBe(selectable ? SPONSORED_MODEL_ID : undefined);
+      ).resolves.toBe(selectable ? SPONSORED_MODEL_ID : 'model-0');
     },
   );
 
