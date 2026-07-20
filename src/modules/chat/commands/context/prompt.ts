@@ -2,9 +2,9 @@ import {
   ApplicationCommandType,
   ContextMenuCommandBuilder,
   type MessageContextMenuCommandInteraction,
-  MessageFlags,
 } from 'discord.js';
 
+import { safeEphemeralReplyToInteraction } from '@/common/utils/messages.js';
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
 import { SendPromptOptionsSchema } from '@/modules/chat/schemas/Chat.js';
@@ -25,10 +25,10 @@ export const execute = async (
   const prompt = interaction.targetMessage.content;
 
   if (prompt.length === 0) {
-    await interaction.reply({
-      content: commandErrors.unknownChatError,
-      flags: MessageFlags.Ephemeral,
-    });
+    await safeEphemeralReplyToInteraction(
+      interaction,
+      commandErrors.unknownChatError,
+    );
     return;
   }
 
