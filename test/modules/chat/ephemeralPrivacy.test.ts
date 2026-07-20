@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { SendPromptOptions } from '@/modules/chat/schemas/Chat.js';
 
+import { logger } from '@/common/logger/index.js';
 import { execute as executeChat } from '@/modules/chat/commands/chat/chat.js';
 import { execute as executeCredentials } from '@/modules/chat/commands/chat/credentials.js';
 import { clearChatUserCache } from '@/modules/chat/utils/identity.js';
@@ -25,6 +26,9 @@ const streamErrorResponse = (): Response =>
     'event: error\ndata: {"code":"free_tier_unavailable","message":"provider secret"}\n\n',
     { headers: { 'Content-Type': 'text/event-stream' }, status: 200 },
   );
+
+const unavailableResponse = (): Response =>
+  new Response('not ready', { status: 503 });
 
 const expectEphemeral = (calls: ReturnType<typeof callsOf>): void => {
   expect(calls.length).toBeGreaterThan(0);
@@ -71,7 +75,10 @@ const streamOptions: SendPromptOptions = {
 };
 
 describe('ephemeral chat output', () => {
+  const originalLoggerSilent = logger.silent;
+
   beforeEach(() => {
+    logger.silent = true;
     vi.stubEnv('CHATBOT_URL', 'https://chatbot.invalid');
     vi.stubEnv('API_KEY', 'test-api-key');
     clearChatUserCache(CREDENTIAL_USER_ID);
@@ -83,6 +90,7 @@ describe('ephemeral chat output', () => {
     clearChatUserCache(CREDENTIAL_USER_ID);
     clearChatUserCache(MODEL_USER_ID);
     invalidateModelCatalog(MODEL_USER_ID);
+    logger.silent = originalLoggerSilent;
   });
 
   test('keeps credential output ephemeral across follow-ups', async () => {
@@ -162,7 +170,27 @@ describe('ephemeral chat output', () => {
     );
 
     expect(callsOf(driver.state, 'reply')).toHaveLength(0);
-    expect(callsOf(driver.state, 'edit')).toHaveLength(1);
+    expect(callsOf(driver.state, 'delete')).toHaveLength(1);
+    expect(callsOf(driver.state, 'edit')).toHaveLength(0);
+    expectEphemeral(callsOf(driver.state, 'followUp'));
+  });
+
+  test('settles a public deferral before a private transport error', async () => {
+    const driver = fakeInteraction('ask', 'query', MODEL_USER_ID);
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => unavailableResponse()),
+    );
+    await driver.interaction.deferReply();
+
+    await handlePromptWithStreaming(
+      driver.interaction,
+      streamOptions,
+      'private transport error',
+    );
+
+    expect(callsOf(driver.state, 'delete')).toHaveLength(1);
+    expect(callsOf(driver.state, 'edit')).toHaveLength(0);
     expectEphemeral(callsOf(driver.state, 'followUp'));
   });
 });

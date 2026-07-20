@@ -12,7 +12,10 @@ import {
   captureException,
   trackMessageAnswered,
 } from '@/common/services/analytics.js';
-import { safeStreamReplyToInteraction } from '@/common/utils/messages.js';
+import {
+  safeEphemeralReplyToInteraction,
+  safeStreamReplyToInteraction,
+} from '@/common/utils/messages.js';
 import { commandErrors } from '@/translations/commands.js';
 
 import type { SendPromptOptions } from '../schemas/Chat.js';
@@ -43,18 +46,6 @@ type StreamableInteraction =
   | ChatInputCommandInteraction
   | MessageContextMenuCommandInteraction
   | UserContextMenuCommandInteraction;
-
-const replyEphemeral = async (
-  interaction: StreamableInteraction,
-  content: string,
-): Promise<void> => {
-  if (interaction.deferred || interaction.replied) {
-    await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
-    return;
-  }
-
-  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
-};
 
 type StreamEventContext = {
   readonly emit: (event: StreamEvent) => Promise<void>;
@@ -91,7 +82,7 @@ const replyStreamError = async (
   ephemeral: boolean,
 ): Promise<void> => {
   if (ephemeral) {
-    await replyEphemeral(interaction, errorMessage);
+    await safeEphemeralReplyToInteraction(interaction, errorMessage);
     return;
   }
 
@@ -136,13 +127,10 @@ export const handlePromptWithStreaming = async (
     );
 
     if (ephemeralError.message !== null) {
-      if (
-        (interaction.deferred || interaction.replied) &&
-        interaction.ephemeral !== true
-      ) {
-        await interaction.editReply(commandErrors.unknownChatError);
-      }
-      await replyEphemeral(interaction, ephemeralError.message);
+      await safeEphemeralReplyToInteraction(
+        interaction,
+        ephemeralError.message,
+      );
       return;
     }
 

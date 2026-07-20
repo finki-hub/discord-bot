@@ -1,12 +1,18 @@
-import type { ChatInputCommandInteraction } from 'discord.js';
+import { type ChatInputCommandInteraction, MessageFlags } from 'discord.js';
 
 export type InteractionCall = {
   readonly kind: InteractionCallKind;
   readonly payload: unknown;
 };
-export type InteractionCallKind = 'defer' | 'edit' | 'followUp' | 'reply';
+export type InteractionCallKind =
+  | 'defer'
+  | 'delete'
+  | 'edit'
+  | 'followUp'
+  | 'reply';
 export type InteractionState = {
   deferred: boolean;
+  ephemeral: boolean;
   replied: boolean;
   readonly calls: InteractionCall[];
   readonly requestOrder: string[];
@@ -23,6 +29,7 @@ export const fakeInteraction = (
   const state: InteractionState = {
     calls: [],
     deferred: false,
+    ephemeral: false,
     replied: false,
     requestOrder: [],
   };
@@ -32,6 +39,9 @@ export const fakeInteraction = (
     guildId: null,
     get deferred() {
       return state.deferred;
+    },
+    get ephemeral() {
+      return state.ephemeral;
     },
     get replied() {
       return state.replied;
@@ -47,8 +57,17 @@ export const fakeInteraction = (
     },
     deferReply: (payload: unknown) => {
       state.deferred = true;
+      state.ephemeral =
+        typeof payload === 'object' &&
+        payload !== null &&
+        'flags' in payload &&
+        payload.flags === MessageFlags.Ephemeral;
       state.calls.push({ kind: 'defer', payload });
       state.requestOrder.push('defer');
+      return Promise.resolve();
+    },
+    deleteReply: () => {
+      state.calls.push({ kind: 'delete', payload: undefined });
       return Promise.resolve();
     },
     editReply: (payload: unknown) => {

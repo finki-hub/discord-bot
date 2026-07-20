@@ -1,9 +1,9 @@
 import {
   type ChatInputCommandInteraction,
-  MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
 
+import { safeEphemeralReplyToInteraction } from '@/common/utils/messages.js';
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
 import { commandDescriptions, commandErrors } from '@/translations/commands.js';
@@ -13,18 +13,6 @@ import { isModelSelectable } from '../schemas/Model.js';
 import { resolveInteractionChatUser } from './interaction.js';
 import { getSupportedModels, getValidatedInferenceModel } from './requests.js';
 import { handlePromptWithStreaming } from './streaming.js';
-
-const replyEphemeral = async (
-  interaction: ChatInputCommandInteraction,
-  content: string,
-): Promise<void> => {
-  if (interaction.deferred || interaction.replied) {
-    await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
-    return;
-  }
-
-  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
-};
 
 export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
   data: new SlashCommandBuilder()
@@ -77,14 +65,20 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
     } else {
       const catalog = await getSupportedModels(chatUser.id);
       if (catalog === null) {
-        await replyEphemeral(interaction, commandErrors.llmUnavailable);
+        await safeEphemeralReplyToInteraction(
+          interaction,
+          commandErrors.llmUnavailable,
+        );
         return;
       }
       const selectedModel = catalog.models.find(
         ({ id }) => id === inferenceModel,
       );
       if (selectedModel === undefined || !isModelSelectable(selectedModel)) {
-        await replyEphemeral(interaction, commandErrors.invalidInferenceModel);
+        await safeEphemeralReplyToInteraction(
+          interaction,
+          commandErrors.invalidInferenceModel,
+        );
         return;
       }
       validatedInferenceModel = inferenceModel;
