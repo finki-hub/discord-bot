@@ -4,6 +4,7 @@ import {
   perfectionist,
   prettier,
   typescript,
+  vitest,
 } from 'eslint-config-imperium';
 
 const config = [
@@ -15,6 +16,24 @@ const config = [
   typescript,
   prettier,
   perfectionist,
+  vitest,
+  {
+    files: ['test/**/*.ts'],
+    rules: {
+      '@typescript-eslint/require-await': 'off',
+      camelcase: 'off',
+      'perfectionist/sort-object-types': 'off',
+      'perfectionist/sort-objects': 'off',
+      'sonarjs/no-duplicate-string': 'off',
+      'vitest/consistent-test-it': 'off',
+      'vitest/padding-around-all': 'off',
+      'vitest/padding-around-expect-groups': 'off',
+      'vitest/prefer-strict-equal': 'off',
+      'vitest/prefer-to-be-falsy': 'off',
+      'vitest/prefer-to-be-truthy': 'off',
+      'vitest/require-to-throw-message': 'off',
+    },
+  },
   {
     rules: {
       'no-restricted-imports': [

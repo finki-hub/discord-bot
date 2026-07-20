@@ -58,9 +58,13 @@ The **core** layer is the framework responsible for bootstrapping the bot, loadi
 | `lib/Command.ts`       | Command type definitions (Chat, Button, Autocomplete, Context Menu) |
 | `lib/Module.ts`        | Module interface schema using Zod                                   |
 | `commands/modules.ts`  | Command discovery and registration with Discord API                 |
-| `commands/handlers.ts` | Interaction handlers for all command types                          |
-| `events/`              | Discord event listeners (ClientReady, InteractionCreate, etc.)      |
-| `utils/`               | Utility functions for modules, events, and permissions              |
+| `commands/handlers.ts`                 | Chat input command execution and error handling                         |
+| `commands/autocompleteHandler.ts`      | Autocomplete command execution and response cleanup                     |
+| `commands/componentHandlers.ts`        | Button and modal interaction execution                                   |
+| `commands/contextMenuHandlers.ts`      | User and message context-menu command execution                         |
+| `commands/interactionHandlerUtils.ts`  | Shared permissions, deferral, and interaction error helpers              |
+| `events/`                              | Discord event listeners (ClientReady, InteractionCreate, etc.)          |
+| `utils/`                               | Utility functions for modules, events, and permissions                   |
 
 ### Bootstrap Flow
 
@@ -75,12 +79,13 @@ The **core** layer is the framework responsible for bootstrapping the bot, loadi
 
 ### Command Types
 
-The framework supports four types of commands:
+The framework supports five types of commands:
 
 - **ChatCommand** - Slash commands (`/command`)
 - **ButtonCommand** - Button interaction handlers
 - **AutocompleteCommand** - Autocomplete suggestion handlers
 - **ContextMenuCommand** - Right-click context menu commands
+- **ModalCommand** - Modal submit interaction handlers
 
 Commands are automatically discovered from module directories based on their folder structure:
 
@@ -88,6 +93,7 @@ Commands are automatically discovered from module directories based on their fol
 - `commands/button/` - Button handlers
 - `commands/autocomplete/` - Autocomplete handlers
 - `commands/context/` - Context menu commands
+- `commands/modal/` - Modal submit handlers
 
 ### Event System
 
@@ -429,7 +435,10 @@ logger.error("Error - something failed");
 
 ### Command Error Handling
 
-All command handlers are wrapped with try-catch in `core/commands/handlers.ts`:
+Chat input command execution is wrapped with try-catch in `core/commands/handlers.ts`.
+Autocomplete, component, and context-menu interactions use their corresponding
+extracted handlers in `core/commands/`; shared permission, deferral, and error
+helpers are defined in `interactionHandlerUtils.ts`:
 
 1. **Permission errors** - Caught and logged, user sees generic message
 2. **Discord API errors** - Detected via `DiscordAPIError`, handled gracefully
@@ -544,7 +553,8 @@ modules/myfeature/
 │   ├── chat/             # Slash commands
 │   ├── button/           # Button handlers
 │   ├── autocomplete/     # Autocomplete handlers
-│   └── context/          # Context menu commands
+│   ├── context/          # Context menu commands
+│   └── modal/             # Modal submit handlers
 ├── components/           # UI component builders
 ├── schemas/              # Zod validation schemas
 └── utils/                # Module-specific utilities

@@ -1,0 +1,16 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  vitest:
+    uses: finki-hub/.github/.github/workflows/vitest.yaml@main
+    secrets: inherit

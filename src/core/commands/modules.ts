@@ -11,6 +11,7 @@ import {
   type ButtonCommand,
   type ChatCommand,
   type ContextMenuCommand,
+  type ModalCommand,
 } from '../lib/Command.js';
 import { getModules } from '../utils/modules.js';
 
@@ -18,6 +19,7 @@ const chatCommands = new Collection<string, ChatCommand>();
 const buttonCommands = new Collection<string, ButtonCommand>();
 const autocompleteCommands = new Collection<string, AutocompleteCommand>();
 const contextCommands = new Collection<string, ContextMenuCommand>();
+const modalCommands = new Collection<string, ModalCommand>();
 const commandModules = new Collection<string, string>();
 
 const getCommandImportPath = (dirent: Dirent) => {
@@ -51,7 +53,7 @@ const getModuleCommands = async (module: string) => {
   }
 };
 
-type CommandType = 'autocomplete' | 'button' | 'chat' | 'context';
+type CommandType = 'autocomplete' | 'button' | 'chat' | 'context' | 'modal';
 
 const getCommandType = (parentPath: string): CommandType | null => {
   const normalizedPath = parentPath.replaceAll('\\', '/');
@@ -80,6 +82,12 @@ const getCommandType = (parentPath: string): CommandType | null => {
   ) {
     return 'context';
   }
+  if (
+    normalizedPath.endsWith('/commands/modal') ||
+    normalizedPath.includes('/commands/modal/')
+  ) {
+    return 'modal';
+  }
 
   return null;
 };
@@ -90,6 +98,7 @@ const getCommandName = (
     | ButtonCommand
     | ChatCommand
     | ContextMenuCommand
+    | ModalCommand
     | { data?: { name: string }; name?: string },
 ): null | string => {
   if ('data' in commandData && commandData.data?.name) {
@@ -164,6 +173,16 @@ const registerCommand = (params: {
         commandName,
         module,
       });
+      break;
+
+    case 'modal':
+      registered = checkAndSetCommand({
+        collection: modalCommands,
+        commandData: commandData as ModalCommand,
+        commandName,
+        module,
+      });
+      break;
   }
 
   if (registered) {
@@ -184,6 +203,7 @@ const loadCommand = async (
       | ButtonCommand
       | ChatCommand
       | ContextMenuCommand
+      | ModalCommand
       | { data?: { name: string }; name?: string };
 
     const commandName = getCommandName(commandData);
@@ -220,6 +240,7 @@ const refreshCommands = async () => {
   buttonCommands.clear();
   autocompleteCommands.clear();
   contextCommands.clear();
+  modalCommands.clear();
   commandModules.clear();
 
   const modules = await getModules();
@@ -243,7 +264,7 @@ const refreshCommands = async () => {
   }
 
   logger.debug(
-    `Commands loaded: ${chatCommands.size} chat, ${buttonCommands.size} button, ${autocompleteCommands.size} autocomplete, ${contextCommands.size} context (${totalCommands} total)`,
+    `Commands loaded: ${chatCommands.size} chat, ${buttonCommands.size} button, ${autocompleteCommands.size} autocomplete, ${contextCommands.size} context, ${modalCommands.size} modal (${totalCommands} total)`,
   );
 };
 
@@ -253,6 +274,7 @@ export const getAutocompleteCommand = (name: string) =>
   autocompleteCommands.get(name);
 export const getContextMenuCommand = (name: string) =>
   contextCommands.get(name);
+export const getModalCommand = (name: string) => modalCommands.get(name);
 export const getCommandModule = (name: string) => commandModules.get(name);
 
 export const registerCommands = async () => {

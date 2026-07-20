@@ -23,9 +23,10 @@ import {
 } from '@/modules/chat/schemas/Chat.js';
 import {
   EMBEDDING_MODELS,
-  INFERENCE_MODELS,
+  formatModelLabel,
 } from '@/modules/chat/schemas/Model.js';
 import { getCommonCommand } from '@/modules/chat/utils/chatCommand.js';
+import { resolveInteractionChatUser } from '@/modules/chat/utils/interaction.js';
 import {
   fillEmbeddings,
   getClosestQuestions,
@@ -150,13 +151,8 @@ export const data = new SlashCommandBuilder()
         option
           .setName('prompt')
           .setDescription('Промпт за LLM агентот')
-          .setRequired(true),
-      )
-      .addStringOption((option) =>
-        option
-          .setName('system-prompt')
-          .setDescription('Системски промпт за LLM агентот')
-          .setRequired(false),
+          .setRequired(true)
+          .setMaxLength(2_000),
       )
       .addStringOption((option) =>
         option
@@ -170,7 +166,7 @@ export const data = new SlashCommandBuilder()
           .setName('inference-model')
           .setDescription('Моделот за инференца')
           .setRequired(false)
-          .setChoices(generateModelChoices(INFERENCE_MODELS)),
+          .setAutocomplete(true),
       )
       .addNumberOption((option) =>
         option
@@ -263,20 +259,28 @@ const handleChatClosest = async (interaction: ChatInputCommandInteraction) => {
 };
 
 const handleChatModels = async (interaction: ChatInputCommandInteraction) => {
-  const models = await getSupportedModels();
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const chatUser = await resolveInteractionChatUser(interaction);
+  if (chatUser === null) {
+    return;
+  }
+
+  const models = await getSupportedModels(chatUser.id);
 
   if (models === null) {
     await interaction.editReply(commandErrors.dataFetchFailed);
     return;
   }
 
-  if (models.length === 0) {
+  if (models.models.length === 0) {
     await interaction.editReply(labels.none);
     return;
   }
 
-  const content = models.map((model) => `- ${inlineCode(model)}`).join('\n');
-  await safeReplyToInteraction(interaction, content);
+  const content = models.models
+    .map((model) => `- ${formatModelLabel(model)}: ${inlineCode(model.id)}`)
+    .join('\n');
+  await safeReplyToInteraction(interaction, content, { ephemeral: true });
 };
 
 const { execute: handleChatQuery } = getCommonCommand('ask');

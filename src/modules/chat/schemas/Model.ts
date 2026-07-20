@@ -1,71 +1,94 @@
+/* eslint-disable camelcase -- catalog fields mirror the backend wire contract */
 import { z } from 'zod';
 
-export enum Model {
-  BGE_M3 = 'bge-m3:latest',
-  BGE_M3_LOCAL = 'BAAI/bge-m3',
-  CLAUDE_HAIKU_4_5 = 'claude-haiku-4-5',
-  CLAUDE_OPUS_4_7 = 'claude-opus-4-7',
-  CLAUDE_OPUS_4_8 = 'claude-opus-4-8',
-  CLAUDE_SONNET_4_6 = 'claude-sonnet-4-6',
-  DEEPSEEK_R1_70B = 'deepseek-r1:70b',
-  DOMESTIC_YAK_8B_INSTRUCT_GGUF = 'hf.co/LVSTCK/domestic-yak-8B-instruct-GGUF:Q8_0',
-  GEMINI_2_5_FLASH = 'gemini-2.5-flash',
-  GEMINI_2_5_PRO = 'gemini-2.5-pro',
-  GEMINI_3_FLASH_PREVIEW = 'gemini-3-flash-preview',
-  GEMINI_EMBEDDING_001 = 'gemini-embedding-001',
-  GPT_4_1 = 'gpt-4.1',
-  GPT_4_1_MINI = 'gpt-4.1-mini',
-  GPT_4_1_NANO = 'gpt-4.1-nano',
-  GPT_4O_MINI = 'gpt-4o-mini',
-  GPT_5_2 = 'gpt-5.2',
-  GPT_5_4 = 'gpt-5.4',
-  GPT_5_4_MINI = 'gpt-5.4-mini',
-  GPT_5_MINI = 'gpt-5-mini',
-  GPT_5_NANO = 'gpt-5-nano',
-  LLAMA_3_3_70B = 'llama3.3:70b',
-  MISTRAL = 'mistral:latest',
-  MULTILINGUAL_E5_LARGE = 'intfloat/multilingual-e5-large',
-  QWEN2_1_5_B_INSTRUCT = 'Qwen/Qwen2-1.5B-Instruct',
-  QWEN2_5_7B_INSTRUCT = 'Qwen/Qwen2.5-7B-Instruct',
-  QWEN2_5_72B = 'qwen2.5:72b',
-  TEXT_EMBEDDING_3_LARGE = 'text-embedding-3-large',
-  VEZILKALLM_GGUF = 'hf.co/mradermacher/VezilkaLLM-GGUF:Q8_0',
-}
+import { labels } from '@/translations/labels.js';
 
-export const ModelSchema = z.enum(Model);
+export const ModelAvailabilitySchema = z.enum([
+  'both',
+  'byok',
+  'sponsored',
+  'unavailable',
+]);
+
+export type ModelAvailability = z.infer<typeof ModelAvailabilitySchema>;
+
+export const SponsoredQuotaSchema = z
+  .object({
+    limit: z.number().int().nonnegative(),
+    remaining: z.number().int().nonnegative(),
+    resets_at: z.string().min(1),
+  })
+  .refine(({ limit, remaining }) => remaining <= limit);
+
+export type SponsoredQuota = z.infer<typeof SponsoredQuotaSchema>;
+
+export const ModelDescriptorSchema = z.object({
+  availability: ModelAvailabilitySchema.optional(),
+  id: z.string(),
+  name: z.string(),
+  provider: z.string(),
+  sponsored_quota: SponsoredQuotaSchema.nullable().optional(),
+});
+
+export type ModelDescriptor = z.infer<typeof ModelDescriptorSchema>;
+
+export const ModelCatalogResponseSchema = z.object({
+  models: z.array(ModelDescriptorSchema),
+  source: z.string(),
+  version: z.number(),
+});
+
+export type ModelCatalogResponse = z.infer<typeof ModelCatalogResponseSchema>;
+
+export const MAX_DISCORD_CHOICE_NAME_LENGTH = 100;
+
+export const isModelSelectable = (
+  model: Pick<ModelDescriptor, 'availability'>,
+): boolean => model.availability !== 'unavailable';
+
+export const formatModelLabel = (model: ModelDescriptor): string => {
+  const baseLabel = `${model.name} (${model.provider})`;
+  const hasSponsoredAccess =
+    model.availability === 'sponsored' || model.availability === 'both';
+  if (!hasSponsoredAccess) {
+    return baseLabel.slice(0, MAX_DISCORD_CHOICE_NAME_LENGTH);
+  }
+
+  const quota = model.sponsored_quota;
+  const accessLabel =
+    quota === null || quota === undefined
+      ? labels.free
+      : `${labels.free} (${labels.quotaRemaining}: ${quota.remaining}/${quota.limit})`;
+  const suffix = ` — ${accessLabel}`;
+  const baseLength = Math.max(
+    0,
+    MAX_DISCORD_CHOICE_NAME_LENGTH - suffix.length,
+  );
+
+  return `${baseLabel.slice(0, baseLength)}${suffix}`;
+};
 
 export const EMBEDDING_MODELS = [
-  Model.BGE_M3,
-  Model.BGE_M3_LOCAL,
-  Model.LLAMA_3_3_70B,
-  Model.TEXT_EMBEDDING_3_LARGE,
-  Model.GEMINI_EMBEDDING_001,
-  Model.MULTILINGUAL_E5_LARGE,
+  'BAAI/bge-m3',
+  'gemini-embedding-001',
+  'text-embedding-3-large',
 ] as const;
 
 export const INFERENCE_MODELS = [
-  Model.CLAUDE_HAIKU_4_5,
-  Model.CLAUDE_OPUS_4_7,
-  Model.CLAUDE_OPUS_4_8,
-  Model.CLAUDE_SONNET_4_6,
-  Model.DEEPSEEK_R1_70B,
-  Model.DOMESTIC_YAK_8B_INSTRUCT_GGUF,
-  Model.GEMINI_2_5_FLASH,
-  Model.GEMINI_2_5_PRO,
-  Model.GEMINI_3_FLASH_PREVIEW,
-  Model.GPT_4_1,
-  Model.GPT_4_1_MINI,
-  Model.GPT_4_1_NANO,
-  Model.GPT_4O_MINI,
-  Model.GPT_5_2,
-  Model.GPT_5_4,
-  Model.GPT_5_4_MINI,
-  Model.GPT_5_MINI,
-  Model.GPT_5_NANO,
-  Model.LLAMA_3_3_70B,
-  Model.MISTRAL,
-  Model.QWEN2_1_5_B_INSTRUCT,
-  Model.QWEN2_5_72B,
-  Model.QWEN2_5_7B_INSTRUCT,
-  Model.VEZILKALLM_GGUF,
+  'claude-haiku-4-5',
+  'claude-opus-4-8',
+  'claude-sonnet-5',
+  'gemini-3.1-flash-lite',
+  'gemini-3.1-pro-preview',
+  'gemini-3.5-flash',
+  'gpt-5.4-mini',
+  'gpt-5.4-nano',
+  'gpt-5.4',
+  'gpt-5.5',
+  'gpt-5.6-luna',
+  'gpt-5.6-sol',
+  'gpt-5.6-terra',
+  'qwen3:14b-q4_K_M',
+  'qwen3:30b-a3b-instruct-2507-q4_K_M',
+  'qwen3:30b-a3b-thinking-2507-q4_K_M',
 ] as const;

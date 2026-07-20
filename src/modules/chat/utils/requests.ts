@@ -1,3 +1,5 @@
+/* eslint-disable camelcase -- SSE payload fields mirror the backend wire contract. */
+
 import { createParser } from 'eventsource-parser';
 import { z } from 'zod';
 
@@ -16,6 +18,18 @@ import type {
   UnembeddedQuestionsOptions,
 } from '../schemas/Chat.js';
 
+import {
+  ChatApiError,
+  type CredentialProvider,
+  type CredentialPublic,
+  CredentialPublicSchema,
+  type CredentialUpsert,
+  SafeErrorDetailSchema,
+} from '../schemas/Credentials.js';
+import {
+  isModelSelectable,
+  ModelCatalogResponseSchema,
+} from '../schemas/Model.js';
 import { sanitizeOptions } from './utils.js';
 
 // Await each event so the consumer finishes sending/editing its reply before the
@@ -76,12 +90,18 @@ const toStreamEvent = (sse: {
   switch (name) {
     case 'done':
       return { type: 'done' };
-    case 'error':
-      return {
+    case 'error': {
+      const event: Extract<StreamEvent, { type: 'error' }> = {
         code: asString(payload['code'], 'error'),
         message: asString(payload['message']),
         type: 'error',
       };
+      const resetsAt = asString(payload['resets_at']);
+      if (resetsAt) {
+        event.resets_at = resetsAt;
+      }
+      return event;
+    }
     case 'reset':
       return { type: 'reset' };
     case 'status': {
@@ -150,6 +170,115 @@ export const applyStreamEvent = (
 export const hasSavableAnswer = (state: StreamAccumulator): boolean =>
   state.answer.length > 0 && !state.errored;
 
+const authHeaders = (): Record<string, string> => {
+  const apiKey = getApiKey();
+  if (apiKey === null) {
+    throw new ChatApiError(401, 'API key not configured');
+  }
+  return {
+    'Content-Type': 'application/json',
+    'x-api-key': apiKey,
+  };
+};
+
+const parseSafeDetail = async (response: Response): Promise<string> => {
+  try {
+    const json = await response.json();
+    return (
+      SafeErrorDetailSchema.parse(json).detail ?? `HTTP ${response.status}`
+    );
+  } catch {
+    return `HTTP ${response.status}`;
+  }
+};
+
+export const listCredentials = async (
+  userId: string,
+): Promise<CredentialPublic[]> => {
+  const chatbotUrl = getChatbotUrl();
+
+  if (chatbotUrl === null) {
+    throw new ChatApiError(503, 'Chatbot URL not configured');
+  }
+
+  const result = await fetch(
+    `${chatbotUrl}/chat/state/users/${userId}/credentials`,
+    {
+      headers: authHeaders(),
+      method: 'GET',
+    },
+  );
+
+  if (!result.ok) {
+    const detail = await parseSafeDetail(result);
+    throw new ChatApiError(result.status, detail);
+  }
+
+  return z.array(CredentialPublicSchema).parse(await result.json());
+};
+
+export const upsertCredential = async (
+  userId: string,
+  provider: CredentialProvider,
+  credential: CredentialUpsert,
+): Promise<CredentialPublic> => {
+  const chatbotUrl = getChatbotUrl();
+
+  if (chatbotUrl === null) {
+    throw new ChatApiError(503, 'Chatbot URL not configured');
+  }
+
+  const result = await fetch(
+    `${chatbotUrl}/chat/state/users/${userId}/credentials/${provider}`,
+    {
+      body: JSON.stringify(credential),
+      headers: authHeaders(),
+      method: 'PUT',
+    },
+  );
+
+  if (!result.ok) {
+    const detail = await parseSafeDetail(result);
+    throw new ChatApiError(result.status, detail);
+  }
+
+  return CredentialPublicSchema.parse(await result.json());
+};
+
+export const deleteCredential = async (
+  userId: string,
+  provider: CredentialProvider,
+): Promise<void> => {
+  const chatbotUrl = getChatbotUrl();
+
+  if (chatbotUrl === null) {
+    throw new ChatApiError(503, 'Chatbot URL not configured');
+  }
+
+  const result = await fetch(
+    `${chatbotUrl}/chat/state/users/${userId}/credentials/${provider}`,
+    {
+      headers: authHeaders(),
+      method: 'DELETE',
+    },
+  );
+
+  if (!result.ok && result.status !== 204) {
+    const detail = await parseSafeDetail(result);
+    throw new ChatApiError(result.status, detail);
+  }
+};
+
+const modelCatalogCache = new Map<
+  string,
+  { expiresAt: number; value: z.infer<typeof ModelCatalogResponseSchema> }
+>();
+const MODEL_CATALOG_CACHE_MS = 5 * 60 * 1_000;
+
+export const invalidateModelCatalog = (userId: string): void => {
+  modelCatalogCache.delete(userId);
+};
+
 export const sendPrompt = async (
   options: SendPromptOptions,
   onEvent: (event: StreamEvent) => Promise<void>,
@@ -160,11 +289,18 @@ export const sendPrompt = async (
     throw new Error('LLM_DISABLED');
   }
 
+  const apiKey = getApiKey();
+
+  if (apiKey === null) {
+    throw new Error('LLM_UNAVAILABLE');
+  }
+
   const result = await fetch(`${chatbotUrl}/chat/`, {
     body: JSON.stringify(sanitizeOptions(options)),
     headers: {
       Accept: 'text/event-stream',
       'Content-Type': 'application/json',
+      'x-api-key': apiKey,
     },
     method: 'POST',
   });
@@ -185,38 +321,42 @@ export const sendPrompt = async (
 
   const responseId = result.headers.get('x-response-id');
 
-  let receivedEvents = 0;
-  const pendingEvents: StreamEvent[] = [];
+  try {
+    let receivedEvents = 0;
+    const pendingEvents: StreamEvent[] = [];
 
-  const parser = createParser({
-    onEvent: (sse) => {
-      receivedEvents++;
-      const event = toStreamEvent(sse);
-      if (event !== null) {
-        pendingEvents.push(event);
+    const parser = createParser({
+      onEvent: (sse) => {
+        receivedEvents++;
+        const event = toStreamEvent(sse);
+        if (event !== null) {
+          pendingEvents.push(event);
+        }
+      },
+    });
+
+    const reader: ReadableStreamDefaultReader<Uint8Array> =
+      result.body.getReader();
+    const decoder = new TextDecoder();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
       }
-    },
-  });
-
-  const reader: ReadableStreamDefaultReader<Uint8Array> =
-    result.body.getReader();
-  const decoder = new TextDecoder();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+      parser.feed(decoder.decode(value, { stream: true }));
+      await drainEvents(pendingEvents, onEvent);
     }
-    parser.feed(decoder.decode(value, { stream: true }));
-    await drainEvents(pendingEvents, onEvent);
+
+    if (receivedEvents === 0) {
+      throw new Error('LLM_UNAVAILABLE');
+    }
+
+    logger.info('Prompt answered', { responseId });
+
+    return responseId;
+  } finally {
+    invalidateModelCatalog(options.user_id);
   }
-
-  if (receivedEvents === 0) {
-    throw new Error('LLM_UNAVAILABLE');
-  }
-
-  logger.info(`Prompt answered: ${options.messages.at(-1)?.content ?? ''}`);
-
-  return responseId;
 };
 
 export const sendFeedback = async (
@@ -290,17 +430,26 @@ export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {
   }
 };
 
-export const getSupportedModels = async () => {
+export const getSupportedModels = async (userId: string) => {
   const chatbotUrl = getChatbotUrl();
+  const apiKey = getApiKey();
 
-  if (chatbotUrl === null) {
+  if (chatbotUrl === null || apiKey === null) {
     return null;
   }
 
+  const cached = modelCatalogCache.get(userId);
+  if (cached !== undefined && cached.expiresAt > Date.now()) {
+    return cached.value;
+  }
+
   try {
-    const result = await fetch(`${chatbotUrl}/chat/models`, {
+    const url = new URL(`${chatbotUrl}/chat/models`);
+    url.searchParams.set('user_id', userId);
+    const result = await fetch(url, {
       headers: {
         'Content-Type': 'application/json',
+        'x-api-key': apiKey,
       },
     });
 
@@ -308,11 +457,41 @@ export const getSupportedModels = async () => {
       return null;
     }
 
-    return z.array(z.string()).parse(await result.json());
+    const catalog = ModelCatalogResponseSchema.parse(await result.json());
+    modelCatalogCache.set(userId, {
+      expiresAt: Date.now() + MODEL_CATALOG_CACHE_MS,
+      value: catalog,
+    });
+    return catalog;
   } catch (error) {
     logger.error(`Failed getting supported models\n${String(error)}`);
     return null;
   }
+};
+
+export const getValidatedInferenceModel = async (
+  userId: string,
+  configuredModel: string | undefined,
+): Promise<string | undefined> => {
+  if (configuredModel === undefined) {
+    return undefined;
+  }
+  const catalog = await getSupportedModels(userId);
+  if (catalog === null) {
+    return configuredModel;
+  }
+  if (
+    catalog.models.some(
+      ({ availability, id }) =>
+        id === configuredModel && isModelSelectable({ availability }),
+    )
+  ) {
+    return configuredModel;
+  }
+  logger.warn(
+    `Ignoring unsupported configured inference model: ${configuredModel}`,
+  );
+  return catalog.models.find(isModelSelectable)?.id;
 };
 
 export const fillEmbeddings = async (

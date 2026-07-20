@@ -9,7 +9,7 @@ type ConversationEntry = {
 };
 
 const MAX_TRACKED_MESSAGES = 1_000;
-const MAX_HISTORY_TURNS = 20;
+const MAX_HISTORY_TURNS = 9;
 
 const conversations = new Map<string, ConversationEntry>();
 

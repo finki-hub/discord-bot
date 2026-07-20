@@ -3,6 +3,7 @@ import {
   codeBlock,
   type Message,
   type MessageContextMenuCommandInteraction,
+  MessageFlags,
   type UserContextMenuCommandInteraction,
 } from 'discord.js';
 
@@ -23,6 +24,29 @@ type StreamReplyOptions = {
   language?: string;
   mentionUsers?: boolean;
   useCodeBlock?: boolean;
+};
+
+export const safeEphemeralReplyToInteraction = async (
+  interaction: StreamableInteraction,
+  content: string,
+): Promise<void> => {
+  if (interaction.deferred) {
+    if (interaction.ephemeral === true) {
+      await interaction.editReply({ content });
+      return;
+    }
+
+    await interaction.deleteReply();
+    await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  if (interaction.replied) {
+    await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
 };
 
 const splitMessage = function* (message: string) {
@@ -72,16 +96,28 @@ export const safeReplyToInteraction = async (
     | UserContextMenuCommandInteraction,
   message: string,
   options?: {
+    ephemeral?: boolean;
     language?: string;
     mentionUsers?: boolean;
     useCodeBlock?: boolean;
   },
 ) => {
   const {
+    ephemeral = false,
     language = '',
     mentionUsers = false,
     useCodeBlock = false,
   } = options ?? {};
+  const mentionOptions = mentionUsers
+    ? {}
+    : {
+        allowedMentions: {
+          users: [],
+        },
+      };
+  const ephemeralOptions = ephemeral
+    ? ({ flags: MessageFlags.Ephemeral } as const)
+    : {};
   let reply = false;
 
   for (const output of splitMessage(message)) {
@@ -92,29 +128,19 @@ export const safeReplyToInteraction = async (
 
     if (reply) {
       await interaction.followUp({
-        ...(!mentionUsers && {
-          allowedMentions: {
-            users: [],
-          },
-        }),
+        ...mentionOptions,
+        ...ephemeralOptions,
         content: nextReply,
       });
     } else if (interaction.deferred) {
       await interaction.editReply({
-        ...(!mentionUsers && {
-          allowedMentions: {
-            users: [],
-          },
-        }),
+        ...mentionOptions,
         content: nextReply,
       });
     } else {
       await interaction.reply({
-        ...(!mentionUsers && {
-          allowedMentions: {
-            users: [],
-          },
-        }),
+        ...mentionOptions,
+        ...ephemeralOptions,
         content: nextReply,
       });
     }

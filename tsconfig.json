@@ -21,6 +21,7 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "outDir": "dist",
+    "rootDir": ".",
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": true,
@@ -33,8 +34,6 @@
   },
   "exclude": [
     "eslint.config.js",
-    "vitest.config.js",
-    "dist",
-    "test"
+    "dist"
   ]
 }

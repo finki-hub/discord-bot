@@ -2,7 +2,6 @@ import {
   type BotConfig,
   type BotConfigKeys,
 } from '@/modules/admin/schemas/BotConfig.js';
-import { Model } from '@/modules/chat/schemas/Model.js';
 
 export const DEFAULT_CONFIGURATION = {
   channels: undefined,
@@ -15,8 +14,8 @@ export const DEFAULT_CONFIGURATION = {
     enabled: true,
   },
   models: {
-    embeddings: Model.BGE_M3_LOCAL,
-    inference: Model.CLAUDE_SONNET_4_6,
+    embeddings: 'BAAI/bge-m3',
+    inference: 'claude-sonnet-5',
   },
   roles: undefined,
   ticketing: {

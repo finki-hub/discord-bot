@@ -16,6 +16,11 @@ const FALLBACK_DISTINCT_ID = 'discord-bot';
 
 const state: { client: null | PostHog } = { client: null };
 
+const sanitizeExceptionForCapture = (errorName: string): Error =>
+  Object.defineProperty(new Error('Captured exception'), 'name', {
+    value: errorName,
+  });
+
 export const initAnalytics = () => {
   const key = getPostHogKey();
 
@@ -198,9 +203,10 @@ export const captureException = (
   const normalizedError = Error.isError(error)
     ? error
     : new Error(String(error));
+  const capturedError = sanitizeExceptionForCapture(normalizedError.name);
 
   try {
-    client.captureException(normalizedError, distinctId, {
+    client.captureException(capturedError, distinctId, {
       command: props.command ?? null,
       error_type: normalizedError.name,
       service: SERVICE,

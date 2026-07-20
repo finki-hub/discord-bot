@@ -21,6 +21,9 @@ export const commandDescriptions = {
   'config reload': 'Освежи ги конфигурациите',
   'config set': 'Измени конфигурација',
   course: 'Преземи информации за предмет',
+  'credentials delete': 'Избриши API клуч за провајдер',
+  'credentials list': 'Прикажи поставени API клучеви',
+  'credentials set': 'Постави API клуч за провајдер',
   faq: 'Преземи најчесто поставувано прашање',
   help: 'Преземи листа од сите достапни команди',
   home: 'Преземи линк до изворниот код',
@@ -105,12 +108,20 @@ export const commandErrors = {
   commandNotFound: 'Командата не постои.',
   configurationSavingFailed: 'Зачувувањето на конфигурацијата беше неуспешно.',
   courseNotFound: 'Предметот не постои.',
+  credentialRequired:
+    'Немате поставено API клуч за овој провајдер. Користете /credentials set за да поставите.',
   dataFetchFailed: 'Преземањето на податоците беше неуспешно.',
   dataReloadFailed:
     'Неуспешно освежување на податоците. Проверете ги логите за повеќе детали.',
   faqNotFound: 'Прашањето не постои.',
   feedbackDisabled: 'Повратните информации не се овозможени.',
+  freeQuotaExhausted:
+    'Го искористивте вашиот дневен бесплатен лимит. Користете /credentials set за сопствен API клуч или обидете се повторно по ресетирањето.',
+  freeTierUnavailable:
+    'Бесплатниот спонзориран модел моментално не е достапен. Обидете се повторно подоцна.',
   invalidChannel: 'Каналот е невалиден.',
+  invalidInferenceModel:
+    'Избраниот модел не е достапен. Изберете модел од предложената листа.',
   invalidTicket: 'Тикетот не е валиден.',
   invalidTicketType: 'Дадениот тип на тикетот не е валиден.',
   linkNotFound: 'Линкот не постои.',
@@ -124,6 +135,8 @@ export const commandErrors = {
   questionsFetchFailed: 'Преземањето на прашањата беше неуспешно.',
   roomNotFound: 'Просторијата не постои.',
   sessionNotFound: 'Сесијата не постои.',
+  sponsoredRequestInProgress:
+    'Веќе имате активно бесплатно барање. Почекајте да заврши и обидете се повторно.',
   staffNotFound: 'Професорот не постои.',
   ticketingDisabled: 'Тикетите не се овозможени.',
   unknownChatError:
@@ -131,6 +144,27 @@ export const commandErrors = {
 };
 
 export const commandErrorFunctions = {
+  freeQuotaExhausted: (resetsAt?: string) => {
+    if (resetsAt === undefined) {
+      return commandErrors.freeQuotaExhausted;
+    }
+
+    let resetInstant: Temporal.Instant;
+    try {
+      resetInstant = Temporal.Instant.from(resetsAt);
+    } catch {
+      return commandErrors.freeQuotaExhausted;
+    }
+
+    const localizedReset = resetInstant.toLocaleString('mk-MK', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      timeZone: 'UTC',
+    });
+
+    return `Го искористивте вашиот дневен бесплатен лимит. Лимитот се ресетира на ${localizedReset} UTC. Користете /credentials set за сопствен API клуч или почекајте.`;
+  },
+
   invalidConfiguration: (error: unknown) =>
     // @ts-expect-error error is unknown
     `Дадената конфигурација не е валидна: ${codeBlock('json', error)}`,
