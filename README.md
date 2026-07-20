@@ -53,6 +53,8 @@ There is also a dev container available. To use it, just clone the repository, d
 | `npm run check`     | Type-check the TypeScript project                |
 | `npm run lint`      | Run ESLint                                       |
 | `npm run format`    | Run ESLint with auto-fix                         |
+| `npm test`          | Run the Vitest suite once                        |
+| `npm run test:watch`| Run Vitest in watch mode                         |
 | `npm run clean`     | Remove `dist/`                                   |
 
 ## Configuration
