@@ -13,6 +13,4 @@ permissions:
 jobs:
   vitest:
     uses: finki-hub/.github/.github/workflows/vitest.yaml@main
-    with:
-      node-version: "26"
     secrets: inherit
