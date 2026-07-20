@@ -26,6 +26,29 @@ type StreamReplyOptions = {
   useCodeBlock?: boolean;
 };
 
+export const safeEphemeralReplyToInteraction = async (
+  interaction: StreamableInteraction,
+  content: string,
+): Promise<void> => {
+  if (interaction.deferred) {
+    if (interaction.ephemeral === true) {
+      await interaction.editReply({ content });
+      return;
+    }
+
+    await interaction.deleteReply();
+    await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  if (interaction.replied) {
+    await interaction.followUp({ content, flags: MessageFlags.Ephemeral });
+    return;
+  }
+
+  await interaction.reply({ content, flags: MessageFlags.Ephemeral });
+};
+
 const splitMessage = function* (message: string) {
   if (message === '') {
     yield '';
