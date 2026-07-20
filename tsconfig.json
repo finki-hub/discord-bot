@@ -34,8 +34,6 @@
   },
   "exclude": [
     "eslint.config.js",
-    "vitest.config.js",
-    "dist",
-    "test"
+    "dist"
   ]
 }
