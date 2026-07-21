@@ -14,8 +14,15 @@ import { resolveInteractionChatUser } from './interaction.js';
 import { getSupportedModels, getValidatedInferenceModel } from './requests.js';
 import { handlePromptWithStreaming } from './streaming.js';
 
-export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
-  data: new SlashCommandBuilder()
+type CommonCommandOptions = {
+  readonly allowReasoning?: boolean;
+};
+
+export const getCommonCommand = (
+  name: keyof typeof commandDescriptions,
+  { allowReasoning = true }: CommonCommandOptions = {},
+) => {
+  const data = new SlashCommandBuilder()
     .setName(name)
     .setDescription(commandDescriptions[name])
     .addStringOption((option) =>
@@ -24,17 +31,20 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
         .setDescription('Промпт за LLM агентот')
         .setRequired(true)
         .setMaxLength(2_000),
-    )
-    .addBooleanOption((option) =>
+    );
+
+  if (allowReasoning) {
+    data.addBooleanOption((option) =>
       option
         .setName('reasoning')
         .setDescription(
           'Овозможи размислување пред одговор (ако моделот поддржува)',
         )
         .setRequired(false),
-    ),
+    );
+  }
 
-  execute: async (interaction: ChatInputCommandInteraction) => {
+  const execute = async (interaction: ChatInputCommandInteraction) => {
     const prompt = interaction.options.getString('prompt', true);
     const embeddingsModel =
       interaction.options.getString('embeddings-model') ?? undefined;
@@ -44,7 +54,9 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
       interaction.options.getNumber('temperature') ?? undefined;
     const topP = interaction.options.getNumber('top-p') ?? undefined;
     const maxTokens = interaction.options.getNumber('max-tokens') ?? undefined;
-    const reasoning = interaction.options.getBoolean('reasoning') ?? undefined;
+    const reasoning = allowReasoning
+      ? (interaction.options.getBoolean('reasoning') ?? undefined)
+      : false;
 
     const models =
       interaction.guild === null
@@ -96,5 +108,7 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
     });
 
     await handlePromptWithStreaming(interaction, options, 'chat query command');
-  },
-});
+  };
+
+  return { data, execute };
+};
