@@ -3,7 +3,7 @@
     "croner": "^10.0.1",
     "discord-api-types": "^0.38.53",
     "discord.js": "^14.27.0",
-    "eventsource-parser": "^4.0.0",
+    "eventsource-parser": "^4.1.0",
     "fuse.js": "^7.5.0",
     "posthog-node": "^5.50.0",
     "winston": "^3.19.0",
