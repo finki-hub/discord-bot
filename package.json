@@ -5,7 +5,7 @@
     "discord.js": "^14.27.0",
     "eventsource-parser": "^4.1.0",
     "fuse.js": "^7.5.0",
-    "posthog-node": "^5.51.1",
+    "posthog-node": "^5.51.2",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
     "winston-transport": "^4.9.0",
