@@ -5,6 +5,10 @@ import {
   captureException,
   initAnalytics,
   shutdownAnalytics,
+  trackCommandInvoked,
+  trackInteraction,
+  trackLifecycle,
+  trackMessageAnswered,
 } from '@/common/services/analytics.js';
 
 type CaptureExceptionMock = (
@@ -31,6 +35,7 @@ describe('analytics exception capture', () => {
   beforeEach(() => {
     vi.stubEnv('POSTHOG_KEY', 'test-key');
     vi.stubEnv('POSTHOG_SALT', 'test-salt');
+    vi.stubGlobal('__APP_REVISION__', undefined);
     postHog.capture.mockClear();
     postHog.captureException.mockClear();
     postHog.shutdown.mockClear();
@@ -42,6 +47,7 @@ describe('analytics exception capture', () => {
   });
 
   test('uses SDK exception capture without exposing the original message', () => {
+    vi.stubGlobal('__APP_REVISION__', 'a'.repeat(40));
     const error = Object.defineProperty(
       new Error('provider-secret global_limit=100'),
       'name',
@@ -67,10 +73,157 @@ describe('analytics exception capture', () => {
       createHash('sha256').update('test-saltdiscord-user').digest('hex'),
     );
     expect(properties).toEqual({
+      app_revision: 'a'.repeat(40),
       command: 'ask',
       error_type: 'ProviderError',
       service: 'discord-bot',
       surface: 'interaction',
     });
+  });
+
+  test.each([
+    ['a'.repeat(40), 'a'.repeat(40)],
+    [undefined, undefined],
+    ['', undefined],
+    ['a'.repeat(39), undefined],
+    ['a'.repeat(41), undefined],
+    ['A'.repeat(40), undefined],
+    ['g'.repeat(40), undefined],
+    [`${'a'.repeat(40)}\n`, undefined],
+    [42, undefined],
+  ])('attaches only a validated build revision: %s', (revision, expected) => {
+    vi.stubGlobal('__APP_REVISION__', revision);
+    vi.stubEnv('APP_REVISION', 'c'.repeat(40));
+    const extraProps = {
+      app_revision: 'b'.repeat(40),
+      message: 'private-message-sentinel',
+      args: 'private-args-sentinel',
+    };
+    const chatProps = {
+      ...extraProps,
+      channelId: null,
+      command: 'ask',
+      guildId: null,
+      surface: 'dm',
+    };
+    trackCommandInvoked('discord-user', chatProps);
+    trackMessageAnswered('discord-user', { ...chatProps, responseId: null });
+    trackInteraction('discord-user', {
+      ...extraProps,
+      command: 'ask',
+      durationMs: 12,
+      errorType: 'ProviderError',
+      module: 'chat',
+      outcome: 'error',
+      surface: 'dm',
+      type: 'chat',
+    });
+    trackLifecycle('ready', { ...extraProps, guildCount: 2, memberCount: 3 });
+    captureException(new Error('private-error-sentinel'), null, chatProps);
+
+    const revisionProps =
+      expected === undefined ? {} : { app_revision: expected };
+    const distinctId = createHash('sha256')
+      .update('test-saltdiscord-user')
+      .digest('hex');
+    expect(postHog.capture.mock.calls).toEqual([
+      [
+        {
+          distinctId,
+          event: 'command_invoked',
+          properties: {
+            channel_id: null,
+            command: 'ask',
+            guild_id: null,
+            service: 'discord-bot',
+            surface: 'dm',
+            ...revisionProps,
+          },
+        },
+      ],
+      [
+        {
+          distinctId,
+          event: 'message_answered',
+          properties: {
+            channel_id: null,
+            command: 'ask',
+            guild_id: null,
+            response_id: null,
+            service: 'discord-bot',
+            surface: 'dm',
+            ...revisionProps,
+          },
+        },
+      ],
+      [
+        {
+          distinctId,
+          event: 'interaction',
+          properties: {
+            command: 'ask',
+            duration_ms: 12,
+            error_type: 'ProviderError',
+            module: 'chat',
+            outcome: 'error',
+            service: 'discord-bot',
+            surface: 'dm',
+            type: 'chat',
+            ...revisionProps,
+          },
+        },
+      ],
+      [
+        {
+          distinctId: 'discord-bot',
+          event: 'ready',
+          properties: {
+            guild_count: 2,
+            member_count: 3,
+            service: 'discord-bot',
+            ...revisionProps,
+          },
+        },
+      ],
+    ]);
+    expect(postHog.captureException).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ message: 'Captured exception', name: 'Error' }),
+      'discord-bot',
+      {
+        command: 'ask',
+        error_type: 'Error',
+        service: 'discord-bot',
+        surface: 'dm',
+        ...revisionProps,
+      },
+    );
+    const captured = JSON.stringify([
+      postHog.capture.mock.calls,
+      postHog.captureException.mock.calls,
+    ]);
+    expect(captured).not.toContain('private-');
+    expect(captured).not.toContain('test-key');
+    expect(captured).not.toContain('test-salt');
+  });
+
+  test('stays disabled without a key even when a revision is present', async () => {
+    await shutdownAnalytics();
+    vi.stubEnv('POSTHOG_KEY', '');
+    vi.stubGlobal('__APP_REVISION__', 'a'.repeat(40));
+    initAnalytics();
+    trackLifecycle('ready');
+    captureException(new Error('private-error-sentinel'), null);
+    expect(postHog.capture).not.toHaveBeenCalled();
+    expect(postHog.captureException).not.toHaveBeenCalled();
+  });
+
+  test('keeps exception capture fail-open', () => {
+    vi.stubGlobal('__APP_REVISION__', 'a'.repeat(40));
+    postHog.captureException.mockImplementationOnce(() => {
+      throw new Error('SDK failure');
+    });
+    expect(() => {
+      captureException(new Error('private-error-sentinel'), null);
+    }).not.toThrow();
   });
 });

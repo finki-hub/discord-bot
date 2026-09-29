@@ -5,6 +5,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --ignore-scripts
 
 COPY . ./
+ARG APP_REVISION=""
 RUN npm run build
 
 FROM node:26-alpine AS final
