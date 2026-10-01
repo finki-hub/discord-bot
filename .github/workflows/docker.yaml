@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   docker:
-    uses: finki-hub/.github/.github/workflows/docker.yaml@c545734f912fe47b9d24533e495471f4496cdf79
+    uses: finki-hub/.github/.github/workflows/docker.yaml@main
     with:
       build-args: |
         APP_REVISION=${{ github.sha }}
