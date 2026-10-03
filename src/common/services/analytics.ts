@@ -12,6 +12,16 @@ import {
 
 const SERVICE = 'discord-bot';
 
+declare const __APP_REVISION__: string | undefined;
+
+const REVISION_PATTERN = /^[a-f0-9]{40}$/u;
+
+const getRevisionProperties = (): { app_revision?: string } =>
+  typeof __APP_REVISION__ === 'string' &&
+  REVISION_PATTERN.test(__APP_REVISION__)
+    ? { app_revision: __APP_REVISION__ }
+    : {};
+
 const FALLBACK_DISTINCT_ID = 'discord-bot';
 
 const state: { client: null | PostHog } = { client: null };
@@ -88,6 +98,7 @@ export const trackCommandInvoked = (
       guild_id: props.guildId,
       service: SERVICE,
       surface: props.surface,
+      ...getRevisionProperties(),
     },
   });
 };
@@ -112,6 +123,7 @@ export const trackMessageAnswered = (
       response_id: props.responseId,
       service: SERVICE,
       surface: props.surface,
+      ...getRevisionProperties(),
     },
   });
 };
@@ -148,6 +160,7 @@ export const trackInteraction = (
       service: SERVICE,
       surface: props.surface,
       type: props.type,
+      ...getRevisionProperties(),
     },
   });
 };
@@ -178,6 +191,7 @@ export const trackLifecycle = (
         member_count: props.memberCount,
       }),
       service: SERVICE,
+      ...getRevisionProperties(),
     },
   });
 };
@@ -211,6 +225,7 @@ export const captureException = (
       error_type: normalizedError.name,
       service: SERVICE,
       surface: props.surface ?? null,
+      ...getRevisionProperties(),
     });
   } catch (captureError) {
     logger.debug(

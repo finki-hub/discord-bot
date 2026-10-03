@@ -11,4 +11,7 @@ permissions:
 jobs:
   docker:
     uses: finki-hub/.github/.github/workflows/docker.yaml@main
+    with:
+      build-args: |
+        APP_REVISION=${{ github.sha }}
     secrets: inherit
