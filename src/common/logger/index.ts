@@ -31,7 +31,7 @@ export const logger = createLogger({
             `${timestamp} - ${level}: ${message}`,
         ),
       ),
-      handleExceptions: true,
+      handleExceptions: false,
       level: 'info',
     }),
     new DailyRotateFile({
@@ -49,7 +49,7 @@ export const logger = createLogger({
             `${timestamp} - ${level}: ${message}`,
         ),
       ),
-      handleExceptions: true,
+      handleExceptions: false,
       level: 'debug',
       maxFiles: '30d',
       maxSize: '20m',

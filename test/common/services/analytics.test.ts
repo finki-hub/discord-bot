@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
+import { logger } from '@/common/logger/index.js';
 import {
   captureException,
   initAnalytics,
@@ -31,6 +32,12 @@ vi.mock('posthog-node', () => ({
   },
 }));
 
+test('Winston leaves fatal exceptions to the owned safe process handlers', () => {
+  expect(
+    logger.transports.every((transport) => !transport.handleExceptions),
+  ).toBe(true);
+});
+
 describe('analytics exception capture', () => {
   beforeEach(() => {
     vi.stubEnv('POSTHOG_KEY', 'test-key');
@@ -55,7 +62,7 @@ describe('analytics exception capture', () => {
     );
 
     captureException(error, 'discord-user', {
-      command: 'ask',
+      command: 'chat query command',
       surface: 'interaction',
     });
 
@@ -65,8 +72,8 @@ describe('analytics exception capture', () => {
       postHog.captureException.mock.calls[0] ?? [];
     expect(capturedError).toBeInstanceOf(Error);
     expect(capturedError).toMatchObject({
-      message: 'Captured exception',
-      name: 'ProviderError',
+      message: 'error',
+      name: 'Error',
     });
     expect(capturedError?.stack).not.toContain('provider-secret');
     expect(distinctId).toBe(
@@ -74,8 +81,10 @@ describe('analytics exception capture', () => {
     );
     expect(properties).toEqual({
       app_revision: 'a'.repeat(40),
-      command: 'ask',
-      error_type: 'ProviderError',
+      $process_person_profile: false,
+      command: 'chat query command',
+      error_type: 'error',
+      phase: null,
       service: 'discord-bot',
       surface: 'interaction',
     });
@@ -187,13 +196,19 @@ describe('analytics exception capture', () => {
       ],
     ]);
     expect(postHog.captureException).toHaveBeenCalledExactlyOnceWith(
-      expect.objectContaining({ message: 'Captured exception', name: 'Error' }),
+      expect.objectContaining({
+        message: 'error',
+        name: 'Error',
+        stack: 'Error: error',
+      }),
       'discord-bot',
       {
-        command: 'ask',
-        error_type: 'Error',
+        $process_person_profile: false,
+        command: 'unknown',
+        error_type: 'error',
+        phase: null,
         service: 'discord-bot',
-        surface: 'dm',
+        surface: 'unknown',
         ...revisionProps,
       },
     );
@@ -218,6 +233,7 @@ describe('analytics exception capture', () => {
   });
 
   test('keeps exception capture fail-open', () => {
+    const debug = vi.spyOn(logger, 'debug');
     vi.stubGlobal('__APP_REVISION__', 'a'.repeat(40));
     postHog.captureException.mockImplementationOnce(() => {
       throw new Error('SDK failure');
@@ -225,5 +241,8 @@ describe('analytics exception capture', () => {
     expect(() => {
       captureException(new Error('private-error-sentinel'), null);
     }).not.toThrow();
+    expect(debug).toHaveBeenCalledExactlyOnceWith(
+      'Failed capturing exception in PostHog',
+    );
   });
 });
