@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { PostHog } from 'posthog-node';
 
 import { logger } from '@/common/logger/index.js';
+import { errorCategory } from '@/common/utils/safeError.js';
 import {
   getPostHogHost,
   getPostHogKey,
@@ -26,10 +27,14 @@ const FALLBACK_DISTINCT_ID = 'discord-bot';
 
 const state: { client: null | PostHog } = { client: null };
 
-const sanitizeExceptionForCapture = (errorName: string): Error =>
-  Object.defineProperty(new Error('Captured exception'), 'name', {
-    value: errorName,
-  });
+const sanitizeExceptionForCapture = (category: string): Error => {
+  const safeError = new Error(category);
+  // A nonempty header with zero frames prevents SDK capture-site stack synthesis
+  // and source-context enrichment. Deleting the stack is not sufficient.
+  // eslint-disable-next-line unicorn/no-error-property-assignment -- Deliberately replace every frame with a fixed categorical header.
+  safeError.stack = `Error: ${category}`;
+  return safeError;
+};
 
 export const initAnalytics = () => {
   const key = getPostHogKey();
@@ -49,7 +54,7 @@ export const initAnalytics = () => {
   }
 
   state.client = new PostHog(key, {
-    enableExceptionAutocapture: true,
+    enableExceptionAutocapture: false,
     host: getPostHogHost(),
   });
 
@@ -198,7 +203,22 @@ export const trackLifecycle = (
 
 type ExceptionProps = {
   command?: string;
+  phase?: string;
   surface?: string;
+};
+
+// Exact labels from the two streaming callers and conversation continuation.
+const EXCEPTION_COMMANDS = new Set([
+  'chat conversation continuation',
+  'chat query command',
+  'Prompt context command',
+]);
+const EXCEPTION_SURFACES = new Set(['interaction', 'reply', 'thread']);
+const EXCEPTION_PHASES = new Set(['uncaught_exception', 'unhandled_rejection']);
+
+const allowedLabel = (value: string | undefined, allowed: Set<string>) => {
+  if (value === undefined) return null;
+  return allowed.has(value) ? value : 'unknown';
 };
 
 export const captureException = (
@@ -212,24 +232,21 @@ export const captureException = (
     return;
   }
 
-  const distinctId =
-    userId === null ? FALLBACK_DISTINCT_ID : hashUserId(userId);
-  const normalizedError = Error.isError(error)
-    ? error
-    : new Error(String(error));
-  const capturedError = sanitizeExceptionForCapture(normalizedError.name);
-
   try {
+    const distinctId =
+      userId === null ? FALLBACK_DISTINCT_ID : hashUserId(userId);
+    const category = errorCategory(error);
+    const capturedError = sanitizeExceptionForCapture(category);
     client.captureException(capturedError, distinctId, {
-      command: props.command ?? null,
-      error_type: normalizedError.name,
+      $process_person_profile: false,
+      command: allowedLabel(props.command, EXCEPTION_COMMANDS),
+      error_type: category,
+      phase: allowedLabel(props.phase, EXCEPTION_PHASES),
       service: SERVICE,
-      surface: props.surface ?? null,
+      surface: allowedLabel(props.surface, EXCEPTION_SURFACES),
       ...getRevisionProperties(),
     });
-  } catch (captureError) {
-    logger.debug(
-      `Failed capturing exception in PostHog\n${String(captureError)}`,
-    );
+  } catch {
+    logger.debug('Failed capturing exception in PostHog');
   }
 };

@@ -1,5 +1,6 @@
 import { logger } from '@/common/logger/index.js';
 import { initAnalytics } from '@/common/services/analytics.js';
+import { errorCategory } from '@/common/utils/safeError.js';
 import { reloadConfig } from '@/configuration/bot/index.js';
 import { getToken } from '@/configuration/environment.js';
 
@@ -11,6 +12,9 @@ import { attachProcessListeners } from './utils/process.js';
 
 export const bootstrap = async () => {
   logger.info('Starting bot initialization...');
+
+  attachProcessListeners();
+  logger.debug('Process listeners attached');
 
   try {
     process.loadEnvFile();
@@ -26,9 +30,6 @@ export const bootstrap = async () => {
 
     logger.debug('No .env file found, using platform environment variables');
   }
-
-  attachProcessListeners();
-  logger.debug('Process listeners attached');
 
   initAnalytics();
 
@@ -46,7 +47,7 @@ export const bootstrap = async () => {
   try {
     await client.login(getToken());
   } catch (error) {
-    const errorMessage = `Failed logging in\n${String(error)}`;
+    const errorMessage = `Failed logging in (${errorCategory(error)})`;
     logger.error(errorMessage);
     throw new Error(errorMessage, { cause: error });
   }

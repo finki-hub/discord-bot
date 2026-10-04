@@ -3,6 +3,7 @@ import type { LogEntry } from 'winston';
 import { WebhookClient } from 'discord.js';
 import TransportStream from 'winston-transport';
 
+import { errorCategory } from '@/common/utils/safeError.js';
 import { getConfig } from '@/configuration/bot/file.js';
 
 export class WebhookTransport extends TransportStream {
@@ -73,8 +74,7 @@ export class WebhookTransport extends TransportStream {
     } catch (error) {
       // eslint-disable-next-line no-console -- logger transport initialization must avoid recursive logging through the same transport
       console.error(
-        `Failed initializing error webhook for guild ${guildId}:`,
-        error,
+        `Failed initializing error webhook (${errorCategory(error)})`,
       );
       return null;
     }
@@ -109,7 +109,9 @@ export class WebhookTransport extends TransportStream {
       });
     } catch (error) {
       // eslint-disable-next-line no-console -- logger transport send failures must avoid recursive logging through the same transport
-      console.error('Failed sending to error webhook:', error);
+      console.error(
+        `Failed sending to error webhook (${errorCategory(error)})`,
+      );
       for (const [url, cachedClient] of this.webhookClients) {
         if (cachedClient === webhookClient) {
           this.webhookClients.delete(url);

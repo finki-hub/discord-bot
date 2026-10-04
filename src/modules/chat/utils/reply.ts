@@ -7,6 +7,7 @@ import {
   trackMessageAnswered,
 } from '@/common/services/analytics.js';
 import { safeStreamReplyToMessage } from '@/common/utils/messages.js';
+import { errorCategory } from '@/common/utils/safeError.js';
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
 import { commandErrors } from '@/translations/commands.js';
@@ -83,15 +84,12 @@ const handleConversationError = async (
       guildId: message.guild?.id,
     });
   } else {
-    const messageParts = [
-      `Failed executing ${COMMAND_LABEL}`,
-      error.message,
-      error.stack,
-    ].filter(Boolean);
-
-    logger.error(messageParts.join('\n'), {
-      guildId: message.guild?.id,
-    });
+    logger.error(
+      `Failed continuing chat conversation (${errorCategory(error)})`,
+      {
+        guildId: message.guild?.id,
+      },
+    );
 
     captureException(error, message.author.id, {
       command: COMMAND_LABEL,

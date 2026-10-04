@@ -16,6 +16,7 @@ import {
   safeEphemeralReplyToInteraction,
   safeStreamReplyToInteraction,
 } from '@/common/utils/messages.js';
+import { errorCategory } from '@/common/utils/safeError.js';
 import { commandErrors } from '@/translations/commands.js';
 
 import type { SendPromptOptions } from '../schemas/Chat.js';
@@ -174,17 +175,11 @@ export const handlePromptWithStreaming = async (
     }
 
     if (error.message === 'LLM_UNAVAILABLE') {
-      logger.warn(`LLM unavailable when executing ${commandLabel}`, {
+      logger.warn('LLM unavailable when streaming chat response', {
         guildId: interaction.guild?.id,
       });
     } else {
-      const messageParts = [
-        `Failed executing ${commandLabel}`,
-        error.message,
-        error.stack,
-      ].filter(Boolean);
-
-      logger.error(messageParts.join('\n'), {
+      logger.error(`Failed streaming chat response (${errorCategory(error)})`, {
         guildId: interaction.guild?.id,
       });
 
