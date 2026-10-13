@@ -88,7 +88,11 @@ describe('prompt catalog cache', () => {
     const beforePrompt = await getSupportedModels(USER_ID);
     expect(beforePrompt?.models[0]?.sponsored_quota?.remaining).toBe(1);
 
-    await sendPrompt(streamOptions, async () => {});
+    await sendPrompt(
+      streamOptions,
+      '00000000-0000-4000-8000-000000000001',
+      async () => {},
+    );
     const afterPrompt = await getSupportedModels(USER_ID);
 
     expect(catalogFetches).toBe(2);
@@ -96,14 +100,47 @@ describe('prompt catalog cache', () => {
     expect(afterPrompt?.models[0]?.sponsored_quota?.remaining).toBe(0);
   });
 
+  test('sends the opaque session header without changing the prompt body', async () => {
+    await sendPrompt(
+      streamOptions,
+      '00000000-0000-4000-8000-000000000007',
+      async () => {},
+    );
+
+    const promptCall = vi
+      .mocked(fetch)
+      .mock.calls.find(([input]) => requestUrl(input).pathname === '/chat/');
+    expect(promptCall).toBeDefined();
+    const [, init] = promptCall ?? [];
+    expect(init?.headers).toMatchObject({
+      'x-api-key': 'test-api-key',
+      'x-opencode-session': '00000000-0000-4000-8000-000000000007',
+    });
+    const body = init?.body;
+    expect(body).toBeTypeOf('string');
+    if (typeof body !== 'string') {
+      throw new TypeError('Expected the prompt request body to be JSON text');
+    }
+    expect(JSON.parse(body)).toEqual({
+      inference_model: 'sponsored-model',
+      interface: 'discord',
+      messages: [{ content: 'question', role: 'user' }],
+      user_id: USER_ID,
+    });
+  });
+
   test('refreshes sponsored quota after prompt stream consumption fails', async () => {
     const beforePrompt = await getSupportedModels(USER_ID);
     expect(beforePrompt?.models[0]?.sponsored_quota?.remaining).toBe(1);
 
     await expect(
-      sendPrompt(streamOptions, async () => {
-        throw new Error('consumer failed');
-      }),
+      sendPrompt(
+        streamOptions,
+        '00000000-0000-4000-8000-000000000001',
+        async () => {
+          throw new Error('consumer failed');
+        },
+      ),
     ).rejects.toThrow('consumer failed');
     const afterPrompt = await getSupportedModels(USER_ID);
 

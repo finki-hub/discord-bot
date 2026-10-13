@@ -8,6 +8,7 @@ import type { SendPromptOptions } from '@/modules/chat/schemas/Chat.js';
 import { logger } from '@/common/logger/index.js';
 import {
   getConversationHistory,
+  getConversationSessionId,
   registerConversation,
 } from '@/modules/chat/utils/conversation.js';
 import { clearChatUserCache } from '@/modules/chat/utils/identity.js';
@@ -171,9 +172,13 @@ const fakeMessage = () => {
 const readSseEvent = async (payload: Record<string, string>) => {
   installFetchQueue([sseResponse(payload)]);
   const events: StreamEvent[] = [];
-  await sendPrompt(streamOptions, async (event) => {
-    events.push(event);
-  });
+  await sendPrompt(
+    streamOptions,
+    '00000000-0000-4000-8000-000000000001',
+    async (event) => {
+      events.push(event);
+    },
+  );
   expect(events).toHaveLength(1);
   return events[0];
 };
@@ -254,6 +259,10 @@ describe('sponsored stream errors', () => {
       expect(messageContent).not.toContain(RAW_MESSAGE);
       expect(getConversationHistory('message-response-1')).toBeUndefined();
       expect(getConversationHistory('interaction-response-1')).toBeUndefined();
+      expect(getConversationSessionId('message-response-1')).toBeUndefined();
+      expect(
+        getConversationSessionId('interaction-response-1'),
+      ).toBeUndefined();
     },
   );
 });

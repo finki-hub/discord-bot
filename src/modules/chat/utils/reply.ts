@@ -21,6 +21,7 @@ import {
 } from './constants.js';
 import {
   getConversationHistory,
+  getConversationSessionId,
   registerConversation,
 } from './conversation.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
@@ -126,7 +127,8 @@ export const handleChatMessage = async (message: Message) => {
   }
 
   const history = getConversationHistory(key);
-  if (history === undefined) {
+  const sessionId = getConversationSessionId(key);
+  if (history === undefined || sessionId === undefined) {
     return;
   }
 
@@ -179,25 +181,33 @@ export const handleChatMessage = async (message: Message) => {
     const capture: { responseId: null | string } = { responseId: null };
 
     const messages = await safeStreamReplyToMessage(message, async (emit) => {
-      capture.responseId = await sendPrompt(options, async (event) => {
-        const localizedEvent = localizeStreamEvent(event);
-        const publicEvent =
-          localizedEvent.type === 'error' &&
-          PRIVATE_STREAM_ERROR_CODES.has(localizedEvent.code)
-            ? { ...localizedEvent, message: commandErrors.unknownChatError }
-            : localizedEvent;
-        applyStreamEvent(state, publicEvent);
-        await emit(publicEvent);
-      });
+      capture.responseId = await sendPrompt(
+        options,
+        sessionId,
+        async (event) => {
+          const localizedEvent = localizeStreamEvent(event);
+          const publicEvent =
+            localizedEvent.type === 'error' &&
+            PRIVATE_STREAM_ERROR_CODES.has(localizedEvent.code)
+              ? { ...localizedEvent, message: commandErrors.unknownChatError }
+              : localizedEvent;
+          applyStreamEvent(state, publicEvent);
+          await emit(publicEvent);
+        },
+      );
     });
 
     if (hasSavableAnswer(state)) {
       const messageIds = messages.map((sent) => sent.id);
-      registerConversation(inChatThread ? [message.channelId] : messageIds, [
-        ...history,
-        { content: prompt, role: 'user' },
-        { content: state.answer.slice(0, 2_000), role: 'assistant' },
-      ]);
+      registerConversation(
+        inChatThread ? [message.channelId] : messageIds,
+        [
+          ...history,
+          { content: prompt, role: 'user' },
+          { content: state.answer.slice(0, 2_000), role: 'assistant' },
+        ],
+        sessionId,
+      );
 
       await appendTimingFootnote(
         messages.at(-1),

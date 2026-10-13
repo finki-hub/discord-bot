@@ -31,6 +31,7 @@ vi.mock('@/common/utils/messages.js', () => ({
 }));
 vi.mock('@/modules/chat/utils/conversation.js', () => ({
   getConversationHistory: () => [{ content: 'old question', role: 'user' }],
+  getConversationSessionId: () => '00000000-0000-4000-8000-000000000001',
 }));
 vi.mock('@/modules/chat/utils/identity.js', () => ({
   resolveChatUser: () => {
