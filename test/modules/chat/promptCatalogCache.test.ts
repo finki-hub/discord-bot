@@ -114,7 +114,7 @@ describe('prompt catalog cache', () => {
     const [, init] = promptCall ?? [];
     expect(init?.headers).toMatchObject({
       'x-api-key': 'test-api-key',
-      'x-opencode-session': '00000000-0000-4000-8000-000000000007',
+      'X-Conversation-Id': '00000000-0000-4000-8000-000000000007',
     });
     const body = init?.body;
     expect(body).toBeTypeOf('string');

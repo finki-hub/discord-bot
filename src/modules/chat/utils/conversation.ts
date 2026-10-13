@@ -6,8 +6,8 @@ import type { ConversationTurn } from '../schemas/Chat.js';
 // reply to any of them continues the same conversation.
 
 type ConversationEntry = {
+  conversationId: string;
   history: ConversationTurn[];
-  sessionId: string;
   updatedAt: number;
 };
 
@@ -40,22 +40,21 @@ export const getConversationHistory = (
   messageId: string,
 ): ConversationTurn[] | undefined => conversations.get(messageId)?.history;
 
-export const getConversationSessionId = (
-  messageId: string,
-): string | undefined => conversations.get(messageId)?.sessionId;
+export const getConversationId = (messageId: string): string | undefined =>
+  conversations.get(messageId)?.conversationId;
 
 export const registerConversation = (
   messageIds: readonly string[],
   history: ConversationTurn[],
-  sessionId: string = randomUUID(),
+  conversationId: string = randomUUID(),
 ) => {
   if (messageIds.length === 0) {
     return;
   }
 
   const entry: ConversationEntry = {
+    conversationId,
     history: history.slice(-MAX_HISTORY_TURNS),
-    sessionId,
     updatedAt: Date.now(),
   };
 

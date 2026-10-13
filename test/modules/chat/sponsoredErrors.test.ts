@@ -8,7 +8,7 @@ import type { SendPromptOptions } from '@/modules/chat/schemas/Chat.js';
 import { logger } from '@/common/logger/index.js';
 import {
   getConversationHistory,
-  getConversationSessionId,
+  getConversationId,
   registerConversation,
 } from '@/modules/chat/utils/conversation.js';
 import { clearChatUserCache } from '@/modules/chat/utils/identity.js';
@@ -259,10 +259,8 @@ describe('sponsored stream errors', () => {
       expect(messageContent).not.toContain(RAW_MESSAGE);
       expect(getConversationHistory('message-response-1')).toBeUndefined();
       expect(getConversationHistory('interaction-response-1')).toBeUndefined();
-      expect(getConversationSessionId('message-response-1')).toBeUndefined();
-      expect(
-        getConversationSessionId('interaction-response-1'),
-      ).toBeUndefined();
+      expect(getConversationId('message-response-1')).toBeUndefined();
+      expect(getConversationId('interaction-response-1')).toBeUndefined();
     },
   );
 });

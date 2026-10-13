@@ -8,7 +8,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   getConversationHistory,
-  getConversationSessionId,
+  getConversationId,
   registerConversation,
 } from '@/modules/chat/utils/conversation.js';
 import { handleChatThread } from '@/modules/chat/utils/thread.js';
@@ -55,18 +55,20 @@ describe('chat thread sessions', () => {
       }) as unknown as ChatInputCommandInteraction;
 
     await handleChatThread(makeInteraction());
-    const initialSessionId = getConversationSessionId(threadId);
-    expect(initialSessionId).toMatch(UUID_PATTERN);
-    if (initialSessionId === undefined) {
-      throw new Error('Expected a session for the newly created thread');
+    const initialConversationId = getConversationId(threadId);
+    expect(initialConversationId).toMatch(UUID_PATTERN);
+    if (initialConversationId === undefined) {
+      throw new Error(
+        'Expected a conversation ID for the newly created thread',
+      );
     }
     const history = [{ content: 'thread question', role: 'user' as const }];
-    registerConversation([threadId], history, initialSessionId);
+    registerConversation([threadId], history, initialConversationId);
 
     await handleChatThread(makeInteraction());
 
     expect(createdThreads).toBe(1);
-    expect(getConversationSessionId(threadId)).toBe(initialSessionId);
+    expect(getConversationId(threadId)).toBe(initialConversationId);
     expect(getConversationHistory(threadId)).toEqual(history);
   });
 });

@@ -105,7 +105,7 @@ export const handlePromptWithStreaming = async (
   commandLabel: string,
 ) => {
   try {
-    const sessionId = randomUUID();
+    const conversationId = randomUUID();
     const state: StreamAccumulator = {
       answer: '',
       errored: false,
@@ -120,7 +120,7 @@ export const handlePromptWithStreaming = async (
       async (emit) => {
         capture.responseId = await sendPrompt(
           options,
-          sessionId,
+          conversationId,
           async (event) => {
             await forwardStreamEvent({
               emit,
@@ -149,7 +149,7 @@ export const handlePromptWithStreaming = async (
           ...options.messages,
           { content: state.answer.slice(0, 2_000), role: 'assistant' },
         ],
-        sessionId,
+        conversationId,
       );
 
       await appendTimingFootnote(

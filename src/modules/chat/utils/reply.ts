@@ -21,7 +21,7 @@ import {
 } from './constants.js';
 import {
   getConversationHistory,
-  getConversationSessionId,
+  getConversationId,
   registerConversation,
 } from './conversation.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
@@ -127,8 +127,8 @@ export const handleChatMessage = async (message: Message) => {
   }
 
   const history = getConversationHistory(key);
-  const sessionId = getConversationSessionId(key);
-  if (history === undefined || sessionId === undefined) {
+  const conversationId = getConversationId(key);
+  if (history === undefined || conversationId === undefined) {
     return;
   }
 
@@ -183,7 +183,7 @@ export const handleChatMessage = async (message: Message) => {
     const messages = await safeStreamReplyToMessage(message, async (emit) => {
       capture.responseId = await sendPrompt(
         options,
-        sessionId,
+        conversationId,
         async (event) => {
           const localizedEvent = localizeStreamEvent(event);
           const publicEvent =
@@ -206,7 +206,7 @@ export const handleChatMessage = async (message: Message) => {
           { content: prompt, role: 'user' },
           { content: state.answer.slice(0, 2_000), role: 'assistant' },
         ],
-        sessionId,
+        conversationId,
       );
 
       await appendTimingFootnote(

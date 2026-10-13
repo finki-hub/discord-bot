@@ -9,7 +9,7 @@ import type { SendPromptOptions } from '@/modules/chat/schemas/Chat.js';
 
 import {
   getConversationHistory,
-  getConversationSessionId,
+  getConversationId,
   registerConversation,
 } from '@/modules/chat/utils/conversation.js';
 import { handleChatMessage } from '@/modules/chat/utils/reply.js';
@@ -20,7 +20,8 @@ const UUID_PATTERN =
 
 const mocks = vi.hoisted(() => {
   let responseIndex = 0;
-  const sent: Array<{ options: SendPromptOptions; sessionId: string }> = [];
+  const sent: Array<{ options: SendPromptOptions; conversationId: string }> =
+    [];
   return {
     applyStreamEvent: (state: { answer: string }, event: StreamEvent): void => {
       if (event.type === 'token') {
@@ -49,17 +50,17 @@ const mocks = vi.hoisted(() => {
     sendPrompt: vi.fn<
       (
         options: SendPromptOptions,
-        sessionId: string,
+        conversationId: string,
         onEvent: (event: StreamEvent) => Promise<void>,
       ) => Promise<string>
     >(
       async (
         options: SendPromptOptions,
-        sessionId: string,
+        conversationId: string,
         onEvent: (event: StreamEvent) => Promise<void>,
       ) => {
         responseIndex += 1;
-        sent.push({ options, sessionId });
+        sent.push({ options, conversationId });
         await onEvent({ text: `answer-${responseIndex}`, type: 'token' });
         return `response-${responseIndex}`;
       },
@@ -168,22 +169,20 @@ describe('conversation session lifecycle', () => {
 
     expect(mocks.sent).toHaveLength(2);
     const [first, second] = mocks.sent;
-    expect(first?.sessionId).toMatch(UUID_PATTERN);
-    expect(second?.sessionId).toMatch(UUID_PATTERN);
-    expect(second?.sessionId).not.toBe(first?.sessionId);
-    expect(getConversationSessionId('stream-message-2')).toBe(first?.sessionId);
-    expect(getConversationSessionId('stream-message-4')).toBe(
-      second?.sessionId,
-    );
+    expect(first?.conversationId).toMatch(UUID_PATTERN);
+    expect(second?.conversationId).toMatch(UUID_PATTERN);
+    expect(second?.conversationId).not.toBe(first?.conversationId);
+    expect(getConversationId('stream-message-2')).toBe(first?.conversationId);
+    expect(getConversationId('stream-message-4')).toBe(second?.conversationId);
   });
 
   test('reuses a reply session while sending the growing history each turn', async () => {
     const rootMessageId = `reply-root-${randomUUID()}`;
-    const sessionId = randomUUID();
+    const conversationId = randomUUID();
     registerConversation(
       [rootMessageId],
       [{ content: 'starting question', role: 'user' }],
-      sessionId,
+      conversationId,
     );
 
     await handleChatMessage(followUpMessage(rootMessageId, 'first follow-up'));
@@ -191,13 +190,13 @@ describe('conversation session lifecycle', () => {
     await handleChatMessage(followUpMessage(firstReplyId, 'second follow-up'));
 
     expect(mocks.sent).toHaveLength(2);
-    expect(mocks.sent.map(({ sessionId: sentId }) => sentId)).toEqual([
-      sessionId,
-      sessionId,
+    expect(mocks.sent.map(({ conversationId: sentId }) => sentId)).toEqual([
+      conversationId,
+      conversationId,
     ]);
     expect(mocks.sent[0]?.options.messages).toHaveLength(2);
     expect(mocks.sent[1]?.options.messages).toHaveLength(4);
-    expect(getConversationSessionId('stream-message-2')).toBe(sessionId);
+    expect(getConversationId('stream-message-2')).toBe(conversationId);
     expect(getConversationHistory('stream-message-4')).toHaveLength(5);
   });
 });

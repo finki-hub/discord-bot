@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   getConversationHistory,
-  getConversationSessionId,
+  getConversationId,
   registerConversation,
 } from '@/modules/chat/utils/conversation.js';
 
@@ -20,21 +20,21 @@ describe('conversation sessions', () => {
     registerConversation([firstMessage, answerMessage], history);
     registerConversation([secondMessage], history);
 
-    const firstSessionId = getConversationSessionId(firstMessage);
-    expect(firstSessionId).toMatch(UUID_PATTERN);
-    expect(getConversationSessionId(answerMessage)).toBe(firstSessionId);
-    expect(getConversationSessionId(secondMessage)).not.toBe(firstSessionId);
+    const firstConversationId = getConversationId(firstMessage);
+    expect(firstConversationId).toMatch(UUID_PATTERN);
+    expect(getConversationId(answerMessage)).toBe(firstConversationId);
+    expect(getConversationId(secondMessage)).not.toBe(firstConversationId);
     expect(getConversationHistory(firstMessage)).toEqual(history);
   });
 
   test('preserves an existing session when an answer is re-registered', () => {
     const messageId = `conversation-followup-${randomUUID()}`;
-    const sessionId = randomUUID();
+    const conversationId = randomUUID();
 
     registerConversation(
       [messageId],
       [{ content: 'first', role: 'user' }],
-      sessionId,
+      conversationId,
     );
     registerConversation(
       [messageId],
@@ -43,10 +43,10 @@ describe('conversation sessions', () => {
         { content: 'answer', role: 'assistant' },
         { content: 'follow-up', role: 'user' },
       ],
-      sessionId,
+      conversationId,
     );
 
-    expect(getConversationSessionId(messageId)).toBe(sessionId);
+    expect(getConversationId(messageId)).toBe(conversationId);
     expect(getConversationHistory(messageId)).toHaveLength(3);
   });
 });
