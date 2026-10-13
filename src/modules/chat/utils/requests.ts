@@ -281,6 +281,7 @@ export const invalidateModelCatalog = (userId: string): void => {
 
 export const sendPrompt = async (
   options: SendPromptOptions,
+  conversationId: string,
   onEvent: (event: StreamEvent) => Promise<void>,
 ) => {
   const chatbotUrl = getChatbotUrl();
@@ -301,6 +302,7 @@ export const sendPrompt = async (
       Accept: 'text/event-stream',
       'Content-Type': 'application/json',
       'x-api-key': apiKey,
+      'X-Conversation-Id': conversationId,
     },
     method: 'POST',
   });

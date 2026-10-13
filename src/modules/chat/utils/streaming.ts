@@ -4,6 +4,7 @@ import {
   MessageFlags,
   type UserContextMenuCommandInteraction,
 } from 'discord.js';
+import { randomUUID } from 'node:crypto';
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
 
@@ -104,6 +105,7 @@ export const handlePromptWithStreaming = async (
   commandLabel: string,
 ) => {
   try {
+    const conversationId = randomUUID();
     const state: StreamAccumulator = {
       answer: '',
       errored: false,
@@ -116,14 +118,18 @@ export const handlePromptWithStreaming = async (
     const messages = await safeStreamReplyToInteraction(
       interaction,
       async (emit) => {
-        capture.responseId = await sendPrompt(options, async (event) => {
-          await forwardStreamEvent({
-            emit,
-            ephemeralError,
-            event,
-            state,
-          });
-        });
+        capture.responseId = await sendPrompt(
+          options,
+          conversationId,
+          async (event) => {
+            await forwardStreamEvent({
+              emit,
+              ephemeralError,
+              event,
+              state,
+            });
+          },
+        );
       },
     );
 
@@ -137,10 +143,14 @@ export const handlePromptWithStreaming = async (
 
     if (hasSavableAnswer(state)) {
       const messageIds = messages.map((message) => message.id);
-      registerConversation(messageIds, [
-        ...options.messages,
-        { content: state.answer.slice(0, 2_000), role: 'assistant' },
-      ]);
+      registerConversation(
+        messageIds,
+        [
+          ...options.messages,
+          { content: state.answer.slice(0, 2_000), role: 'assistant' },
+        ],
+        conversationId,
+      );
 
       await appendTimingFootnote(
         messages.at(-1),

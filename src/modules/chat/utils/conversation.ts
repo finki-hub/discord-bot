@@ -1,9 +1,12 @@
+import { randomUUID } from 'node:crypto';
+
 import type { ConversationTurn } from '../schemas/Chat.js';
 
 // An answer can span several messages, which all map to one shared entry, so a
 // reply to any of them continues the same conversation.
 
 type ConversationEntry = {
+  conversationId: string;
   history: ConversationTurn[];
   updatedAt: number;
 };
@@ -37,15 +40,20 @@ export const getConversationHistory = (
   messageId: string,
 ): ConversationTurn[] | undefined => conversations.get(messageId)?.history;
 
+export const getConversationId = (messageId: string): string | undefined =>
+  conversations.get(messageId)?.conversationId;
+
 export const registerConversation = (
   messageIds: readonly string[],
   history: ConversationTurn[],
+  conversationId: string = randomUUID(),
 ) => {
   if (messageIds.length === 0) {
     return;
   }
 
   const entry: ConversationEntry = {
+    conversationId,
     history: history.slice(-MAX_HISTORY_TURNS),
     updatedAt: Date.now(),
   };
