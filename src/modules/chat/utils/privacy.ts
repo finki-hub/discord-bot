@@ -1,3 +1,5 @@
+import { getOrInsert } from '@/common/utils/maps.js';
+
 import { ChatApiError } from '../schemas/Credentials.js';
 
 // A deletion fences new work and drains all work already using this user's data.
@@ -32,7 +34,7 @@ export const forgetChatUser = async <T>(
   if (ids.some((id) => users.get(id)?.deleting === true))
     throw new ChatApiError(409, 'Deletion already in progress');
   const work = ids.map((id) =>
-    users.getOrInsertComputed(id, () => ({
+    getOrInsert(users, id, () => ({
       deleting: false,
       pending: new Set(),
     })),

@@ -1,5 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
+import { getOrInsert } from '@/common/utils/maps.js';
+
 import type { ConversationTurn } from '../schemas/Chat.js';
 
 // An answer can span several messages, which all map to one shared entry, so a
@@ -64,7 +66,7 @@ export const getPersistenceConversation = (
 ): { id: string; session: ConversationSession } => {
   const entry = conversations.get(messageId);
   if (entry === undefined) throw new Error('LLM_UNAVAILABLE');
-  const partition = entry.partitions.getOrInsertComputed(account.id, () => ({
+  const partition = getOrInsert(entry.partitions, account.id, () => ({
     id: randomUUID(),
     userId: account.userId,
   }));
@@ -100,7 +102,7 @@ const seedPersistencePartition = (
 ) => {
   if (options.accountId === undefined || options.userId === undefined) return;
   const userId = options.userId;
-  partitions.getOrInsertComputed(options.accountId, () => ({
+  getOrInsert(partitions, options.accountId, () => ({
     id: conversationId,
     userId,
   }));

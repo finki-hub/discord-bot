@@ -6,6 +6,7 @@ import type * as MessageUtils from '@/common/utils/messages.js';
 import type * as Feedback from '@/modules/chat/utils/feedback.js';
 import type * as Requests from '@/modules/chat/utils/requests.js';
 
+import { getOrInsert } from '@/common/utils/maps.js';
 import { execute as ask } from '@/modules/chat/commands/chat/ask.js';
 import { execute as chat } from '@/modules/chat/commands/chat/chat.js';
 import { forgetConversations } from '@/modules/chat/utils/conversation.js';
@@ -128,7 +129,7 @@ beforeEach(() => {
           { status: 409 },
         );
       }
-      const exchange = exchanges.getOrInsertComputed(id, () => ({
+      const exchange = getOrInsert(exchanges, id, () => ({
         userId: payload.user_id,
         prompts: [],
       }));
