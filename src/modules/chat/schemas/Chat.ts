@@ -9,8 +9,17 @@ export const ConversationTurnSchema = z.object({
 
 export type ConversationTurn = z.infer<typeof ConversationTurnSchema>;
 
+const DiscordContextSchema = z.object({
+  channelId: z.string().optional(),
+  guildId: z.string().optional(),
+  messageId: z.string().optional(),
+});
+
+export type DiscordContext = z.infer<typeof DiscordContextSchema>;
+
 export const SendPromptOptionsSchema = z
   .object({
+    discordContext: DiscordContextSchema.optional(),
     embeddingsModel: z.string().optional(),
     history: z.array(ConversationTurnSchema).max(9).optional(),
     inferenceModel: z.string().optional(),
@@ -22,6 +31,13 @@ export const SendPromptOptionsSchema = z
     userId: z.uuid(),
   })
   .transform((data) => ({
+    ...(data.discordContext !== undefined && {
+      discord_context: {
+        channel_id: data.discordContext.channelId,
+        guild_id: data.discordContext.guildId,
+        message_id: data.discordContext.messageId,
+      },
+    }),
     embeddings_model: data.embeddingsModel,
     inference_model: data.inferenceModel,
     interface: 'discord' as const,
@@ -40,28 +56,20 @@ export type SendPromptOptions = z.infer<typeof SendPromptOptionsSchema>;
 
 export const FeedbackOptionsSchema = z
   .object({
-    answerText: z.string().optional(),
     channelId: z.string().optional(),
     client: z.enum(['discord', 'web']),
     clientRef: z.string().optional(),
-    embeddingsModel: z.string().optional(),
     feedbackType: z.enum(['like', 'dislike']),
     guildId: z.string().optional(),
-    inferenceModel: z.string().optional(),
-    questionText: z.string().optional(),
     responseId: z.string(),
     userId: z.string(),
   })
   .transform((data) => ({
-    answer_text: data.answerText,
     channel_id: data.channelId,
     client: data.client,
     client_ref: data.clientRef,
-    embeddings_model: data.embeddingsModel,
     feedback_type: data.feedbackType,
     guild_id: data.guildId,
-    inference_model: data.inferenceModel,
-    question_text: data.questionText,
     response_id: data.responseId,
     user_id: data.userId,
   }));

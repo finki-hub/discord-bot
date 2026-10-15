@@ -1,18 +1,24 @@
 import { type ButtonInteraction, MessageFlags } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
+import { errorCategory } from '@/common/utils/safeError.js';
 import { FeedbackOptionsSchema } from '@/modules/chat/schemas/Chat.js';
 import {
   buildFeedbackRow,
   getFeedbackContext,
   isFeedbackEnabled,
 } from '@/modules/chat/utils/feedback.js';
+import { resolveChatUser } from '@/modules/chat/utils/identity.js';
+import {
+  beginChatOperations,
+  conversationPrivacyKey,
+} from '@/modules/chat/utils/privacy.js';
 import { sendFeedback } from '@/modules/chat/utils/requests.js';
 import { commandErrors, commandResponses } from '@/translations/commands.js';
 
 export const name = 'chatFeedback';
 
-export const execute = async (
+const recordFeedback = async (
   interaction: ButtonInteraction,
   args: string[],
 ) => {
@@ -53,23 +59,35 @@ export const execute = async (
   // message — recolouring its buttons — rather than posting a new ephemeral reply.
   await interaction.deferUpdate();
 
-  const context = getFeedbackContext(responseId);
+  try {
+    // The API only accepts ratings from registered accounts; this is cached.
+    await resolveChatUser(interaction.user, AbortSignal.timeout(3_000));
+  } catch (error) {
+    logger.warn(`Failed registering feedback rater (${errorCategory(error)})`);
+    await interaction.followUp({
+      content: commandErrors.feedbackUnavailable,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
   const options = FeedbackOptionsSchema.parse({
-    answerText: context?.answer,
     channelId: interaction.channelId,
     client: 'discord',
     clientRef: interaction.message.id,
     feedbackType: action,
     guildId: interaction.guild?.id,
-    questionText: context?.question,
     responseId,
     userId: interaction.user.id,
   });
 
-  if (!(await sendFeedback(options))) {
+  const result = await sendFeedback(options);
+  if (result !== 'recorded') {
     await interaction.followUp({
-      content: commandErrors.unknownChatError,
+      content:
+        result === 'unavailable'
+          ? commandErrors.feedbackUnavailable
+          : commandErrors.unknownChatError,
       flags: MessageFlags.Ephemeral,
     });
 
@@ -89,5 +107,31 @@ export const execute = async (
     logger.warn(`Failed updating feedback buttons\n${String(error)}`, {
       guildId: interaction.guild?.id,
     });
+  }
+};
+
+export const execute = async (
+  interaction: ButtonInteraction,
+  args: string[],
+) => {
+  const context = getFeedbackContext(args[1] ?? '');
+  const finish = beginChatOperations([
+    ...(context?.userIds ?? []),
+    interaction.user.id,
+    ...(context?.conversationId === undefined
+      ? []
+      : [conversationPrivacyKey(context.conversationId)]),
+  ]);
+  if (finish === null) {
+    await interaction.reply({
+      content: commandErrors.llmUnavailable,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  try {
+    await recordFeedback(interaction, args);
+  } finally {
+    finish();
   }
 };

@@ -22,10 +22,15 @@ import {
 import {
   getConversationHistory,
   getConversationId,
+  getConversationUsers,
+  getPersistenceConversation,
   registerConversation,
+  rememberConversationParticipant,
 } from './conversation.js';
+import { messageDiscordContext } from './discordContext.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
 import { resolveChatUser } from './identity.js';
+import { beginChatOperations, conversationPrivacyKey } from './privacy.js';
 import {
   applyStreamEvent,
   getValidatedInferenceModel,
@@ -40,12 +45,14 @@ const COMMAND_LABEL = 'chat conversation continuation';
 const finalizeChatAnswer = async (params: {
   askerId: string;
   channelId: string;
+  conversationId: string;
   guildId: null | string;
   lastMessage: Message | undefined;
   question: string;
   responseId: null | string;
   state: StreamAccumulator;
   surface: string;
+  userIds: string[];
 }) => {
   const { responseId } = params;
 
@@ -59,7 +66,10 @@ const finalizeChatAnswer = async (params: {
     });
     rememberFeedbackContext(responseId, {
       answer: params.state.answer,
+      conversationId: params.conversationId,
       question: params.question,
+      userId: params.askerId,
+      userIds: params.userIds,
     });
   }
 
@@ -138,6 +148,13 @@ export const handleChatMessage = async (message: Message) => {
   }
 
   const surface = inChatThread ? 'thread' : 'reply';
+  const finish = beginChatOperations([
+    ...getConversationUsers(key),
+    message.author.id,
+    conversationPrivacyKey(conversationId),
+  ]);
+  if (finish === null) return;
+  rememberConversationParticipant(key, message.author.id);
 
   trackCommandInvoked(message.author.id, {
     channelId: message.channelId,
@@ -152,11 +169,16 @@ export const handleChatMessage = async (message: Message) => {
         ? DEFAULT_CONFIGURATION.models
         : await getConfigProperty('models', message.guild.id);
     const chatUser = await resolveChatUser(message.author);
+    const persistence = getPersistenceConversation(key, {
+      id: chatUser.id,
+      userId: message.author.id,
+    });
     const inferenceModel = await getValidatedInferenceModel(
       chatUser.id,
       models.inference,
     );
     const options = SendPromptOptionsSchema.parse({
+      discordContext: messageDiscordContext(message),
       embeddingsModel: models.embeddings,
       history,
       inferenceModel,
@@ -183,7 +205,7 @@ export const handleChatMessage = async (message: Message) => {
     const messages = await safeStreamReplyToMessage(message, async (emit) => {
       capture.responseId = await sendPrompt(
         options,
-        conversationId,
+        persistence.id,
         async (event) => {
           const localizedEvent = localizeStreamEvent(event);
           const publicEvent =
@@ -206,27 +228,33 @@ export const handleChatMessage = async (message: Message) => {
           { content: prompt, role: 'user' },
           { content: state.answer.slice(0, 2_000), role: 'assistant' },
         ],
-        conversationId,
+        persistence.session,
       );
 
-      await appendTimingFootnote(
-        messages.at(-1),
+      await appendTimingFootnote(messages.at(-1), {
+        firstChunkAt: state.firstChunkAt,
         startedAt,
-        state.firstChunkAt,
-      );
+      });
 
       await finalizeChatAnswer({
         askerId: message.author.id,
         channelId: message.channelId,
+        conversationId,
         guildId: message.guild?.id ?? null,
         lastMessage: messages.at(-1),
         question: prompt,
         responseId: capture.responseId,
         state,
         surface,
+        userIds: [
+          ...(persistence.session.participants ?? []),
+          message.author.id,
+        ],
       });
     }
   } catch (error) {
     await handleConversationError(message, error, surface);
+  } finally {
+    finish();
   }
 };

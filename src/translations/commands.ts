@@ -12,6 +12,7 @@ export const commandDescriptions = {
   ask: 'Испрати промпт до LLM агентот',
   'chat closest': 'Преземи најблиски прашања',
   'chat embed': 'Ембедирај ги документите',
+  'chat forget': 'Избриши ги твоите зачувани разговори со агентот',
   'chat models': 'Преземи листа на јазични модели',
   'chat query': 'Испрати промпт до LLM агентот',
   'chat thread': 'Креирај своја приватна нишка за разговор со агентот',
@@ -41,9 +42,12 @@ export const commandDescriptions = {
   'ticket send': 'Испрати порака за креирање тикети',
 };
 
+const chatStorageNotice =
+  'Разговорите се зачувуваат за подобрување на ботот. Можеш да ги избришеш со /chat forget.';
+
 export const commandResponses = {
-  chatThreadWelcome:
-    'Ова е твојот личен простор за разговор со агентот. Слободно постави прашање тука и ќе ти одговорам. 🤖',
+  chatStorageNotice,
+  chatThreadWelcome: `Ова е твојот личен простор за разговор со агентот. Слободно постави прашање тука и ќе ти одговорам. 🤖\n-# ${chatStorageNotice}`,
   configurationReloaded: 'Конфигурацијата е освежена.',
   configurationReloading: 'Се освежува конфигурацијата...',
   dataReloaded: 'Податоците се освежени.',
@@ -55,6 +59,9 @@ export const commandResponses = {
 };
 
 export const commandResponseFunctions = {
+  chatHistoryDeleted: (conversations: number, feedback: number) =>
+    `Избришани се твоите зачувани разговори (${conversations}) и оценки на одговори (${feedback}).`,
+
   chatThreadCreated: (threadId: string) =>
     `Креирана е твојата приватна нишка: ${channelMention(threadId)}`,
 
@@ -97,6 +104,8 @@ export const commandErrors = {
   botMissingPermissions:
     'Ботот нема потребни дозволи за да ја изврши оваа команда. Контактирајте ги администраторите.',
   buttonNoPermission: 'Командата не е ваша.',
+  chatHistoryDeleteFailed:
+    'Бришењето на разговорите беше неуспешно. Обидете се повторно.',
   chatThreadCreationFailed:
     'Креирањето на нишката беше неуспешно. Обидете се повторно.',
   chatThreadInvalidChannel:
@@ -115,6 +124,8 @@ export const commandErrors = {
     'Неуспешно освежување на податоците. Проверете ги логите за повеќе детали.',
   faqNotFound: 'Прашањето не постои.',
   feedbackDisabled: 'Повратните информации не се овозможени.',
+  feedbackUnavailable:
+    'Овој одговор сè уште не е зачуван или повеќе не е достапен за оценување. Обиди се повторно подоцна.',
   freeQuotaExhausted:
     'Го искористивте вашиот дневен бесплатен лимит. Користете /credentials set за сопствен API клуч или обидете се повторно по ресетирањето.',
   freeTierUnavailable:

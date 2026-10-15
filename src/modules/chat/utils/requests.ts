@@ -1,11 +1,13 @@
 /* eslint-disable camelcase -- SSE payload fields mirror the backend wire contract. */
 
 import { createParser } from 'eventsource-parser';
+import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
 
 import { logger } from '@/common/logger/index.js';
+import { errorCategory } from '@/common/utils/safeError.js';
 import { getApiKey, getChatbotUrl } from '@/configuration/environment.js';
 import { QuestionsSchema } from '@/modules/faq/schemas/Question.js';
 import { labels } from '@/translations/labels.js';
@@ -20,6 +22,8 @@ import type {
 
 import {
   ChatApiError,
+  type ChatHistoryDeleted,
+  ChatHistoryDeletedSchema,
   type CredentialProvider,
   type CredentialPublic,
   CredentialPublicSchema,
@@ -269,6 +273,36 @@ export const deleteCredential = async (
   }
 };
 
+export const deleteChatHistory = async (
+  userId: string,
+): Promise<ChatHistoryDeleted> => {
+  const chatbotUrl = getChatbotUrl();
+
+  if (chatbotUrl === null) {
+    throw new ChatApiError(503, 'Chatbot URL not configured');
+  }
+
+  try {
+    const result = await fetch(
+      `${chatbotUrl}/chat/state/users/${userId}/history`,
+      {
+        headers: authHeaders(),
+        method: 'DELETE',
+      },
+    );
+
+    if (!result.ok) {
+      const detail = await parseSafeDetail(result);
+      throw new ChatApiError(result.status, detail);
+    }
+
+    return ChatHistoryDeletedSchema.parse(await result.json());
+  } catch (error) {
+    if (error instanceof ChatApiError) throw error;
+    throw new ChatApiError(503, 'Chat history deletion failed');
+  }
+};
+
 const modelCatalogCache = new Map<
   string,
   { expiresAt: number; value: z.infer<typeof ModelCatalogResponseSchema> }
@@ -361,39 +395,63 @@ export const sendPrompt = async (
   }
 };
 
+const FEEDBACK_MAX_ATTEMPTS = 3;
+const FEEDBACK_RETRY_DELAY_MS = 250;
+const FEEDBACK_TIMEOUT_MS = 3_000;
+const FEEDBACK_GENERATION_PATTERN = /^(?:0|[1-9]\d{0,18})$/u;
+
+export type FeedbackResult = 'failed' | 'recorded' | 'unavailable';
+
 export const sendFeedback = async (
   options: FeedbackOptions,
-): Promise<boolean> => {
+): Promise<FeedbackResult> => {
   const chatbotUrl = getChatbotUrl();
   const apiKey = getApiKey();
 
   if (chatbotUrl === null || apiKey === null) {
     logger.error('Cannot send feedback: chatbot URL or API key not configured');
 
-    return false;
+    return 'failed';
   }
 
   try {
-    const result = await fetch(`${chatbotUrl}/chat/feedback`, {
-      body: JSON.stringify(sanitizeOptions(options)),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      },
-      method: 'POST',
-    });
-
-    if (!result.ok) {
-      logger.error(`Failed sending feedback: HTTP ${result.status}`);
-
-      return false;
+    // Storage finishes asynchronously after streaming. Only a missing response
+    // is retryable; never recreate it from cached Discord text.
+    const signal = AbortSignal.timeout(FEEDBACK_TIMEOUT_MS);
+    let generation: string | undefined;
+    for (let attempt = 1; attempt <= FEEDBACK_MAX_ATTEMPTS; attempt += 1) {
+      const result = await fetch(`${chatbotUrl}/chat/feedback`, {
+        body: JSON.stringify(sanitizeOptions(options)),
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          ...(generation !== undefined && {
+            'X-Feedback-Generation': generation,
+          }),
+        },
+        method: 'POST',
+        signal,
+      });
+      await result.body?.cancel();
+      if (result.ok) return 'recorded';
+      if (result.status !== 404) {
+        logger.error(`Failed sending feedback: HTTP ${result.status}`);
+        return 'failed';
+      }
+      const token = result.headers.get('X-Feedback-Generation');
+      if (token === null || !FEEDBACK_GENERATION_PATTERN.test(token)) {
+        return 'unavailable';
+      }
+      // A later 404 can permit another attempt, never advance the deletion fence.
+      generation ??= token;
+      if (attempt < FEEDBACK_MAX_ATTEMPTS) {
+        await delay(FEEDBACK_RETRY_DELAY_MS, undefined, { signal });
+      }
     }
-
-    return true;
+    return 'unavailable';
   } catch (error) {
-    logger.error(`Failed sending feedback\n${String(error)}`);
-
-    return false;
+    logger.error(`Failed sending feedback (${errorCategory(error)})`);
+    return 'failed';
   }
 };
 

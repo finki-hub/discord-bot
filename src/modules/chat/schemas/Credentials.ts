@@ -43,6 +43,13 @@ export const CredentialUpsertSchema = z.object({
 
 export type CredentialUpsert = z.infer<typeof CredentialUpsertSchema>;
 
+export const ChatHistoryDeletedSchema = z.object({
+  deleted_conversations: z.number().int().nonnegative(),
+  deleted_feedback: z.number().int().nonnegative(),
+});
+
+export type ChatHistoryDeleted = z.infer<typeof ChatHistoryDeletedSchema>;
+
 export const SafeErrorDetailSchema = z.object({
   detail: z.string().optional(),
 });
