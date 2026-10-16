@@ -46,15 +46,17 @@ const chunkStaffEntries = (
   for (const entry of entries) {
     currentChunk.push(entry);
 
-    if (formatter(currentChunk).length > MAX_CONTENT_LENGTH) {
-      currentChunk.pop();
-
-      if (currentChunk.length > 0) {
-        chunks.push(formatter(currentChunk));
-      }
-
-      currentChunk = [entry];
+    if (formatter(currentChunk).length <= MAX_CONTENT_LENGTH) {
+      continue;
     }
+
+    currentChunk.pop();
+
+    if (currentChunk.length > 0) {
+      chunks.push(formatter(currentChunk));
+    }
+
+    currentChunk = [entry];
   }
 
   if (currentChunk.length > 0) {
@@ -71,11 +73,9 @@ export const linkStaff = (names: string[]): string[] => {
 
   const active = resolveStaff(names).filter((entry) => entry.active);
 
-  if (active.length === 0) {
-    return [labels.none];
-  }
-
-  return chunkStaffEntries(active, formatEntries);
+  return active.length === 0
+    ? [labels.none]
+    : chunkStaffEntries(active, formatEntries);
 };
 
 export const getRetiredStaff = (...nameGroups: string[][]): string[] => {
@@ -83,13 +83,11 @@ export const getRetiredStaff = (...nameGroups: string[][]): string[] => {
     .flatMap((names) => resolveStaff(names))
     .filter((entry) => !entry.active);
 
-  if (retired.length === 0) {
-    return [];
-  }
-
-  return chunkStaffEntries(retired, (entries) =>
-    strikethrough(formatEntries(entries)),
-  );
+  return retired.length === 0
+    ? []
+    : chunkStaffEntries(retired, (entries) =>
+        strikethrough(formatEntries(entries)),
+      );
 };
 
 const ParticipantSchema = z

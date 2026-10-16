@@ -72,10 +72,7 @@ const requestUrl = (input: Parameters<typeof fetch>[0]): URL => {
   if (typeof input === 'string') {
     return new URL(input);
   }
-  if (input instanceof URL) {
-    return input;
-  }
-  return new URL(input.url);
+  return input instanceof URL ? input : new URL(input.url);
 };
 
 describe('sponsored model catalog', () => {

@@ -65,5 +65,7 @@ type AccreditationAvailability = {
 };
 
 type AccreditationOptionalFields = {
-  [Y in AccreditationYear as `${Y}-${Exclude<AccreditationField, 'available'>}`]?: string;
+  [
+    Y in AccreditationYear as `${Y}-${Exclude<AccreditationField, 'available'>}`
+  ]?: string;
 };

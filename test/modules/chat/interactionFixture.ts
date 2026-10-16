@@ -5,11 +5,7 @@ export type InteractionCall = {
   readonly payload: unknown;
 };
 export type InteractionCallKind =
-  | 'defer'
-  | 'delete'
-  | 'edit'
-  | 'followUp'
-  | 'reply';
+  'defer' | 'delete' | 'edit' | 'followUp' | 'reply';
 export type InteractionState = {
   deferred: boolean;
   ephemeral: boolean;
@@ -97,23 +93,14 @@ export const callsOf = (
 
 export const jsonResponse = (body: unknown): Response => Response.json(body);
 
-export const payloadFlags = (payload: unknown): unknown => {
-  if (
-    typeof payload !== 'object' ||
-    payload === null ||
-    !('flags' in payload)
-  ) {
-    return undefined;
-  }
-  return payload.flags;
-};
+export const payloadFlags = (payload: unknown): unknown =>
+  typeof payload !== 'object' || payload === null || !('flags' in payload)
+    ? undefined
+    : payload.flags;
 
 export const requestUrl = (input: Parameters<typeof fetch>[0]): URL => {
   if (typeof input === 'string') {
     return new URL(input);
   }
-  if (input instanceof URL) {
-    return input;
-  }
-  return new URL(input.url);
+  return input instanceof URL ? input : new URL(input.url);
 };

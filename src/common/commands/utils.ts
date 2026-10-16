@@ -7,15 +7,14 @@ export const getCommandMention = (name: string | undefined) => {
     return '';
   }
 
+  const separatorIndex = name.indexOf(' ');
+  const commandName =
+    separatorIndex === -1 ? name : name.slice(0, separatorIndex);
   const command = client.application?.commands.cache.find(
-    (cmd) => cmd.name === (name.includes(' ') ? name.split(' ', 1)[0] : name),
+    (cmd) => cmd.name === commandName,
   );
 
-  if (command === undefined) {
-    return name;
-  }
-
-  return `</${name}:${command.id}>`;
+  return command === undefined ? name : `</${name}:${command.id}>`;
 };
 
 export const getFullCommandName = (
@@ -23,9 +22,7 @@ export const getFullCommandName = (
 ) => {
   const subcommand = interaction.options.getSubcommand(false);
 
-  if (subcommand === null) {
-    return interaction.commandName;
-  }
-
-  return `${interaction.commandName} ${subcommand}`;
+  return subcommand === null
+    ? interaction.commandName
+    : `${interaction.commandName} ${subcommand}`;
 };

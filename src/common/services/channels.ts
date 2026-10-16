@@ -4,7 +4,7 @@ import { logger } from '@/common/logger/index.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
 import { client } from '@/core/client.js';
 
-import { type Channel } from '../schemas/Channel.js';
+import { type Channel, ChannelSchema } from '../schemas/Channel.js';
 
 const channels: Record<
   string,
@@ -22,8 +22,10 @@ export const initializeChannels = async (guildId: string) => {
     Record<Channel, GuildTextBasedChannel | undefined>
   > = {};
 
-  for (const [Channel, channelId] of Object.entries(channelIds)) {
-    if (channelId === undefined) {
+  for (const [channelName, channelId] of Object.entries(channelIds)) {
+    const channelType = ChannelSchema.safeParse(channelName);
+
+    if (channelId === undefined || !channelType.success) {
       continue;
     }
 
@@ -36,7 +38,7 @@ export const initializeChannels = async (guildId: string) => {
         continue;
       }
 
-      guildChannels[Channel as Channel] = channel;
+      guildChannels[channelType.data] = channel;
     } catch (error) {
       logger.error(`Failed fetching channel ${channelId}\n${String(error)}`, {
         guildId,

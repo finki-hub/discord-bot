@@ -23,11 +23,7 @@ const convertMillisecondsToCronJob = (ms: number) => {
     return `0 0 */${ms / 86_400_000} * *`;
   }
 
-  if (ms < 31_536_000_000) {
-    return `0 0 0 */${ms / 2_592_000_000} *`;
-  }
-
-  return '0 0 0 0 0';
+  return ms < 31_536_000_000 ? `0 0 0 */${ms / 2_592_000_000} *` : '0 0 0 0 0';
 };
 
 export const init = () => {

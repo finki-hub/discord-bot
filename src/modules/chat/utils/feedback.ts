@@ -30,10 +30,12 @@ const evictOldest = () => {
     let oldestAt = Infinity;
 
     for (const [key, value] of contexts) {
-      if (value.updatedAt < oldestAt) {
-        oldestAt = value.updatedAt;
-        oldestKey = key;
+      if (value.updatedAt >= oldestAt) {
+        continue;
       }
+
+      oldestAt = value.updatedAt;
+      oldestKey = key;
     }
 
     if (oldestKey === undefined) {
@@ -72,13 +74,8 @@ export const forgetFeedbackContexts = (
 
 export const isFeedbackEnabled = async (
   guildId: null | string,
-): Promise<boolean> => {
-  if (guildId === null) {
-    return true;
-  }
-
-  return getFeedbackProperty('enabled', guildId);
-};
+): Promise<boolean> =>
+  guildId === null ? true : getFeedbackProperty('enabled', guildId);
 
 type FeedbackType = 'dislike' | 'like';
 
@@ -118,11 +115,11 @@ export const attachFeedbackButtons = async ({
   message: Message | undefined;
   responseId: null | string;
 }) => {
-  if (message === undefined || responseId === null) {
-    return;
-  }
-
-  if (!(await isFeedbackEnabled(guildId))) {
+  if (
+    message === undefined ||
+    responseId === null ||
+    !(await isFeedbackEnabled(guildId))
+  ) {
     return;
   }
 

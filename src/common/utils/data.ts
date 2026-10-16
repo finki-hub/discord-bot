@@ -19,13 +19,7 @@ export const fetchJsonFromUrl = async (url: string) => {
 export const parseContent = (
   content: string,
   fallback: unknown = [],
-): unknown => {
-  if (content.length === 0) {
-    return fallback;
-  }
-
-  return JSON.parse(content);
-};
+): unknown => (content.length === 0 ? fallback : JSON.parse(content));
 
 type LoadJsonResourceOptions<T> = {
   label: string;

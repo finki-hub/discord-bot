@@ -266,8 +266,7 @@ const handleChatClosest = async (interaction: ChatInputCommandInteraction) => {
     .toSorted((a, b) => {
       if (a.distance === undefined && b.distance === undefined) return 0;
       if (a.distance === undefined) return 1;
-      if (b.distance === undefined) return -1;
-      return a.distance - b.distance;
+      return b.distance === undefined ? -1 : a.distance - b.distance;
     })
     .map(
       ({ distance, name }, index) =>
