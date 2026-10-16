@@ -114,10 +114,12 @@ beforeEach(() => {
       if (init?.method === 'DELETE') {
         let count = 0;
         for (const [storedId, stored] of exchanges) {
-          if (path.includes(stored.userId)) {
-            exchanges.delete(storedId);
-            count += 1;
+          if (!path.includes(stored.userId)) {
+            continue;
           }
+
+          exchanges.delete(storedId);
+          count += 1;
         }
         return Response.json({
           deleted_conversations: count,
