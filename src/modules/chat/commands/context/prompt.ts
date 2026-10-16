@@ -8,6 +8,7 @@ import { safeEphemeralReplyToInteraction } from '@/common/utils/messages.js';
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
 import { SendPromptOptionsSchema } from '@/modules/chat/schemas/Chat.js';
+import { interactionDiscordContext } from '@/modules/chat/utils/discordContext.js';
 import { resolveInteractionChatUser } from '@/modules/chat/utils/interaction.js';
 import { getValidatedInferenceModel } from '@/modules/chat/utils/requests.js';
 import { handlePromptWithStreaming } from '@/modules/chat/utils/streaming.js';
@@ -48,6 +49,7 @@ export const execute = async (
   );
 
   const options = SendPromptOptionsSchema.parse({
+    discordContext: interactionDiscordContext(interaction),
     embeddingsModel: models.embeddings,
     inferenceModel,
     prompt,

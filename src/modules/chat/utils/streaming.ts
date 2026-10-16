@@ -4,6 +4,7 @@ import {
   MessageFlags,
   type UserContextMenuCommandInteraction,
 } from 'discord.js';
+import { randomUUID } from 'node:crypto';
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
 
@@ -17,7 +18,7 @@ import {
   safeStreamReplyToInteraction,
 } from '@/common/utils/messages.js';
 import { errorCategory } from '@/common/utils/safeError.js';
-import { commandErrors } from '@/translations/commands.js';
+import { commandErrors, commandResponses } from '@/translations/commands.js';
 
 import type { SendPromptOptions } from '../schemas/Chat.js';
 
@@ -28,6 +29,7 @@ import {
 } from './constants.js';
 import { registerConversation } from './conversation.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
+import { beginChatOperations, conversationPrivacyKey } from './privacy.js';
 import {
   applyStreamEvent,
   hasSavableAnswer,
@@ -103,6 +105,20 @@ export const handlePromptWithStreaming = async (
   options: SendPromptOptions,
   commandLabel: string,
 ) => {
+  const conversationId = randomUUID();
+  const finish = beginChatOperations([
+    interaction.user.id,
+    conversationPrivacyKey(conversationId),
+  ]);
+  if (finish === null) {
+    await safeEphemeralReplyToInteraction(
+      interaction,
+      commandErrors.llmUnavailable,
+    );
+    return;
+  }
+  // Requests rejected before admission (credentials, quota) are never stored.
+  let noticePending = false;
   try {
     const state: StreamAccumulator = {
       answer: '',
@@ -116,14 +132,18 @@ export const handlePromptWithStreaming = async (
     const messages = await safeStreamReplyToInteraction(
       interaction,
       async (emit) => {
-        capture.responseId = await sendPrompt(options, async (event) => {
-          await forwardStreamEvent({
-            emit,
-            ephemeralError,
-            event,
-            state,
-          });
-        });
+        capture.responseId = await sendPrompt(
+          options,
+          conversationId,
+          async (event) => {
+            await forwardStreamEvent({
+              emit,
+              ephemeralError,
+              event,
+              state,
+            });
+          },
+        );
       },
     );
 
@@ -135,18 +155,27 @@ export const handlePromptWithStreaming = async (
       return;
     }
 
+    noticePending = true;
     if (hasSavableAnswer(state)) {
       const messageIds = messages.map((message) => message.id);
-      registerConversation(messageIds, [
-        ...options.messages,
-        { content: state.answer.slice(0, 2_000), role: 'assistant' },
-      ]);
-
-      await appendTimingFootnote(
-        messages.at(-1),
-        startedAt,
-        state.firstChunkAt,
+      registerConversation(
+        messageIds,
+        [
+          ...options.messages,
+          { content: state.answer.slice(0, 2_000), role: 'assistant' },
+        ],
+        {
+          accountId: options.user_id,
+          conversationId,
+          userId: interaction.user.id,
+        },
       );
+
+      noticePending = !(await appendTimingFootnote(messages.at(-1), {
+        firstChunkAt: state.firstChunkAt,
+        notice: commandResponses.chatStorageNotice,
+        startedAt,
+      }));
 
       const { responseId } = capture;
       if (responseId !== null) {
@@ -159,7 +188,10 @@ export const handlePromptWithStreaming = async (
         });
         rememberFeedbackContext(responseId, {
           answer: state.answer,
+          conversationId,
           question: options.messages.at(-1)?.content,
+          userId: interaction.user.id,
+          userIds: [interaction.user.id],
         });
         await attachFeedbackButtons({
           askerId: interaction.user.id,
@@ -191,11 +223,30 @@ export const handlePromptWithStreaming = async (
 
     const errorMessage =
       LLM_ERRORS[error.message] ?? commandErrors.unknownChatError;
+    // A failure after admission can still be stored; credential and quota denials cannot.
+    noticePending = !EPHEMERAL_ERROR_CODES.has(error.message);
 
     await replyStreamError(
       interaction,
       errorMessage,
       EPHEMERAL_ERROR_CODES.has(error.message),
     );
+  } finally {
+    try {
+      if (noticePending) {
+        // Also covers empty/error responses and full-length answers. Keep error
+        // notices private rather than changing the visibility of the response.
+        await interaction.followUp({
+          content: commandResponses.chatStorageNotice,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
+    } catch (error) {
+      logger.warn(`Failed sending storage notice (${errorCategory(error)})`, {
+        guildId: interaction.guild?.id,
+      });
+    } finally {
+      finish();
+    }
   }
 };

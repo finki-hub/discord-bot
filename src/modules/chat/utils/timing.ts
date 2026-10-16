@@ -8,22 +8,28 @@ const MAX_MESSAGE_LENGTH = 2_000;
 const formatDuration = (ms: number) =>
   ms >= 1_000 ? `${(ms / 1_000).toFixed(1)}s` : `${Math.round(ms)}ms`;
 
+type FootnoteOptions = {
+  readonly firstChunkAt: null | number;
+  readonly notice?: string;
+  readonly startedAt: number;
+};
+
 export const appendTimingFootnote = async (
   message: Message | undefined,
-  startedAt: number,
-  firstChunkAt: null | number,
+  { firstChunkAt, notice, startedAt }: FootnoteOptions,
 ) => {
   if (message === undefined) {
-    return;
+    return false;
   }
 
   const total = formatDuration(Date.now() - startedAt);
   const ttft =
     firstChunkAt === null ? null : formatDuration(firstChunkAt - startedAt);
-  const footnote =
+  const timing =
     ttft === null
       ? `\n-# ⏱ ${total}`
       : `\n-# ⏱ ${total} · ${labels.firstToken} ${ttft}`;
+  const footnote = notice === undefined ? timing : `${timing}\n-# ${notice}`;
 
   try {
     // Re-fetch first: the streaming loop edits the answer in place (through the
@@ -34,13 +40,15 @@ export const appendTimingFootnote = async (
     const current = await message.fetch();
 
     if (current.content.length + footnote.length > MAX_MESSAGE_LENGTH) {
-      return;
+      return false;
     }
 
     await current.edit({ content: current.content + footnote });
+    return true;
   } catch (error) {
     logger.warn(`Failed appending timing footnote\n${String(error)}`, {
       guildId: message.guildId ?? undefined,
     });
+    return false;
   }
 };

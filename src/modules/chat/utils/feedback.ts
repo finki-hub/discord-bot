@@ -15,8 +15,11 @@ const MAX_TRACKED_RESPONSES = 1_000;
 // acceptance and ownership ride the customId, not this map.
 type FeedbackContext = {
   answer: string;
+  conversationId?: string | undefined;
   question?: string | undefined;
   updatedAt: number;
+  userId?: string | undefined;
+  userIds?: string[] | undefined;
 };
 
 const contexts = new Map<string, FeedbackContext>();
@@ -53,6 +56,21 @@ export const rememberFeedbackContext = (
 
 export const getFeedbackContext = (responseId: string) =>
   contexts.get(responseId);
+
+export const forgetFeedbackContexts = (
+  userId: string,
+  conversationIds: ReadonlySet<string> = new Set(),
+) => {
+  for (const [key, context] of contexts) {
+    if (
+      context.userId === userId ||
+      context.userIds?.includes(userId) === true ||
+      (context.conversationId !== undefined &&
+        conversationIds.has(context.conversationId))
+    )
+      contexts.delete(key);
+  }
+};
 
 export const isFeedbackEnabled = async (
   guildId: null | string,

@@ -3,13 +3,13 @@
     "croner": "^10.0.1",
     "discord-api-types": "^0.38.56",
     "discord.js": "^14.27.0",
-    "eventsource-parser": "^4.1.1",
+    "eventsource-parser": "^4.1.2",
     "fuse.js": "^7.5.0",
-    "posthog-node": "^5.55.0",
+    "posthog-node": "^5.55.3",
     "winston": "^3.19.0",
     "winston-daily-rotate-file": "^5.0.0",
     "winston-transport": "^4.9.0",
-    "zod": "^4.6.5"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
@@ -19,7 +19,7 @@
     "tsc-alias": "^1.9.7",
     "tsx": "^4.23.15",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.3"
+    "vitest": "^5.0.4"
   },
   "license": "MIT",
   "main": "dist/index.js",

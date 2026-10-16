@@ -31,6 +31,9 @@ vi.mock('@/common/utils/messages.js', () => ({
 }));
 vi.mock('@/modules/chat/utils/conversation.js', () => ({
   getConversationHistory: () => [{ content: 'old question', role: 'user' }],
+  getConversationId: () => '00000000-0000-4000-8000-000000000001',
+  getConversationUsers: () => ['test-user'],
+  rememberConversationParticipant: () => {},
 }));
 vi.mock('@/modules/chat/utils/identity.js', () => ({
   resolveChatUser: () => {
@@ -69,7 +72,8 @@ test('streaming failure keeps its reply and safe guild alert', async () => {
     { guildId: driver.interaction.guild?.id },
   );
   expect(mocks.captureException).toHaveBeenCalledOnce();
-  expect(driver.state.calls).toHaveLength(1);
+  expect(driver.state.calls).toHaveLength(2);
+  expect(driver.state.calls[1]?.kind).toBe('followUp');
   expect(
     JSON.stringify([driver.state.calls, mocks.logger.error.mock.calls]),
   ).not.toContain('PRIVATE_');
