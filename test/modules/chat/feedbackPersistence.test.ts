@@ -399,6 +399,44 @@ test('network failures are not retried or exposed to the user', async () => {
   expect(fetchMock).toHaveBeenCalledOnce();
 });
 
+test('answers with no local context, such as pre-deploy ones, say they can never be rated', async () => {
+  forgetFeedbackContexts(OWNER);
+  mockApi([404, 404, 404]);
+  const driver = button();
+  await rate(driver.interaction, args);
+  expect(driver.state.calls).toEqual([
+    {
+      kind: 'followUp',
+      payload: { content: commandErrors.feedbackNotStored, flags: 64 },
+    },
+  ]);
+});
+
+test('running out of time while storage is pending is unavailable, not a failure', async () => {
+  const controller = new AbortController();
+  vi.spyOn(AbortSignal, 'timeout').mockReturnValue(controller.signal);
+  const fetchMock = vi.fn<typeof fetch>(async () => {
+    queueMicrotask(() => {
+      controller.abort();
+    });
+    return Response.json(
+      {},
+      { status: 404, headers: { 'X-Feedback-Generation': '7' } },
+    );
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const result = await sendFeedback(
+    FeedbackOptionsSchema.parse({
+      client: 'discord',
+      feedbackType: 'like',
+      responseId: RESPONSE_ID,
+      userId: RATER,
+    }),
+  );
+  expect(result).toBe('unavailable');
+  expect(fetchMock).toHaveBeenCalledOnce();
+});
+
 test('the request budget aborts a stalled request without retrying', async () => {
   const controller = new AbortController();
   const timeout = vi

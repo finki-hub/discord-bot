@@ -13,6 +13,7 @@ import { forgetConversations } from '@/modules/chat/utils/conversation.js';
 import { forgetFeedbackContexts } from '@/modules/chat/utils/feedback.js';
 import { handleChatMessage } from '@/modules/chat/utils/reply.js';
 import { handleChatThread } from '@/modules/chat/utils/thread.js';
+import { commandResponses } from '@/translations/commands.js';
 
 import { fakeInteraction, requestUrl } from './interactionFixture.js';
 
@@ -23,6 +24,7 @@ const ACCOUNT_B = '00000000-0000-4000-8000-000000000002';
 const UUID_PATTERN = /^[0-9a-f-]{36}$/u;
 const state = vi.hoisted(() => ({ message: 0, thread: false }));
 const exchanges = new Map<string, { userId: string; prompts: string[] }>();
+const edits: Array<{ answerId: string; content: string }> = [];
 const sent: Array<{
   id: string;
   userId: string;
@@ -72,10 +74,16 @@ async function stream(
 ) {
   await produce(async () => {});
   state.message += 1;
+  const answerId = `owned-answer-${state.message}`;
   return [
     {
-      id: `owned-answer-${state.message}`,
-      fetch: async () => ({ content: 'server answer', edit: async () => {} }),
+      id: answerId,
+      fetch: async () => ({
+        content: 'server answer',
+        edit: async ({ content }: { content: string }) => {
+          edits.push({ answerId, content });
+        },
+      }),
     },
   ] as unknown as Message[];
 }
@@ -95,6 +103,7 @@ const followUp = (key: string, userId: string, content: string): Message =>
 beforeEach(() => {
   state.message = 0;
   sent.length = 0;
+  edits.length = 0;
   exchanges.clear();
   vi.stubEnv('CHATBOT_URL', 'https://chatbot.invalid');
   vi.stubEnv('API_KEY', 'test-api-key');
@@ -235,3 +244,27 @@ test.each([false, true])(
     ]);
   },
 );
+
+test('shows the storage notice once to each user who joins a reply chain', async () => {
+  state.thread = false;
+  const create = fakeInteraction('ask', '', A);
+  Object.assign(create.interaction, {
+    channelId: 'shared-channel',
+    isMessageContextMenuCommand: () => false,
+    options: {
+      getString: (name: string) => (name === 'prompt' ? 'A initial' : null),
+      getNumber: () => null,
+    },
+  });
+  await ask(create.interaction);
+  await handleChatMessage(followUp('owned-answer-1', B, 'B first'));
+  await handleChatMessage(followUp('owned-answer-2', B, 'B second'));
+  await handleChatMessage(followUp('owned-answer-3', A, 'A followup'));
+
+  const noticed = edits
+    .filter(({ content }) =>
+      content.includes(commandResponses.chatStorageNotice),
+    )
+    .map(({ answerId }) => answerId);
+  expect(noticed).toEqual(['owned-answer-1', 'owned-answer-2']);
+});

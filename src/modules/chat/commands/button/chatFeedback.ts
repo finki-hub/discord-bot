@@ -83,10 +83,16 @@ const recordFeedback = async (
 
   const result = await sendFeedback(options);
   if (result !== 'recorded') {
+    // Answers from before this process started (or since forgotten) have no
+    // context here and will never be stored, so retrying cannot help.
+    const unavailableMessage =
+      getFeedbackContext(responseId) === undefined
+        ? commandErrors.feedbackNotStored
+        : commandErrors.feedbackUnavailable;
     await interaction.followUp({
       content:
         result === 'unavailable'
-          ? commandErrors.feedbackUnavailable
+          ? unavailableMessage
           : commandErrors.unknownChatError,
       flags: MessageFlags.Ephemeral,
     });

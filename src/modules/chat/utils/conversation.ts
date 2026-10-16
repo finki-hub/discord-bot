@@ -10,7 +10,7 @@ import type { ConversationTurn } from '../schemas/Chat.js';
 type ConversationEntry = {
   conversationId: string;
   history: ConversationTurn[];
-  partitions: Map<string, { id: string; userId: string }>;
+  partitions: Map<string, Partition>;
   updatedAt: number;
   userIds: Set<string>;
 };
@@ -22,6 +22,9 @@ type ConversationSession = {
   partitions?: ConversationEntry['partitions'];
   userId: string;
 };
+
+// noticeShown: whether this account has seen the storage notice in this chain.
+type Partition = { id: string; noticeShown?: boolean; userId: string };
 
 const MAX_TRACKED_MESSAGES = 1_000;
 const MAX_HISTORY_TURNS = 9;
@@ -63,7 +66,12 @@ export const getConversationUsers = (messageId: string): string[] => [
 export const getPersistenceConversation = (
   messageId: string,
   account: { id: string; userId: string },
-): { id: string; session: ConversationSession } => {
+): {
+  id: string;
+  markNoticeShown: () => void;
+  noticePending: boolean;
+  session: ConversationSession;
+} => {
   const entry = conversations.get(messageId);
   if (entry === undefined) throw new Error('LLM_UNAVAILABLE');
   const partition = getOrInsert(entry.partitions, account.id, () => ({
@@ -74,6 +82,10 @@ export const getPersistenceConversation = (
   // aliases are evicted from the bounded lookup cache before finalization.
   return {
     id: partition.id,
+    markNoticeShown: () => {
+      partition.noticeShown = true;
+    },
+    noticePending: partition.noticeShown !== true,
     session: {
       accountId: account.id,
       conversationId: entry.conversationId,
@@ -102,8 +114,10 @@ const seedPersistencePartition = (
 ) => {
   if (options.accountId === undefined || options.userId === undefined) return;
   const userId = options.userId;
+  // The asker saw the notice under the answer that started the chain.
   getOrInsert(partitions, options.accountId, () => ({
     id: conversationId,
+    noticeShown: true,
     userId,
   }));
 };
@@ -122,7 +136,7 @@ export const registerConversation = (
   const conversationId = options.conversationId ?? randomUUID();
   const userIds = new Set(options.participants);
   let partitions: ConversationEntry['partitions'] =
-    options.partitions ?? new Map<string, { id: string; userId: string }>();
+    options.partitions ?? new Map<string, Partition>();
   for (const existing of conversations.values()) {
     if (existing.conversationId === conversationId) {
       partitions = existing.partitions;

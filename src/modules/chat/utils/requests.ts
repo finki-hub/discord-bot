@@ -414,11 +414,11 @@ export const sendFeedback = async (
     return 'failed';
   }
 
+  let generation: string | undefined;
   try {
     // Storage finishes asynchronously after streaming. Only a missing response
     // is retryable; never recreate it from cached Discord text.
     const signal = AbortSignal.timeout(FEEDBACK_TIMEOUT_MS);
-    let generation: string | undefined;
     for (let attempt = 1; attempt <= FEEDBACK_MAX_ATTEMPTS; attempt += 1) {
       const result = await fetch(`${chatbotUrl}/chat/feedback`, {
         body: JSON.stringify(sanitizeOptions(options)),
@@ -450,6 +450,8 @@ export const sendFeedback = async (
     }
     return 'unavailable';
   } catch (error) {
+    // Timing out while storage is still pending is "not available yet".
+    if (generation !== undefined) return 'unavailable';
     logger.error(`Failed sending feedback (${errorCategory(error)})`);
     return 'failed';
   }

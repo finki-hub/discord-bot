@@ -10,7 +10,7 @@ import { safeStreamReplyToMessage } from '@/common/utils/messages.js';
 import { errorCategory } from '@/common/utils/safeError.js';
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
-import { commandErrors } from '@/translations/commands.js';
+import { commandErrors, commandResponses } from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
 import { ChatApiError } from '../schemas/Credentials.js';
@@ -41,6 +41,41 @@ import {
 import { appendTimingFootnote } from './timing.js';
 
 const COMMAND_LABEL = 'chat conversation continuation';
+
+// Someone joining another user's reply chain gets their own stored conversation
+// but never saw the notice under the original answer.
+const appendAnswerFootnote = async ({
+  inChatThread,
+  lastMessage,
+  message,
+  persistence,
+  timing,
+}: {
+  inChatThread: boolean;
+  lastMessage: Message | undefined;
+  message: Message;
+  persistence: { markNoticeShown: () => void; noticePending: boolean };
+  timing: { firstChunkAt: null | number; startedAt: number };
+}) => {
+  // Thread members already see the notice in the thread's welcome message.
+  if (inChatThread || !persistence.noticePending) {
+    await appendTimingFootnote(lastMessage, timing);
+    return;
+  }
+
+  const notice = commandResponses.chatStorageNotice;
+  if (!(await appendTimingFootnote(lastMessage, { ...timing, notice }))) {
+    try {
+      await message.reply({
+        allowedMentions: { repliedUser: false },
+        content: `-# ${notice}`,
+      });
+    } catch {
+      // The notice is best-effort; the answer itself was already delivered.
+    }
+  }
+  persistence.markNoticeShown();
+};
 
 const finalizeChatAnswer = async (params: {
   askerId: string;
@@ -231,9 +266,12 @@ export const handleChatMessage = async (message: Message) => {
         persistence.session,
       );
 
-      await appendTimingFootnote(messages.at(-1), {
-        firstChunkAt: state.firstChunkAt,
-        startedAt,
+      await appendAnswerFootnote({
+        inChatThread,
+        lastMessage: messages.at(-1),
+        message,
+        persistence,
+        timing: { firstChunkAt: state.firstChunkAt, startedAt },
       });
 
       await finalizeChatAnswer({
