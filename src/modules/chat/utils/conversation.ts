@@ -140,10 +140,12 @@ export const registerConversation = (
   let partitions: ConversationEntry['partitions'] =
     options.partitions ?? new Map<string, Partition>();
   for (const existing of conversations.values()) {
-    if (existing.conversationId === conversationId) {
-      partitions = existing.partitions;
-      for (const userId of existing.userIds) userIds.add(userId);
+    if (existing.conversationId !== conversationId) {
+      continue;
     }
+
+    partitions = existing.partitions;
+    for (const userId of existing.userIds) userIds.add(userId);
   }
   if (options.userId !== undefined) userIds.add(options.userId);
   for (const partition of partitions.values()) userIds.add(partition.userId);
