@@ -1,15 +1,21 @@
 import {
   type ChatInputCommandInteraction,
+  MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
 
 import { safeEphemeralReplyToInteraction } from '@/common/utils/messages.js';
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
-import { commandDescriptions, commandErrors } from '@/translations/commands.js';
+import {
+  commandDescriptions,
+  commandErrors,
+  commandResponses,
+} from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
 import { isModelSelectable } from '../schemas/Model.js';
+import { interactionDiscordContext } from './discordContext.js';
 import { resolveInteractionChatUser } from './interaction.js';
 import { getSupportedModels, getValidatedInferenceModel } from './requests.js';
 import { handlePromptWithStreaming } from './streaming.js';
@@ -45,69 +51,86 @@ export const getCommonCommand = (
   }
 
   const execute = async (interaction: ChatInputCommandInteraction) => {
-    const prompt = interaction.options.getString('prompt', true);
-    const embeddingsModel =
-      interaction.options.getString('embeddings-model') ?? undefined;
-    const inferenceModel =
-      interaction.options.getString('inference-model') ?? undefined;
-    const temperature =
-      interaction.options.getNumber('temperature') ?? undefined;
-    const topP = interaction.options.getNumber('top-p') ?? undefined;
-    const maxTokens = interaction.options.getNumber('max-tokens') ?? undefined;
-    const reasoning = allowReasoning
-      ? (interaction.options.getBoolean('reasoning') ?? undefined)
-      : false;
+    let streamingStarted = false;
+    try {
+      const prompt = interaction.options.getString('prompt', true);
+      const embeddingsModel =
+        interaction.options.getString('embeddings-model') ?? undefined;
+      const inferenceModel =
+        interaction.options.getString('inference-model') ?? undefined;
+      const temperature =
+        interaction.options.getNumber('temperature') ?? undefined;
+      const topP = interaction.options.getNumber('top-p') ?? undefined;
+      const maxTokens =
+        interaction.options.getNumber('max-tokens') ?? undefined;
+      const reasoning = allowReasoning
+        ? (interaction.options.getBoolean('reasoning') ?? undefined)
+        : false;
 
-    const models =
-      interaction.guild === null
-        ? DEFAULT_CONFIGURATION.models
-        : await getConfigProperty('models', interaction.guild.id);
+      const models =
+        interaction.guild === null
+          ? DEFAULT_CONFIGURATION.models
+          : await getConfigProperty('models', interaction.guild.id);
 
-    const chatUser = await resolveInteractionChatUser(interaction);
-    if (chatUser === null) {
-      return;
-    }
-
-    let validatedInferenceModel: string | undefined;
-    if (inferenceModel === undefined) {
-      validatedInferenceModel = await getValidatedInferenceModel(
-        chatUser.id,
-        models.inference,
-      );
-    } else {
-      const catalog = await getSupportedModels(chatUser.id);
-      if (catalog === null) {
-        await safeEphemeralReplyToInteraction(
-          interaction,
-          commandErrors.llmUnavailable,
-        );
+      const chatUser = await resolveInteractionChatUser(interaction);
+      if (chatUser === null) {
         return;
       }
-      const selectedModel = catalog.models.find(
-        ({ id }) => id === inferenceModel,
-      );
-      if (selectedModel === undefined || !isModelSelectable(selectedModel)) {
-        await safeEphemeralReplyToInteraction(
-          interaction,
-          commandErrors.invalidInferenceModel,
+
+      let validatedInferenceModel: string | undefined;
+      if (inferenceModel === undefined) {
+        validatedInferenceModel = await getValidatedInferenceModel(
+          chatUser.id,
+          models.inference,
         );
-        return;
+      } else {
+        const catalog = await getSupportedModels(chatUser.id);
+        if (catalog === null) {
+          await safeEphemeralReplyToInteraction(
+            interaction,
+            commandErrors.llmUnavailable,
+          );
+          return;
+        }
+        const selectedModel = catalog.models.find(
+          ({ id }) => id === inferenceModel,
+        );
+        if (selectedModel === undefined || !isModelSelectable(selectedModel)) {
+          await safeEphemeralReplyToInteraction(
+            interaction,
+            commandErrors.invalidInferenceModel,
+          );
+          return;
+        }
+        validatedInferenceModel = inferenceModel;
       }
-      validatedInferenceModel = inferenceModel;
+
+      const options = SendPromptOptionsSchema.parse({
+        discordContext: interactionDiscordContext(interaction),
+        embeddingsModel: embeddingsModel ?? models.embeddings,
+        inferenceModel: validatedInferenceModel,
+        maxTokens,
+        prompt,
+        reasoning,
+        temperature,
+        topP,
+        userId: chatUser.id,
+      });
+
+      streamingStarted = true;
+      await handlePromptWithStreaming(
+        interaction,
+        options,
+        'chat query command',
+      );
+    } finally {
+      if (!streamingStarted) {
+        await interaction.followUp({
+          content: commandResponses.chatStorageNotice,
+          flags: MessageFlags.Ephemeral,
+        });
+      }
     }
-
-    const options = SendPromptOptionsSchema.parse({
-      embeddingsModel: embeddingsModel ?? models.embeddings,
-      inferenceModel: validatedInferenceModel,
-      maxTokens,
-      prompt,
-      reasoning,
-      temperature,
-      topP,
-      userId: chatUser.id,
-    });
-
-    await handlePromptWithStreaming(interaction, options, 'chat query command');
   };
 
   return { data, execute };

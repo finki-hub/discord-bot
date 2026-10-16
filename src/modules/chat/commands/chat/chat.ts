@@ -21,13 +21,24 @@ import {
   FillProgressSchema,
   UnembeddedQuestionsOptionsSchema,
 } from '@/modules/chat/schemas/Chat.js';
+import { ChatApiError } from '@/modules/chat/schemas/Credentials.js';
 import {
   EMBEDDING_MODELS,
   formatModelLabel,
 } from '@/modules/chat/schemas/Model.js';
 import { getCommonCommand } from '@/modules/chat/utils/chatCommand.js';
+import {
+  forgetConversations,
+  getUserConversationIds,
+} from '@/modules/chat/utils/conversation.js';
+import { forgetFeedbackContexts } from '@/modules/chat/utils/feedback.js';
 import { resolveInteractionChatUser } from '@/modules/chat/utils/interaction.js';
 import {
+  conversationPrivacyKey,
+  forgetChatUser,
+} from '@/modules/chat/utils/privacy.js';
+import {
+  deleteChatHistory,
   fillEmbeddings,
   getClosestQuestions,
   getSupportedModels,
@@ -35,7 +46,11 @@ import {
 } from '@/modules/chat/utils/requests.js';
 import { handleChatThread } from '@/modules/chat/utils/thread.js';
 import { generateModelChoices } from '@/modules/chat/utils/utils.js';
-import { commandDescriptions, commandErrors } from '@/translations/commands.js';
+import {
+  commandDescriptions,
+  commandErrors,
+  commandResponseFunctions,
+} from '@/translations/commands.js';
 import { labels } from '@/translations/labels.js';
 
 const EMBEDDINGS_MODEL_OPTION_NAME = 'embeddings-model';
@@ -205,6 +220,11 @@ export const data = new SlashCommandBuilder()
     subcommand
       .setName('thread')
       .setDescription(commandDescriptions['chat thread']),
+  )
+  .addSubcommand((subcommand) =>
+    subcommand
+      .setName('forget')
+      .setDescription(commandDescriptions['chat forget']),
   );
 
 const handleChatClosest = async (interaction: ChatInputCommandInteraction) => {
@@ -281,6 +301,47 @@ const handleChatModels = async (interaction: ChatInputCommandInteraction) => {
     .map((model) => `- ${formatModelLabel(model)}: ${inlineCode(model.id)}`)
     .join('\n');
   await safeReplyToInteraction(interaction, content, { ephemeral: true });
+};
+
+const handleChatForget = async (interaction: ChatInputCommandInteraction) => {
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+  const chatUser = await resolveInteractionChatUser(interaction);
+  if (chatUser === null) {
+    return;
+  }
+
+  try {
+    const deleted = await forgetChatUser(
+      [
+        interaction.user.id,
+        ...[...getUserConversationIds(interaction.user.id)].map(
+          conversationPrivacyKey,
+        ),
+      ],
+      () => {
+        forgetFeedbackContexts(
+          interaction.user.id,
+          forgetConversations(interaction.user.id),
+        );
+      },
+      () => deleteChatHistory(chatUser.id),
+    );
+    await interaction.editReply(
+      commandResponseFunctions.chatHistoryDeleted(
+        deleted.deleted_conversations,
+        deleted.deleted_feedback,
+      ),
+    );
+  } catch (error) {
+    if (!(error instanceof ChatApiError)) {
+      throw error;
+    }
+
+    logger.error(`Failed deleting chat history (HTTP ${error.status})`, {
+      guildId: interaction.guild?.id,
+    });
+    await interaction.editReply(commandErrors.chatHistoryDeleteFailed);
+  }
 };
 
 const { execute: handleChatQuery } = getCommonCommand('ask');
@@ -390,6 +451,7 @@ const handleChatUnembedded = async (
 const chatHandlers = {
   closest: handleChatClosest,
   embed: handleChatEmbed,
+  forget: handleChatForget,
   models: handleChatModels,
   query: handleChatQuery,
   thread: handleChatThread,

@@ -1,202 +1,295 @@
 import type { Message } from 'discord.js';
-import type { Logger } from 'winston';
 
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
+import type * as MessageUtils from '@/common/utils/messages.js';
 import type { SendPromptOptions } from '@/modules/chat/schemas/Chat.js';
+import type * as Requests from '@/modules/chat/utils/requests.js';
 
+import { execute as ask } from '@/modules/chat/commands/chat/ask.js';
 import {
+  forgetConversations,
   getConversationHistory,
   getConversationId,
   registerConversation,
 } from '@/modules/chat/utils/conversation.js';
+import { forgetChatUser } from '@/modules/chat/utils/privacy.js';
 import { handleChatMessage } from '@/modules/chat/utils/reply.js';
 import { handlePromptWithStreaming } from '@/modules/chat/utils/streaming.js';
+import { commandResponses } from '@/translations/commands.js';
 
-const UUID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu;
+import { fakeInteraction } from './interactionFixture.js';
 
-const mocks = vi.hoisted(() => {
-  let responseIndex = 0;
-  const sent: Array<{ options: SendPromptOptions; conversationId: string }> =
-    [];
-  return {
-    applyStreamEvent: (state: { answer: string }, event: StreamEvent): void => {
-      if (event.type === 'token') {
-        state.answer += event.text;
-      }
-    },
-    attachFeedbackButtons: vi.fn<() => Promise<void>>(async () => {}),
-    getValidatedInferenceModel: vi.fn<
-      (userId: string, configuredModel: string | undefined) => Promise<string>
-    >(async () => 'model'),
-    hasSavableAnswer: (state: { answer: string }): boolean =>
-      state.answer.length > 0,
-    rememberFeedbackContext: vi.fn<() => void>(),
-    resolveChatUser: vi.fn<
-      () => Promise<{
-        id: string;
-        provider: 'discord';
-        provider_subject: string;
-      }>
-    >(async () => ({
-      id: '00000000-0000-4000-8000-000000000099',
-      provider: 'discord' as const,
-      provider_subject: 'discord-user',
-    })),
-    sent,
-    sendPrompt: vi.fn<
+const USER_ID = '00000000-0000-4000-8000-000000000099';
+const UUID_PATTERN = /^[0-9a-f-]{36}$/iu;
+
+const mocks = vi.hoisted(() => ({
+  nextMessage: 0,
+  answer: 'answer',
+  content: 'answer',
+  edit: vi.fn<(value: { content: string }) => Promise<void>>(async () => {}),
+  attachFeedbackButtons: vi.fn<() => Promise<void>>(async () => {}),
+  rememberFeedbackContext: vi.fn<() => void>(),
+  sendPrompt:
+    vi.fn<
       (
         options: SendPromptOptions,
         conversationId: string,
         onEvent: (event: StreamEvent) => Promise<void>,
       ) => Promise<string>
-    >(
-      async (
-        options: SendPromptOptions,
-        conversationId: string,
-        onEvent: (event: StreamEvent) => Promise<void>,
-      ) => {
-        responseIndex += 1;
-        sent.push({ options, conversationId });
-        await onEvent({ text: `answer-${responseIndex}`, type: 'token' });
-        return `response-${responseIndex}`;
-      },
-    ),
-    nextMessageId: (): string => {
-      responseIndex += 1;
-      return `stream-message-${responseIndex}`;
-    },
-    reset: (): void => {
-      responseIndex = 0;
-      sent.length = 0;
-    },
+    >(),
+}));
+
+vi.mock('@/common/logger/index.js', () => ({
+  logger: { error: vi.fn<() => void>(), warn: vi.fn<() => void>() },
+}));
+vi.mock('@/common/services/analytics.js', () => ({
+  captureException: vi.fn<() => void>(),
+  trackCommandInvoked: vi.fn<() => void>(),
+  trackMessageAnswered: vi.fn<() => void>(),
+}));
+vi.mock('@/common/utils/messages.js', async (original) => {
+  const actual = await original<typeof MessageUtils>();
+  return {
+    ...actual,
+    safeStreamReplyToInteraction: streamReply,
+    safeStreamReplyToMessage: streamReply,
   };
 });
 
-vi.mock(import('@/common/logger/index.js'), () => ({
-  logger: {
-    error: vi.fn<(...args: unknown[]) => void>(),
-    warn: vi.fn<(...args: unknown[]) => void>(),
-  } as unknown as Logger,
-}));
-vi.mock(import('@/common/services/analytics.js'), () => ({
-  captureException: vi.fn<(...args: unknown[]) => void>(),
-  trackCommandInvoked: vi.fn<(...args: unknown[]) => void>(),
-  trackMessageAnswered: vi.fn<(...args: unknown[]) => void>(),
-}));
-vi.mock(import('@/common/utils/messages.js'), () => ({
-  safeEphemeralReplyToInteraction: vi.fn<() => Promise<void>>(async () => {}),
-  safeStreamReplyToInteraction: async (
-    _interaction: unknown,
-    stream: (emit: (event: StreamEvent) => Promise<void>) => Promise<void>,
-  ) => {
-    await stream(async () => {});
-    return [{ id: mocks.nextMessageId() }] as unknown as Message[];
-  },
-  safeStreamReplyToMessage: async (
-    _message: Message,
-    stream: (emit: (event: StreamEvent) => Promise<void>) => Promise<void>,
-  ) => {
-    await stream(async () => {});
-    return [{ id: mocks.nextMessageId() }] as unknown as Message[];
-  },
-}));
-vi.mock(import('@/modules/chat/utils/feedback.js'), () => ({
+// eslint-disable-next-line func-style -- vi.mock factories need a hoisted declaration.
+async function streamReply(
+  _target: unknown,
+  produce: (emit: (event: StreamEvent) => Promise<void>) => Promise<void>,
+) {
+  await produce(async () => {});
+  mocks.nextMessage += 1;
+  return [
+    {
+      id: `answer-${mocks.nextMessage}`,
+      fetch: async () => ({ content: mocks.content, edit: mocks.edit }),
+    },
+  ] as unknown as Message[];
+}
+vi.mock('@/modules/chat/utils/feedback.js', () => ({
   attachFeedbackButtons: mocks.attachFeedbackButtons,
   rememberFeedbackContext: mocks.rememberFeedbackContext,
 }));
-vi.mock(import('@/modules/chat/utils/identity.js'), () => ({
-  resolveChatUser: mocks.resolveChatUser,
+vi.mock('@/modules/chat/utils/identity.js', () => ({
+  resolveChatUser: async () => ({
+    id: '00000000-0000-4000-8000-000000000099',
+    provider: 'discord',
+    provider_subject: 'discord-user',
+  }),
 }));
-vi.mock(import('@/modules/chat/utils/requests.js'), () => ({
-  applyStreamEvent: mocks.applyStreamEvent,
-  getValidatedInferenceModel: mocks.getValidatedInferenceModel,
-  hasSavableAnswer: mocks.hasSavableAnswer,
+vi.mock('@/modules/chat/utils/requests.js', async (original) => ({
+  ...(await original<typeof Requests>()),
+  getValidatedInferenceModel: async () => 'model',
   sendPrompt: mocks.sendPrompt,
 }));
-vi.mock(import('@/modules/chat/utils/timing.js'), () => ({
-  appendTimingFootnote: vi.fn<() => Promise<void>>(async () => {}),
-}));
 
-const promptOptions: SendPromptOptions = {
-  embeddings_model: undefined,
-  inference_model: 'model',
-  interface: 'discord',
-  max_tokens: undefined,
-  messages: [{ content: 'question', role: 'user' }],
-  reasoning: undefined,
-  temperature: undefined,
-  top_p: undefined,
-  user_id: '00000000-0000-4000-8000-000000000099',
+const driver = () => {
+  const result = fakeInteraction('ask', '', 'discord-user');
+  Object.assign(result.interaction, {
+    channelId: 'ask-channel',
+    id: 'interaction-not-a-message',
+    isMessageContextMenuCommand: () => false,
+    options: {
+      getString: (name: string) => (name === 'prompt' ? 'question' : null),
+      getNumber: () => null,
+    },
+  });
+  return result;
 };
 
-const interaction = (id: string) =>
-  ({
-    channelId: `channel-${id}`,
-    deferred: false,
-    guild: null,
-    replied: false,
-    user: { id: `asker-${id}` },
-  }) as Parameters<typeof handlePromptWithStreaming>[0];
-
-const followUpMessage = (reference: string, content: string): Message =>
+const followUpMessage = (
+  reference: string,
+  content: string,
+  thread = false,
+): Message =>
   ({
     author: { bot: false, id: 'discord-user' },
     channel: {
       isSendable: () => true,
-      isThread: () => false,
+      isThread: () => thread,
       sendTyping: async () => {},
     },
-    channelId: 'channel-follow-up',
+    channelId: thread ? reference : 'reply-channel',
     content,
     guild: null,
-    reference: { messageId: reference },
+    guildId: 'reply-guild',
+    id: `question-${content}`,
+    reference: thread ? null : { messageId: reference },
   }) as unknown as Message;
 
 describe('conversation session lifecycle', () => {
   beforeEach(() => {
-    mocks.reset();
-    mocks.sendPrompt.mockClear();
-    mocks.attachFeedbackButtons.mockClear();
+    forgetConversations('discord-user');
+    mocks.nextMessage = 0;
+    mocks.answer = 'answer';
+    mocks.content = 'answer';
+    mocks.sendPrompt.mockImplementation(async (_options, _id, onEvent) => {
+      await onEvent({ text: mocks.answer, type: 'token' });
+      return 'response-id';
+    });
   });
 
-  test('uses a fresh UUID per ask and registers the sent UUID with its answer', async () => {
-    await handlePromptWithStreaming(interaction('a'), promptOptions, 'ask');
-    await handlePromptWithStreaming(interaction('b'), promptOptions, 'ask');
-
-    expect(mocks.sent).toHaveLength(2);
-    const [first, second] = mocks.sent;
-    expect(first?.conversationId).toMatch(UUID_PATTERN);
-    expect(second?.conversationId).toMatch(UUID_PATTERN);
-    expect(second?.conversationId).not.toBe(first?.conversationId);
-    expect(getConversationId('stream-message-2')).toBe(first?.conversationId);
-    expect(getConversationId('stream-message-4')).toBe(second?.conversationId);
-  });
-
-  test('reuses a reply session while sending the growing history each turn', async () => {
-    const rootMessageId = `reply-root-${randomUUID()}`;
-    const conversationId = randomUUID();
-    registerConversation(
-      [rootMessageId],
-      [{ content: 'starting question', role: 'user' }],
-      conversationId,
+  test('actual asks send context, use distinct IDs and register the sent IDs', async () => {
+    await ask(driver().interaction);
+    await ask(driver().interaction);
+    const first = mocks.sendPrompt.mock.calls[0];
+    const second = mocks.sendPrompt.mock.calls[1];
+    expect(first?.[1]).toMatch(UUID_PATTERN);
+    expect(second?.[1]).toMatch(UUID_PATTERN);
+    expect(second?.[1]).not.toBe(first?.[1]);
+    expect(first?.[0].discord_context).toEqual({
+      channel_id: 'ask-channel',
+      guild_id: undefined,
+      message_id: undefined,
+    });
+    expect(getConversationId('answer-1')).toBe(first?.[1]);
+    expect(getConversationId('answer-2')).toBe(second?.[1]);
+    expect(mocks.edit.mock.calls[0]?.[0].content).toContain(
+      commandResponses.chatStorageNotice,
     );
+  });
 
-    await handleChatMessage(followUpMessage(rootMessageId, 'first follow-up'));
-    const firstReplyId = 'stream-message-2';
-    await handleChatMessage(followUpMessage(firstReplyId, 'second follow-up'));
+  test.each([false, true])(
+    'reply/thread=%s reuses its ID and forwards growing history and context',
+    async (thread) => {
+      const root = randomUUID();
+      const id = randomUUID();
+      registerConversation(
+        [root],
+        [{ content: 'starting question', role: 'user' }],
+        { accountId: USER_ID, conversationId: id, userId: 'discord-user' },
+      );
+      await handleChatMessage(followUpMessage(root, 'first', thread));
+      await handleChatMessage(
+        followUpMessage(thread ? root : 'answer-1', 'second', thread),
+      );
+      const calls = mocks.sendPrompt.mock.calls;
+      expect(calls.map((call) => call[1])).toEqual([id, id]);
+      expect(calls[0]?.[0].messages).toHaveLength(2);
+      expect(calls[1]?.[0].messages).toHaveLength(4);
+      expect(calls[0]?.[0].discord_context).toEqual({
+        channel_id: thread ? root : 'reply-channel',
+        guild_id: 'reply-guild',
+        message_id: 'question-first',
+      });
+      expect(getConversationHistory(thread ? root : 'answer-2')).toHaveLength(
+        5,
+      );
+    },
+  );
 
-    expect(mocks.sent).toHaveLength(2);
-    expect(mocks.sent.map(({ conversationId: sentId }) => sentId)).toEqual([
-      conversationId,
-      conversationId,
+  test('long answers fall back to one private storage notice without truncation', async () => {
+    mocks.content = 'a'.repeat(2_000);
+    const { interaction, state } = driver();
+    await ask(interaction);
+    expect(mocks.edit).not.toHaveBeenCalled();
+    expect(state.calls).toEqual([
+      {
+        kind: 'followUp',
+        payload: {
+          content: commandResponses.chatStorageNotice,
+          flags: 64,
+        },
+      },
     ]);
-    expect(mocks.sent[0]?.options.messages).toHaveLength(2);
-    expect(mocks.sent[1]?.options.messages).toHaveLength(4);
-    expect(getConversationId('stream-message-2')).toBe(conversationId);
-    expect(getConversationHistory('stream-message-4')).toHaveLength(5);
+  });
+
+  test('stream errors also receive the notice', async () => {
+    mocks.sendPrompt.mockRejectedValueOnce(new Error('stream interrupted'));
+    const { interaction, state } = driver();
+    await ask(interaction);
+    expect(state.calls.at(-1)).toEqual({
+      kind: 'followUp',
+      payload: {
+        content: commandResponses.chatStorageNotice,
+        flags: 64,
+      },
+    });
+    expect(getConversationId('answer-1')).toBeUndefined();
+  });
+
+  test('requests that never reached the API get no notice', async () => {
+    mocks.sendPrompt.mockRejectedValueOnce(new Error('LLM_UNAVAILABLE'));
+    const { interaction, state } = driver();
+    await ask(interaction);
+    expect(
+      state.calls.some(
+        ({ payload }) =>
+          (payload as undefined | { content?: string })?.content ===
+          commandResponses.chatStorageNotice,
+      ),
+    ).toBe(false);
+  });
+
+  test('a failed footnote edit falls back to the notice', async () => {
+    mocks.edit.mockRejectedValueOnce(new Error('message edit failed'));
+    const { interaction, state } = driver();
+    await ask(interaction);
+    expect(state.calls.at(-1)?.payload).toEqual({
+      content: commandResponses.chatStorageNotice,
+      flags: 64,
+    });
+  });
+
+  test.each(['ask', 'thread'])(
+    'forget drains active %s streams, rejects intervening work and removes late finalization',
+    async (mode) => {
+      const started = Promise.withResolvers<undefined>();
+      const release = Promise.withResolvers<undefined>();
+      mocks.sendPrompt.mockImplementationOnce(async (_options, _id, emit) => {
+        started.resolve(undefined);
+        await release.promise;
+        await emit({ text: 'old secret', type: 'token' });
+        return 'late-response';
+      });
+      const thread = randomUUID();
+      registerConversation([thread], [], { userId: 'discord-user' });
+      const active =
+        mode === 'ask'
+          ? ask(driver().interaction)
+          : handleChatMessage(
+              followUpMessage(thread, 'active thread question', true),
+            );
+      await started.promise;
+      const remove = vi.fn<() => Promise<void>>(async () => {});
+      const deletion = forgetChatUser(
+        'discord-user',
+        () => forgetConversations('discord-user'),
+        remove,
+      );
+      await ask(driver().interaction);
+      expect(mocks.sendPrompt).toHaveBeenCalledOnce();
+      expect(remove).not.toHaveBeenCalled();
+      release.resolve(undefined);
+      await Promise.all([active, deletion]);
+      expect(remove).toHaveBeenCalledOnce();
+      expect(getConversationHistory('answer-1')).toBeUndefined();
+      expect(getConversationHistory(thread)).toBeUndefined();
+      await handleChatMessage(followUpMessage('answer-1', 'after forget'));
+      await handleChatMessage(followUpMessage(thread, 'after forget', true));
+      expect(mocks.sendPrompt).toHaveBeenCalledOnce();
+      await ask(driver().interaction);
+      expect(mocks.sendPrompt).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  test('missing/empty streamed answers still receive the notice', async () => {
+    mocks.answer = '';
+    const { interaction, state } = driver();
+    const options = {
+      messages: [],
+      user_id: USER_ID,
+    } as unknown as SendPromptOptions;
+    await handlePromptWithStreaming(interaction, options, 'ask');
+    expect(state.calls.at(-1)?.payload).toMatchObject({
+      content: commandResponses.chatStorageNotice,
+    });
   });
 });

@@ -2,8 +2,10 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 
 import {
+  forgetConversations,
   getConversationHistory,
   getConversationId,
+  getPersistenceConversation,
   registerConversation,
 } from '@/modules/chat/utils/conversation.js';
 
@@ -48,5 +50,52 @@ describe('conversation sessions', () => {
 
     expect(getConversationId(messageId)).toBe(conversationId);
     expect(getConversationHistory(messageId)).toHaveLength(3);
+  });
+
+  test('an active partition handle survives alias eviction without borrowing another owner ID', () => {
+    const root = randomUUID();
+    const logicalId = randomUUID();
+    registerConversation([root], [{ role: 'user', content: 'A secret' }], {
+      accountId: 'internal-a',
+      conversationId: logicalId,
+      userId: 'owner-a',
+    });
+    const active = getPersistenceConversation(root, {
+      id: 'internal-b',
+      userId: 'owner-b',
+    });
+    registerConversation(
+      Array.from({ length: 1_001 }, () => randomUUID()),
+      [],
+      { userId: 'noise' },
+    );
+    expect(getConversationId(root)).toBeUndefined();
+    registerConversation(
+      ['restored-answer'],
+      [{ role: 'user', content: 'A secret' }],
+      active.session,
+    );
+    expect(
+      getPersistenceConversation('restored-answer', {
+        id: 'internal-a',
+        userId: 'owner-a',
+      }).id,
+    ).toBe(logicalId);
+    expect(
+      getPersistenceConversation('restored-answer', {
+        id: 'internal-b',
+        userId: 'owner-b',
+      }).id,
+    ).toBe(active.id);
+    forgetConversations('owner-a');
+    expect(getConversationHistory('restored-answer')).toEqual([]);
+    expect(
+      getPersistenceConversation('restored-answer', {
+        id: 'internal-b',
+        userId: 'owner-b',
+      }).id,
+    ).toBe(active.id);
+    forgetConversations('owner-b');
+    forgetConversations('noise');
   });
 });

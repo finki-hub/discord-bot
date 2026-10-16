@@ -41,7 +41,10 @@ const authHeaders = (): Record<string, string> => {
   };
 };
 
-export const resolveChatUser = async (discordUser: User): Promise<ChatUser> => {
+export const resolveChatUser = async (
+  discordUser: User,
+  signal?: AbortSignal,
+): Promise<ChatUser> => {
   const body = ChatUserUpsertSchema.parse({
     avatar_url: discordUser.avatarURL({ size: 256 }) ?? undefined,
     name: discordUser.displayName,
@@ -65,6 +68,7 @@ export const resolveChatUser = async (discordUser: User): Promise<ChatUser> => {
   let result: Response;
   try {
     result = await fetch(`${chatbotUrl}/chat/state/users`, {
+      ...(signal !== undefined && { signal }),
       body: JSON.stringify(body),
       headers: authHeaders(),
       method: 'POST',

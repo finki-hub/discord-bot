@@ -17,6 +17,7 @@ import {
   getConversationHistory,
   registerConversation,
 } from './conversation.js';
+import { beginChatOperation } from './privacy.js';
 
 const userThreads = new Map<string, string>();
 
@@ -24,9 +25,9 @@ const threadKey = (guildId: string, userId: string) => `${guildId}:${userId}`;
 
 // Register an empty entry only if missing, so an evicted thread is revived
 // without wiping the history of a thread that is still live.
-const armThread = (threadId: string) => {
+const armThread = (threadId: string, userId: string) => {
   if (getConversationHistory(threadId) === undefined) {
-    registerConversation([threadId], []);
+    registerConversation([threadId], [], { userId });
   }
 };
 
@@ -38,9 +39,7 @@ const fetchExistingThread = async (guild: Guild, threadId: string) => {
   }
 };
 
-export const handleChatThread = async (
-  interaction: ChatInputCommandInteraction,
-) => {
+const createChatThread = async (interaction: ChatInputCommandInteraction) => {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
   const { channel, guild, user } = interaction;
@@ -66,7 +65,7 @@ export const handleChatThread = async (
         }
       }
 
-      armThread(existing.id);
+      armThread(existing.id, user.id);
       await interaction.editReply(
         commandResponseFunctions.chatThreadExisting(existing.id),
       );
@@ -88,7 +87,7 @@ export const handleChatThread = async (
     await thread.members.add(user.id);
     await thread.send(commandResponses.chatThreadWelcome);
 
-    armThread(thread.id);
+    armThread(thread.id, user.id);
     userThreads.set(key, thread.id);
 
     await interaction.editReply(
@@ -99,5 +98,23 @@ export const handleChatThread = async (
       guildId: guild.id,
     });
     await interaction.editReply(commandErrors.chatThreadCreationFailed);
+  }
+};
+
+export const handleChatThread = async (
+  interaction: ChatInputCommandInteraction,
+) => {
+  const finish = beginChatOperation(interaction.user.id);
+  if (finish === null) {
+    await interaction.reply({
+      content: commandErrors.llmUnavailable,
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+  try {
+    await createChatThread(interaction);
+  } finally {
+    finish();
   }
 };

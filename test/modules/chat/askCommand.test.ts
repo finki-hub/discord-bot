@@ -6,6 +6,9 @@ import type { SendPromptOptions } from '@/modules/chat/schemas/Chat.js';
 import type { ChatUser } from '@/modules/chat/schemas/Credentials.js';
 
 import { data, execute } from '@/modules/chat/commands/chat/ask.js';
+import { commandResponses } from '@/translations/commands.js';
+
+import { fakeInteraction } from './interactionFixture.js';
 
 type HandlePromptMock = (
   interaction: ChatInputCommandInteraction,
@@ -57,6 +60,10 @@ describe('/ask command', () => {
   test('disables reasoning without reading an interaction option', async () => {
     const getBoolean = vi.fn<(name: string) => boolean>(() => true);
     const interaction = {
+      channelId: 'ask-channel',
+      guildId: 'ask-guild',
+      id: 'interaction-not-a-message',
+      isMessageContextMenuCommand: () => false,
       guild: null,
       options: {
         getBoolean,
@@ -70,8 +77,29 @@ describe('/ask command', () => {
     expect(getBoolean).not.toHaveBeenCalled();
     expect(mocks.handlePrompt).toHaveBeenCalledWith(
       interaction,
-      expect.objectContaining({ reasoning: false }),
+      expect.objectContaining({
+        reasoning: false,
+        discord_context: {
+          channel_id: 'ask-channel',
+          guild_id: 'ask-guild',
+          message_id: undefined,
+        },
+      }),
       'chat query command',
     );
+  });
+
+  test('identity rejection before streaming still receives the storage notice', async () => {
+    mocks.resolveChatUser.mockResolvedValueOnce(null);
+    const { interaction, state } = fakeInteraction('ask', '', 'discord-user');
+    Object.assign(interaction, {
+      options: { getString: () => 'question', getNumber: () => null },
+    });
+    await execute(interaction);
+    expect(mocks.handlePrompt).not.toHaveBeenCalled();
+    expect(state.calls.at(-1)?.payload).toEqual({
+      content: commandResponses.chatStorageNotice,
+      flags: 64,
+    });
   });
 });

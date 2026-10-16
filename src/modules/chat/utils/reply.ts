@@ -10,7 +10,7 @@ import { safeStreamReplyToMessage } from '@/common/utils/messages.js';
 import { errorCategory } from '@/common/utils/safeError.js';
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
-import { commandErrors } from '@/translations/commands.js';
+import { commandErrors, commandResponses } from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
 import { ChatApiError } from '../schemas/Credentials.js';
@@ -22,10 +22,15 @@ import {
 import {
   getConversationHistory,
   getConversationId,
+  getConversationUsers,
+  getPersistenceConversation,
   registerConversation,
+  rememberConversationParticipant,
 } from './conversation.js';
+import { messageDiscordContext } from './discordContext.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
 import { resolveChatUser } from './identity.js';
+import { beginChatOperations, conversationPrivacyKey } from './privacy.js';
 import {
   applyStreamEvent,
   getValidatedInferenceModel,
@@ -37,15 +42,52 @@ import { appendTimingFootnote } from './timing.js';
 
 const COMMAND_LABEL = 'chat conversation continuation';
 
+// Someone joining another user's reply chain gets their own stored conversation
+// but never saw the notice under the original answer.
+const appendAnswerFootnote = async ({
+  inChatThread,
+  lastMessage,
+  message,
+  persistence,
+  timing,
+}: {
+  inChatThread: boolean;
+  lastMessage: Message | undefined;
+  message: Message;
+  persistence: { markNoticeShown: () => void; noticePending: boolean };
+  timing: { firstChunkAt: null | number; startedAt: number };
+}) => {
+  // Thread members already see the notice in the thread's welcome message.
+  if (inChatThread || !persistence.noticePending) {
+    await appendTimingFootnote(lastMessage, timing);
+    return;
+  }
+
+  const notice = commandResponses.chatStorageNotice;
+  if (!(await appendTimingFootnote(lastMessage, { ...timing, notice }))) {
+    try {
+      await message.reply({
+        allowedMentions: { repliedUser: false },
+        content: `-# ${notice}`,
+      });
+    } catch {
+      // The notice is best-effort; the answer itself was already delivered.
+    }
+  }
+  persistence.markNoticeShown();
+};
+
 const finalizeChatAnswer = async (params: {
   askerId: string;
   channelId: string;
+  conversationId: string;
   guildId: null | string;
   lastMessage: Message | undefined;
   question: string;
   responseId: null | string;
   state: StreamAccumulator;
   surface: string;
+  userIds: string[];
 }) => {
   const { responseId } = params;
 
@@ -59,7 +101,10 @@ const finalizeChatAnswer = async (params: {
     });
     rememberFeedbackContext(responseId, {
       answer: params.state.answer,
+      conversationId: params.conversationId,
       question: params.question,
+      userId: params.askerId,
+      userIds: params.userIds,
     });
   }
 
@@ -138,6 +183,13 @@ export const handleChatMessage = async (message: Message) => {
   }
 
   const surface = inChatThread ? 'thread' : 'reply';
+  const finish = beginChatOperations([
+    ...getConversationUsers(key),
+    message.author.id,
+    conversationPrivacyKey(conversationId),
+  ]);
+  if (finish === null) return;
+  rememberConversationParticipant(key, message.author.id);
 
   trackCommandInvoked(message.author.id, {
     channelId: message.channelId,
@@ -152,11 +204,16 @@ export const handleChatMessage = async (message: Message) => {
         ? DEFAULT_CONFIGURATION.models
         : await getConfigProperty('models', message.guild.id);
     const chatUser = await resolveChatUser(message.author);
+    const persistence = getPersistenceConversation(key, {
+      id: chatUser.id,
+      userId: message.author.id,
+    });
     const inferenceModel = await getValidatedInferenceModel(
       chatUser.id,
       models.inference,
     );
     const options = SendPromptOptionsSchema.parse({
+      discordContext: messageDiscordContext(message),
       embeddingsModel: models.embeddings,
       history,
       inferenceModel,
@@ -183,7 +240,7 @@ export const handleChatMessage = async (message: Message) => {
     const messages = await safeStreamReplyToMessage(message, async (emit) => {
       capture.responseId = await sendPrompt(
         options,
-        conversationId,
+        persistence.id,
         async (event) => {
           const localizedEvent = localizeStreamEvent(event);
           const publicEvent =
@@ -206,27 +263,36 @@ export const handleChatMessage = async (message: Message) => {
           { content: prompt, role: 'user' },
           { content: state.answer.slice(0, 2_000), role: 'assistant' },
         ],
-        conversationId,
+        persistence.session,
       );
 
-      await appendTimingFootnote(
-        messages.at(-1),
-        startedAt,
-        state.firstChunkAt,
-      );
+      await appendAnswerFootnote({
+        inChatThread,
+        lastMessage: messages.at(-1),
+        message,
+        persistence,
+        timing: { firstChunkAt: state.firstChunkAt, startedAt },
+      });
 
       await finalizeChatAnswer({
         askerId: message.author.id,
         channelId: message.channelId,
+        conversationId,
         guildId: message.guild?.id ?? null,
         lastMessage: messages.at(-1),
         question: prompt,
         responseId: capture.responseId,
         state,
         surface,
+        userIds: [
+          ...(persistence.session.participants ?? []),
+          message.author.id,
+        ],
       });
     }
   } catch (error) {
     await handleConversationError(message, error, surface);
+  } finally {
+    finish();
   }
 };

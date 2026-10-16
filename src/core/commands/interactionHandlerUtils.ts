@@ -24,6 +24,7 @@ import {
 } from '../utils/permissions.js';
 
 const nonDeferredCommands = new Set<string>([
+  `${chatCommandId} forget`,
   `${chatCommandId} models`,
   `${chatCommandId} thread`,
   `${credentialsCommandId} delete`,
