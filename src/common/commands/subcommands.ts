@@ -13,13 +13,10 @@ const callHandler = <T>(
   handler: HandlerWithContext<T> | HandlerWithoutContext,
   interaction: ChatInputCommandInteraction,
   context: T | undefined,
-): Promise<void> => {
-  if (context === undefined) {
-    return (handler as HandlerWithoutContext)(interaction);
-  }
-
-  return handler(interaction, context);
-};
+): Promise<void> =>
+  context === undefined
+    ? (handler as HandlerWithoutContext)(interaction)
+    : handler(interaction, context);
 
 export const executeSubcommand = async <T = void>(
   interaction: ChatInputCommandInteraction,

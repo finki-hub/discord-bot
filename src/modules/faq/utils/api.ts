@@ -38,14 +38,11 @@ const setLinkNamesCache = (data: string[]) => {
   };
 };
 
-const fetchWithTimeout = async (
-  url: string,
-  timeout: number = MAX_FETCH_TIMEOUT,
-): Promise<Response> => {
+const fetchWithTimeout = async (url: string): Promise<Response> => {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => {
     controller.abort();
-  }, timeout);
+  }, MAX_FETCH_TIMEOUT);
 
   try {
     const response = await fetch(url, { signal: controller.signal });
@@ -54,7 +51,9 @@ const fetchWithTimeout = async (
   } catch (error) {
     clearTimeout(timeoutId);
     if (Error.isError(error) && error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${timeout}ms`, { cause: error });
+      throw new Error(`Request timeout after ${MAX_FETCH_TIMEOUT}ms`, {
+        cause: error,
+      });
     }
     throw error;
   }
@@ -62,12 +61,10 @@ const fetchWithTimeout = async (
 
 const getValidCacheData = (
   cache: null | { data: null | string[]; timestamp: number },
-  ttl: number,
 ): null | string[] => {
   if (cache === null) return null;
   const age = Date.now() - cache.timestamp;
-  if (age >= ttl || cache.data === null) return null;
-  return cache.data;
+  return age >= CACHE_TTL || cache.data === null ? null : cache.data;
 };
 
 const getCachedData = (
@@ -84,11 +81,7 @@ export const getQuestions = async () => {
   try {
     const result = await fetch(`${chatbotUrl}/questions/list`);
 
-    if (!result.ok) {
-      return null;
-    }
-
-    return QuestionsSchema.parse(await result.json());
+    return result.ok ? QuestionsSchema.parse(await result.json()) : null;
   } catch (error) {
     logger.error(apiErrorFunctions.getQuestionsError(error));
 
@@ -98,7 +91,7 @@ export const getQuestions = async () => {
 
 export const getQuestionNames = async (useCache = true) => {
   if (useCache) {
-    const cached = getValidCacheData(cacheState.questionNamesCache, CACHE_TTL);
+    const cached = getValidCacheData(cacheState.questionNamesCache);
     if (cached !== null) return cached;
   }
 
@@ -109,10 +102,7 @@ export const getQuestionNames = async (useCache = true) => {
   }
 
   try {
-    const result = await fetchWithTimeout(
-      `${chatbotUrl}/questions/names`,
-      MAX_FETCH_TIMEOUT,
-    );
+    const result = await fetchWithTimeout(`${chatbotUrl}/questions/names`);
 
     if (!result.ok) {
       return getCachedData(cacheState.questionNamesCache);
@@ -132,22 +122,14 @@ export const getQuestionNames = async (useCache = true) => {
 export const getQuestion = async (name?: string) => {
   const chatbotUrl = getChatbotUrl();
 
-  if (chatbotUrl === null) {
-    return null;
-  }
-
-  if (name === undefined) {
+  if (chatbotUrl === null || name === undefined) {
     return null;
   }
 
   try {
     const result = await fetch(`${chatbotUrl}/questions/name/${name}`);
 
-    if (!result.ok) {
-      return null;
-    }
-
-    return QuestionSchema.parse(await result.json());
+    return result.ok ? QuestionSchema.parse(await result.json()) : null;
   } catch (error) {
     logger.error(apiErrorFunctions.getQuestionError(error));
 
@@ -158,22 +140,14 @@ export const getQuestion = async (name?: string) => {
 export const getNthQuestion = async (index?: number) => {
   const chatbotUrl = getChatbotUrl();
 
-  if (chatbotUrl === null) {
-    return null;
-  }
-
-  if (index === undefined) {
+  if (chatbotUrl === null || index === undefined) {
     return null;
   }
 
   try {
     const result = await fetch(`${chatbotUrl}/questions/nth/${index}`);
 
-    if (!result.ok) {
-      return null;
-    }
-
-    return QuestionSchema.parse(await result.json());
+    return result.ok ? QuestionSchema.parse(await result.json()) : null;
   } catch (error) {
     logger.error(apiErrorFunctions.getNthQuestionError(error));
 
@@ -191,11 +165,7 @@ export const getLinks = async () => {
   try {
     const result = await fetch(`${chatbotUrl}/links/list`);
 
-    if (!result.ok) {
-      return null;
-    }
-
-    return LinksSchema.parse(await result.json());
+    return result.ok ? LinksSchema.parse(await result.json()) : null;
   } catch (error) {
     logger.error(apiErrorFunctions.getLinksError(error));
 
@@ -205,7 +175,7 @@ export const getLinks = async () => {
 
 export const getLinkNames = async (useCache = true) => {
   if (useCache) {
-    const cached = getValidCacheData(cacheState.linkNamesCache, CACHE_TTL);
+    const cached = getValidCacheData(cacheState.linkNamesCache);
     if (cached !== null) return cached;
   }
 
@@ -216,10 +186,7 @@ export const getLinkNames = async (useCache = true) => {
   }
 
   try {
-    const result = await fetchWithTimeout(
-      `${chatbotUrl}/links/names`,
-      MAX_FETCH_TIMEOUT,
-    );
+    const result = await fetchWithTimeout(`${chatbotUrl}/links/names`);
 
     if (!result.ok) {
       return getCachedData(cacheState.linkNamesCache);
@@ -239,22 +206,14 @@ export const getLinkNames = async (useCache = true) => {
 export const getLink = async (name?: string) => {
   const chatbotUrl = getChatbotUrl();
 
-  if (chatbotUrl === null) {
-    return null;
-  }
-
-  if (name === undefined) {
+  if (chatbotUrl === null || name === undefined) {
     return null;
   }
 
   try {
     const result = await fetch(`${chatbotUrl}/links/name/${name}`);
 
-    if (!result.ok) {
-      return null;
-    }
-
-    return LinkSchema.parse(await result.json());
+    return result.ok ? LinkSchema.parse(await result.json()) : null;
   } catch (error) {
     logger.error(apiErrorFunctions.getLinkError(error));
 
@@ -272,11 +231,7 @@ export const getNthLink = async (index?: number) => {
   try {
     const result = await fetch(`${chatbotUrl}/links/nth/${index}`);
 
-    if (!result.ok) {
-      return null;
-    }
-
-    return LinkSchema.parse(await result.json());
+    return result.ok ? LinkSchema.parse(await result.json()) : null;
   } catch (error) {
     logger.error(apiErrorFunctions.getNthLinkError(error));
 

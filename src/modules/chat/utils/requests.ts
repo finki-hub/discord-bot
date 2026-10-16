@@ -205,7 +205,6 @@ export const listCredentials = async (
     `${chatbotUrl}/chat/state/users/${userId}/credentials`,
     {
       headers: authHeaders(),
-      method: 'GET',
     },
   );
 
@@ -263,10 +262,12 @@ export const deleteCredential = async (
     },
   );
 
-  if (!result.ok && result.status !== 204) {
-    const detail = await parseSafeDetail(result);
-    throw new ChatApiError(result.status, detail);
+  if (result.ok || result.status === 204) {
+    return;
   }
+
+  const detail = await parseSafeDetail(result);
+  throw new ChatApiError(result.status, detail);
 };
 
 const modelCatalogCache = new Map<
@@ -419,11 +420,9 @@ export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {
       },
     });
 
-    if (!result.ok || !result.body || result.status !== 200) {
-      return null;
-    }
-
-    return QuestionsSchema.parse(await result.json());
+    return !result.ok || !result.body || result.status !== 200
+      ? null
+      : QuestionsSchema.parse(await result.json());
   } catch (error) {
     logger.error(`Failed getting closest questions\n${String(error)}`);
     return null;

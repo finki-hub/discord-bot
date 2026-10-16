@@ -162,11 +162,9 @@ const smartSplit = (text: string, maxLength: number): [string, string] => {
     return [text.slice(0, splitIdx), text.slice(splitIdx)];
   }
 
-  if (text[splitIdx] === '\n') {
-    return [text.slice(0, splitIdx + 1), text.slice(splitIdx + 1)];
-  }
-
-  return [text.slice(0, splitIdx), text.slice(splitIdx + 1)];
+  return text[splitIdx] === '\n'
+    ? [text.slice(0, splitIdx + 1), text.slice(splitIdx + 1)]
+    : [text.slice(0, splitIdx), text.slice(splitIdx + 1)];
 };
 
 const MAX_STREAM_LENGTH = 2_000;

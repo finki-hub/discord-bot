@@ -10,8 +10,7 @@ import { ChatApiError, type ChatUser } from '../schemas/Credentials.js';
 import { resolveChatUser } from './identity.js';
 
 type ChatInteraction =
-  | ChatInputCommandInteraction
-  | MessageContextMenuCommandInteraction;
+  ChatInputCommandInteraction | MessageContextMenuCommandInteraction;
 
 export const resolveInteractionChatUser = async (
   interaction: ChatInteraction,

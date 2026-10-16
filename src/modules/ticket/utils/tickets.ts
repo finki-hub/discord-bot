@@ -72,17 +72,15 @@ export const getActiveTickets = async (
 ): Promise<Collection<string, AnyThreadChannel> | undefined> => {
   const ticketsChannelId = await getChannelsProperty(Channel.Tickets, guild.id);
 
-  if (ticketsChannelId === undefined) {
-    return undefined;
-  }
-
-  return guild.channels.cache.filter(
-    (channel): channel is AnyThreadChannel =>
-      channel.isThread() &&
-      channel.parentId === ticketsChannelId &&
-      !channel.archived &&
-      !channel.locked,
-  );
+  return ticketsChannelId === undefined
+    ? undefined
+    : guild.channels.cache.filter(
+        (channel): channel is AnyThreadChannel =>
+          channel.isThread() &&
+          channel.parentId === ticketsChannelId &&
+          !channel.archived &&
+          !channel.locked,
+      );
 };
 
 export const getActiveTicketsSorted = async (
@@ -103,11 +101,7 @@ export const getActiveTicketsSorted = async (
       return -1;
     }
 
-    if (a.createdTimestamp > b.createdTimestamp) {
-      return 1;
-    }
-
-    return 0;
+    return a.createdTimestamp > b.createdTimestamp ? 1 : 0;
   });
 
   return ticketThreads;

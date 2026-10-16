@@ -20,17 +20,11 @@ export const commandRequiresPermissions = (command: string): boolean => {
     ? permissions.subcommands?.[subcommand]
     : undefined;
 
-  if (subcommandPerms !== undefined) {
-    return (
-      (subcommandPerms.permissions?.length ?? 0) > 0 ||
-      (subcommandPerms.roles?.length ?? 0) > 0
-    );
-  }
-
-  return (
-    (permissions.permissions?.length ?? 0) > 0 ||
-    (permissions.roles?.length ?? 0) > 0
-  );
+  return subcommandPerms === undefined
+    ? (permissions.permissions?.length ?? 0) > 0 ||
+        (permissions.roles?.length ?? 0) > 0
+    : (subcommandPerms.permissions?.length ?? 0) > 0 ||
+        (subcommandPerms.roles?.length ?? 0) > 0;
 };
 
 const getCommandPermission = async (
@@ -88,18 +82,14 @@ export const hasCommandPermission = async (
     member.guild.id,
   );
 
-  if (permissions.length === 0 && roles.length === 0) {
-    return true;
-  }
-
-  if (roles.length > 0 && roles.every((role) => role === undefined)) {
-    return false;
-  }
-
   return (
-    (permissions.length > 0 && member.permissions.has(permissions)) ||
-    (roles.length > 0 &&
-      member.roles.cache.hasAny(...roles.filter((role) => role !== undefined)))
+    (permissions.length === 0 && roles.length === 0) ||
+    (!(roles.length > 0 && roles.every((role) => role === undefined)) &&
+      ((permissions.length > 0 && member.permissions.has(permissions)) ||
+        (roles.length > 0 &&
+          member.roles.cache.hasAny(
+            ...roles.filter((role) => role !== undefined),
+          ))))
   );
 };
 

@@ -82,14 +82,10 @@ const getCommandType = (parentPath: string): CommandType | null => {
   ) {
     return 'context';
   }
-  if (
-    normalizedPath.endsWith('/commands/modal') ||
+  return normalizedPath.endsWith('/commands/modal') ||
     normalizedPath.includes('/commands/modal/')
-  ) {
-    return 'modal';
-  }
-
-  return null;
+    ? 'modal'
+    : null;
 };
 
 const getCommandName = (
@@ -104,10 +100,7 @@ const getCommandName = (
   if ('data' in commandData && commandData.data?.name) {
     return commandData.data.name;
   }
-  if ('name' in commandData && commandData.name) {
-    return commandData.name;
-  }
-  return null;
+  return 'name' in commandData && commandData.name ? commandData.name : null;
 };
 
 const checkAndSetCommand = <T>(params: {

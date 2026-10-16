@@ -20,8 +20,7 @@ import {
 import { getCommandModule, getContextMenuCommand } from './modules.js';
 
 type ContextMenuInteraction =
-  | MessageContextMenuCommandInteraction
-  | UserContextMenuCommandInteraction;
+  MessageContextMenuCommandInteraction | UserContextMenuCommandInteraction;
 
 const executeContextMenuCommand = async (
   interaction: ContextMenuInteraction,

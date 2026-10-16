@@ -19,10 +19,12 @@ const evictOldest = () => {
     let oldestAt = Infinity;
 
     for (const [key, entry] of conversations) {
-      if (entry.updatedAt < oldestAt) {
-        oldestAt = entry.updatedAt;
-        oldestKey = key;
+      if (entry.updatedAt >= oldestAt) {
+        continue;
       }
+
+      oldestAt = entry.updatedAt;
+      oldestKey = key;
     }
 
     if (oldestKey === undefined) {

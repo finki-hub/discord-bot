@@ -19,9 +19,9 @@ export const execute = async (
   const [action, responseId, askerId] = args;
 
   if (
-    (action !== 'like' && action !== 'dislike') ||
     responseId === undefined ||
-    askerId === undefined
+    askerId === undefined ||
+    (action !== 'like' && action !== 'dislike')
   ) {
     await interaction.reply({
       content: commandErrors.commandError,
