@@ -353,7 +353,8 @@ const findToolStep = (view: StreamView, id: string): ToolStep | undefined => {
   return undefined;
 };
 
-type FlushMode = 'none' | 'now' | 'throttled';
+// `soon` batches bursts of parallel tool calls and their results into one edit.
+type FlushMode = 'none' | 'now' | 'soon' | 'throttled';
 
 const applyStatus = (
   view: StreamView,
@@ -398,7 +399,7 @@ const applyToolCall = (
     },
     type: 'tool',
   });
-  return 'now';
+  return 'soon';
 };
 
 const applyViewEvent = (view: StreamView, event: StreamEvent): FlushMode => {
@@ -445,7 +446,7 @@ const applyViewEvent = (view: StreamView, event: StreamEvent): FlushMode => {
   }
   step.state = event.ok ? 'done' : 'failed';
   step.summary = event.summary;
-  return 'throttled';
+  return 'soon';
 };
 
 const runStreaming = async (
@@ -476,7 +477,11 @@ const runStreaming = async (
   const handleEvent = async (event: StreamEvent) => {
     const mode = applyViewEvent(view, event);
     const now = Date.now();
-    if (!(mode === 'now' || (mode === 'throttled' && now - lastEdit > 1_000))) {
+    const due =
+      mode === 'now' ||
+      (mode === 'soon' && now - lastEdit > 300) ||
+      (mode === 'throttled' && now - lastEdit > 1_000);
+    if (!due) {
       return;
     }
 
