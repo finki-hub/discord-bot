@@ -43,3 +43,12 @@ export const labels = {
 export const toolStatusLabels = new Map<string, string>([
   ['recommend_thesis_committee', '👥 Составувам комисија…'],
 ]);
+
+export const toolStepLabels = {
+  failed: 'неуспешно',
+  failedPlural: 'неуспешни',
+  search: 'пребарување',
+  searchPlural: 'пребарувања',
+  tool: 'алатка',
+  toolPlural: 'алатки',
+};

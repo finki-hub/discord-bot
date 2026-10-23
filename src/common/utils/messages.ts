@@ -9,7 +9,11 @@ import {
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
 
-import { labels, toolStatusLabels } from '@/translations/labels.js';
+import {
+  labels,
+  toolStatusLabels,
+  toolStepLabels,
+} from '@/translations/labels.js';
 
 type EventProducer = (
   emit: (event: StreamEvent) => Promise<void>,
@@ -169,10 +173,67 @@ const smartSplit = (text: string, maxLength: number): [string, string] => {
 
 const MAX_STREAM_LENGTH = 2_000;
 
+type StreamBlock =
+  { step: ToolStep; type: 'tool' } | { text: string; type: 'text' };
+
 type StreamView = {
-  answer: string;
+  blocks: StreamBlock[];
+  finished: boolean;
+  // Text hidden by a pre-tool `status`: restored once a `tool_call` shows the API
+  // keeps text across tool calls, discarded by a legacy `reset`.
+  hidden: StreamBlock[];
   reasoning: string;
   status: null | string;
+  toolMode: boolean;
+};
+
+type ToolStep = {
+  id: string;
+  label: string;
+  name: string;
+  state: 'done' | 'failed' | 'running';
+  summary: string;
+};
+
+const SEARCH_TOOL = 'search_knowledge_base';
+const TOOL_LINE_LABEL_WIDTH = 160;
+const TOOL_STEP_MARKERS = { done: '✅', failed: '⚠️', running: '⏳' } as const;
+
+const textOf = (blocks: StreamBlock[]): string =>
+  blocks.map((block) => (block.type === 'text' ? block.text : '')).join('');
+
+const toSubtext = (text: string): string => {
+  const line = text.replaceAll(/\s+/gu, ' ').trim();
+  return line.length > TOOL_LINE_LABEL_WIDTH
+    ? `${line.slice(0, TOOL_LINE_LABEL_WIDTH - 1)}…`
+    : line;
+};
+
+const formatToolStep = (step: ToolStep): string => {
+  const icon = step.name === SEARCH_TOOL ? '🔎' : '🛠️';
+  const marker = TOOL_STEP_MARKERS[step.state];
+  const summary = step.summary === '' ? '' : ` ${toSubtext(step.summary)}`;
+  return `-# ${icon} ${toSubtext(step.label)} · ${marker}${summary}`;
+};
+
+const plural = (count: number, one: string, many: string): string =>
+  `${count} ${count === 1 ? one : many}`;
+
+const summarizeToolSteps = (steps: ToolStep[]): string => {
+  if (steps.length === 0) {
+    return '';
+  }
+  const searches = steps.filter((step) => step.name === SEARCH_TOOL).length;
+  const tools = steps.length - searches;
+  const failed = steps.filter((step) => step.state === 'failed').length;
+  const parts = [
+    searches > 0 &&
+      plural(searches, toolStepLabels.search, toolStepLabels.searchPlural),
+    tools > 0 && plural(tools, toolStepLabels.tool, toolStepLabels.toolPlural),
+    failed > 0 &&
+      `⚠️ ${plural(failed, toolStepLabels.failed, toolStepLabels.failedPlural)}`,
+  ].filter((part) => part !== false);
+  return `-# ${searches > 0 ? '🔎' : '🛠️'} ${parts.join(' · ')}`;
 };
 
 // Wrap a single logical line to `width`, breaking on a space where possible so a
@@ -212,12 +273,45 @@ const formatReasoning = (reasoning: string): string =>
     .map((line, index) => (index === 0 ? `> 🧠 ${line}` : `> ${line}`))
     .join('\n');
 
+const blockText = (block: StreamBlock): string =>
+  block.type === 'text' ? block.text.trim() : '';
+
+// While streaming, tool steps sit inline between the text written around them;
+// the finished answer keeps only the text plus a one-line summary at the bottom,
+// right above the timing footnote.
+const composeToolBody = (view: StreamView): string => {
+  if (view.finished) {
+    const texts = view.blocks.map(blockText).filter((text) => text !== '');
+    const steps = view.blocks
+      .filter((block) => block.type === 'tool')
+      .map((block) => block.step);
+    return [texts.join('\n\n'), summarizeToolSteps(steps)]
+      .filter((part) => part !== '')
+      .join('\n');
+  }
+
+  const lines = view.blocks
+    .map((block) =>
+      block.type === 'tool' ? formatToolStep(block.step) : blockText(block),
+    )
+    .filter((line) => line !== '');
+  if (view.status !== null) {
+    lines.push(`-# ${toSubtext(view.status)}`);
+  }
+  return lines.join('\n');
+};
+
+const composeLegacyBody = (view: StreamView): string => {
+  const answer = textOf(view.blocks);
+  // Before answer tokens arrive the lower region shows the status (or nothing);
+  // once they stream, the answer takes over that region below the reasoning.
+  return answer === '' ? (view.status ?? '') : answer;
+};
+
 export const composeStreamView = (view: StreamView): string => {
   const head =
     view.reasoning.trim() === '' ? '' : formatReasoning(view.reasoning);
-  // Before answer tokens arrive the lower region shows the status (or nothing);
-  // once they stream, the answer takes over that region below the reasoning.
-  const tail = view.answer === '' ? (view.status ?? '') : view.answer;
+  const tail = view.toolMode ? composeToolBody(view) : composeLegacyBody(view);
 
   return [head, tail].filter((part) => part !== '').join('\n\n');
 };
@@ -241,12 +335,132 @@ export const splitStreamMessage = (text: string): string[] => {
   return messages;
 };
 
+const appendText = (view: StreamView, text: string) => {
+  const last = view.blocks.at(-1);
+  if (last?.type === 'text') {
+    last.text += text;
+    return;
+  }
+  view.blocks.push({ text, type: 'text' });
+};
+
+const findToolStep = (view: StreamView, id: string): ToolStep | undefined => {
+  for (const block of view.blocks) {
+    if (block.type === 'tool' && block.step.id === id) {
+      return block.step;
+    }
+  }
+  return undefined;
+};
+
+type FlushMode = 'none' | 'now' | 'throttled';
+
+const applyStatus = (
+  view: StreamView,
+  event: Extract<StreamEvent, { type: 'status' }>,
+): FlushMode => {
+  if (view.toolMode) {
+    // Tool statuses duplicate the tool_call steps already shown.
+    if (event.tool) {
+      return 'none';
+    }
+    view.status = event.label;
+    return 'now';
+  }
+
+  const override = event.tool ? toolStatusLabels.get(event.tool) : undefined;
+  view.hidden.push(...view.blocks);
+  view.blocks = [];
+  view.status = override ?? event.label;
+  return 'now';
+};
+
+const applyToolCall = (
+  view: StreamView,
+  event: Extract<StreamEvent, { type: 'tool_call' }>,
+): FlushMode => {
+  if (!view.toolMode) {
+    view.toolMode = true;
+    view.blocks = [...view.hidden, ...view.blocks];
+    view.hidden = [];
+  }
+  view.status = null;
+  if (findToolStep(view, event.id) !== undefined) {
+    return 'none';
+  }
+  view.blocks.push({
+    step: {
+      id: event.id,
+      label: event.label,
+      name: event.name,
+      state: 'running',
+      summary: '',
+    },
+    type: 'tool',
+  });
+  return 'now';
+};
+
+const applyViewEvent = (view: StreamView, event: StreamEvent): FlushMode => {
+  switch (event.type) {
+    case 'done':
+      return 'none';
+    case 'error': {
+      view.status = null;
+      const last = view.blocks.at(-1);
+      if (textOf(view.blocks) !== '' && last?.type === 'text') {
+        last.text += `\n\n${event.message}`;
+      } else {
+        view.blocks.push({ text: event.message, type: 'text' });
+      }
+      return 'now';
+    }
+    case 'reset':
+      // Drop any pre-tool answer preamble so TTFT tracks the real answer;
+      // accumulated reasoning and tool steps are preserved.
+      view.blocks = view.blocks.filter((block) => block.type === 'tool');
+      view.hidden = [];
+      view.status = null;
+      return 'none';
+    case 'status':
+      return applyStatus(view, event);
+    case 'thinking':
+      view.status = null;
+      view.reasoning += event.text;
+      return 'throttled';
+    case 'token':
+      view.status = null;
+      appendText(view, event.text);
+      return 'throttled';
+    case 'tool_call':
+      return applyToolCall(view, event);
+    case 'tool_result':
+      break;
+  }
+
+  // Results arrive in any order; match them to their call by id.
+  const step = findToolStep(view, event.id);
+  if (step === undefined) {
+    return 'none';
+  }
+  step.state = event.ok ? 'done' : 'failed';
+  step.summary = event.summary;
+  return 'throttled';
+};
+
 const runStreaming = async (
   produce: EventProducer,
   flush: (index: number, content: string) => Promise<void>,
   prune?: (keepCount: number) => Promise<void>,
 ) => {
-  const view: StreamView = { answer: '', reasoning: '', status: null };
+  const view: StreamView = {
+    blocks: [],
+    finished: false,
+    hidden: [],
+    reasoning: '',
+    status: null,
+    toolMode: false,
+  };
   let lastEdit = Date.now();
 
   const flushAll = async () => {
@@ -260,58 +474,19 @@ const runStreaming = async (
   };
 
   const handleEvent = async (event: StreamEvent) => {
-    switch (event.type) {
-      case 'done':
-        return;
-      case 'error':
-        view.status = null;
-        view.answer =
-          view.answer === ''
-            ? event.message
-            : `${view.answer}\n\n${event.message}`;
-        lastEdit = Date.now();
-        await flushAll();
-        return;
-      case 'reset':
-        // Drop any pre-tool answer preamble so TTFT tracks the real answer;
-        // accumulated reasoning is preserved so it stays above the answer.
-        view.answer = '';
-        view.status = null;
-        return;
-      case 'status': {
-        const override = event.tool
-          ? toolStatusLabels.get(event.tool)
-          : undefined;
-        view.answer = '';
-        view.status = override ?? event.label;
-        lastEdit = Date.now();
-        await flushAll();
-        return;
-      }
-      case 'thinking': {
-        view.status = null;
-        view.reasoning += event.text;
-        const now = Date.now();
-        if (now - lastEdit > 1_000) {
-          lastEdit = now;
-          await flushAll();
-        }
-        return;
-      }
-      case 'token': {
-        view.status = null;
-        view.answer += event.text;
-        const now = Date.now();
-        if (now - lastEdit > 1_000) {
-          lastEdit = now;
-          await flushAll();
-        }
-      }
+    const mode = applyViewEvent(view, event);
+    const now = Date.now();
+    if (!(mode === 'now' || (mode === 'throttled' && now - lastEdit > 1_000))) {
+      return;
     }
+
+    lastEdit = now;
+    await flushAll();
   };
 
   await produce(handleEvent);
 
+  view.finished = true;
   await flushAll();
 };
 
