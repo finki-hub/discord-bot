@@ -225,7 +225,8 @@ const summarizeToolSteps = (steps: ToolStep[]): string => {
   }
   const searches = steps.filter((step) => step.name === SEARCH_TOOL).length;
   const tools = steps.length - searches;
-  const failed = steps.filter((step) => step.state === 'failed').length;
+  // A step without a result by the end of the answer never finished.
+  const failed = steps.filter((step) => step.state !== 'done').length;
   const parts = [
     searches > 0 &&
       plural(searches, toolStepLabels.search, toolStepLabels.searchPlural),
@@ -463,6 +464,8 @@ const runStreaming = async (
     toolMode: false,
   };
   let lastEdit = Date.now();
+  let editing: null | Promise<void> = null;
+  let trailing: ReturnType<typeof setTimeout> | undefined;
 
   const flushAll = async () => {
     const buffers = splitStreamMessage(composeStreamView(view));
@@ -474,25 +477,59 @@ const runStreaming = async (
     await prune?.(buffers.length);
   };
 
+  // Edits run one at a time, in order, whether an event or the trailing timer
+  // triggers them.
+  const edit = async () => {
+    clearTimeout(trailing);
+    trailing = undefined;
+    // eslint-disable-next-line no-unmodified-loop-condition -- the awaited edit resets it
+    while (editing !== null) {
+      try {
+        await editing;
+      } catch {
+        // The edit that failed reported its own error; this one still runs.
+      }
+    }
+    lastEdit = Date.now();
+    editing = flushAll();
+    try {
+      await editing;
+    } finally {
+      // eslint-disable-next-line require-atomic-updates -- only this edit owns `editing` until it finishes
+      editing = null;
+    }
+  };
+
+  const editQuietly = async () => {
+    try {
+      await edit();
+    } catch {
+      // A timer edit has no caller to report to; the final edit retries.
+    }
+  };
+
   const handleEvent = async (event: StreamEvent) => {
     const mode = applyViewEvent(view, event);
-    const now = Date.now();
-    const due =
-      mode === 'now' ||
-      (mode === 'soon' && now - lastEdit > 300) ||
-      (mode === 'throttled' && now - lastEdit > 1_000);
-    if (!due) {
+    if (mode === 'none') {
       return;
     }
-
-    lastEdit = now;
-    await flushAll();
+    const window = { now: 0, soon: 300, throttled: 1_000 }[mode];
+    const wait = window - (Date.now() - lastEdit);
+    if (mode === 'now' || wait < 0) {
+      await edit();
+      return;
+    }
+    // A skipped edit must still land if no later event arrives, or a tool step
+    // could stay invisible for the whole search.
+    trailing ??= setTimeout(() => {
+      void editQuietly();
+    }, wait);
   };
 
   await produce(handleEvent);
 
   view.finished = true;
-  await flushAll();
+  await edit();
 };
 
 // Delete tracked messages beyond `keepCount` when a streamed view shrinks to
