@@ -3,7 +3,6 @@ import type { ChatInputCommandInteraction, Message } from 'discord.js';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
-import type { SendPromptOptions } from '@/modules/chat/schemas/Chat.js';
 
 import { logger } from '@/common/logger/index.js';
 import {
@@ -22,6 +21,8 @@ import {
   commandErrorFunctions,
   commandErrors,
 } from '@/translations/commands.js';
+
+import { installFetchQueue, streamOptionsFor } from './streamFixture.js';
 
 const RAW_MESSAGE = 'provider-secret global_limit=100';
 const RESET_AT = '2026-07-19T00:00:00Z';
@@ -82,31 +83,7 @@ const userResponse = (): Response =>
 const modelCatalogResponse = (): Response =>
   Response.json({ models: [], source: 'test', version: 1 });
 
-const installFetchQueue = (responses: Response[]): void => {
-  const queue = [...responses];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => {
-      const response = queue.shift();
-      if (response === undefined) {
-        throw new Error('The test exhausted its mocked fetch queue');
-      }
-      return response;
-    }),
-  );
-};
-
-const streamOptions = {
-  embeddings_model: undefined,
-  inference_model: undefined,
-  interface: 'discord',
-  max_tokens: undefined,
-  messages: [{ content: 'question', role: 'user' as const }],
-  reasoning: undefined,
-  temperature: undefined,
-  top_p: undefined,
-  user_id: USER_ID,
-} satisfies SendPromptOptions;
+const streamOptions = streamOptionsFor(USER_ID);
 
 const readContent = (value: unknown): string => {
   if (

@@ -3,7 +3,6 @@ import type { ChatInputCommandInteraction, Message } from 'discord.js';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
-import type { SendPromptOptions } from '@/modules/chat/schemas/Chat.js';
 
 import { logger } from '@/common/logger/index.js';
 import { registerConversation } from '@/modules/chat/utils/conversation.js';
@@ -16,6 +15,8 @@ import {
   type StreamAccumulator,
 } from '@/modules/chat/utils/requests.js';
 import { handlePromptWithStreaming } from '@/modules/chat/utils/streaming.js';
+
+import { installFetchQueue, streamOptionsFor } from './streamFixture.js';
 
 const USER_ID = '00000000-0000-4000-8000-000000000002';
 const SEARCH = 'search_knowledge_base';
@@ -50,31 +51,7 @@ const sseResponse = (frames: readonly Frame[]): Response => {
   });
 };
 
-const installFetchQueue = (responses: Response[]): void => {
-  const queue = [...responses];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async () => {
-      const response = queue.shift();
-      if (response === undefined) {
-        throw new Error('The test exhausted its mocked fetch queue');
-      }
-      return response;
-    }),
-  );
-};
-
-const streamOptions = {
-  embeddings_model: undefined,
-  inference_model: undefined,
-  interface: 'discord',
-  max_tokens: undefined,
-  messages: [{ content: 'question', role: 'user' as const }],
-  reasoning: undefined,
-  temperature: undefined,
-  top_p: undefined,
-  user_id: USER_ID,
-} satisfies SendPromptOptions;
+const streamOptions = streamOptionsFor(USER_ID);
 
 const contentOf = (payload: unknown): null | string =>
   typeof payload === 'object' &&
