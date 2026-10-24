@@ -526,9 +526,9 @@ export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {
       },
     });
 
-    return !result.ok || !result.body || result.status !== 200
-      ? null
-      : QuestionsSchema.parse(await result.json());
+    return result.ok && result.body && result.status === 200
+      ? QuestionsSchema.parse(await result.json())
+      : null;
   } catch (error) {
     logger.error(`Failed getting closest questions\n${String(error)}`);
     return null;
@@ -582,10 +582,8 @@ export const getValidatedInferenceModel = async (
     return undefined;
   }
   const catalog = await getSupportedModels(userId);
-  if (catalog === null) {
-    return configuredModel;
-  }
   if (
+    catalog === null ||
     catalog.models.some(
       ({ availability, id }) =>
         id === configuredModel && isModelSelectable({ availability }),

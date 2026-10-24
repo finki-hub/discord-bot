@@ -60,12 +60,10 @@ describe('analytics exception capture', () => {
       'name',
       { value: 'ProviderError' },
     );
-
     captureException(error, 'discord-user', {
       command: 'chat query command',
       surface: 'interaction',
     });
-
     expect(postHog.capture).not.toHaveBeenCalled();
     expect(postHog.captureException).toHaveBeenCalledOnce();
     const [capturedError, distinctId, properties] =
@@ -135,7 +133,7 @@ describe('analytics exception capture', () => {
     const distinctId = createHash('sha256')
       .update('test-saltdiscord-user')
       .digest('hex');
-    expect(postHog.capture.mock.calls).toEqual([
+    expect(postHog.capture.mock.calls).toEqual(
       [
         {
           distinctId,
@@ -149,8 +147,6 @@ describe('analytics exception capture', () => {
             ...revisionProps,
           },
         },
-      ],
-      [
         {
           distinctId,
           event: 'message_answered',
@@ -164,8 +160,6 @@ describe('analytics exception capture', () => {
             ...revisionProps,
           },
         },
-      ],
-      [
         {
           distinctId,
           event: 'interaction',
@@ -181,8 +175,6 @@ describe('analytics exception capture', () => {
             ...revisionProps,
           },
         },
-      ],
-      [
         {
           distinctId: 'discord-bot',
           event: 'ready',
@@ -193,8 +185,8 @@ describe('analytics exception capture', () => {
             ...revisionProps,
           },
         },
-      ],
-    ]);
+      ].map((event) => [event]),
+    );
     expect(postHog.captureException).toHaveBeenCalledExactlyOnceWith(
       expect.objectContaining({
         message: 'error',
