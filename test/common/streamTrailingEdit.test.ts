@@ -34,7 +34,7 @@ const fakeMessage = (contents: string[]) => {
 
 test('a tool step skipped by the edit throttle still appears while the search runs', async () => {
   const contents: string[] = [];
-  const search = Promise.withResolvers<void>();
+  const search = Promise.withResolvers<undefined>();
 
   const reply = safeStreamReplyToMessage(
     fakeMessage(contents),
@@ -72,7 +72,7 @@ test('a tool step skipped by the edit throttle still appears while the search ru
   expect(contents.at(-1)).toContain('-# 🔎 Пребарувам: рок за упис · ⏳');
   expect(contents.at(-1)).toContain('Прво ќе проверам.');
 
-  search.resolve();
+  search.resolve(undefined);
   await vi.runAllTimersAsync();
   await reply;
   expect(contents.at(-1)).toBe('Прво ќе проверам.\n-# 🔎 1 пребарување');
