@@ -6,13 +6,13 @@ import { describe, expect, test } from 'vitest';
 
 import { execute } from '@/modules/chat/commands/context/prompt.js';
 
-type Call = {
-  readonly kind: 'delete' | 'followUp' | 'reply';
-  readonly payload: unknown;
-};
-
 describe('context prompt privacy', () => {
   test('settles a public deferral before rejecting an empty prompt privately', async () => {
+    type Call = {
+      readonly kind: 'delete' | 'followUp' | 'reply';
+      readonly payload: unknown;
+    };
+
     const calls: Call[] = [];
     const interaction = {
       deferred: true,
