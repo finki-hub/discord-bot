@@ -127,6 +127,33 @@ const toStreamEvent = (sse: {
       return { text: asString(payload['text']), type: 'thinking' };
     case 'token':
       return { text: asString(payload['text']), type: 'token' };
+    case 'tool_call': {
+      const id = asString(payload['id']);
+      const toolName = asString(payload['name']);
+      if (id === '' || toolName === '') {
+        return null;
+      }
+      return {
+        id,
+        label: asString(payload['label']) || toolName,
+        name: toolName,
+        type: 'tool_call',
+      };
+    }
+    case 'tool_result': {
+      const id = asString(payload['id']);
+      const { ok } = payload;
+      if (id === '' || typeof ok !== 'boolean') {
+        return null;
+      }
+      return {
+        id,
+        name: asString(payload['name']),
+        ok,
+        summary: asString(payload['summary']),
+        type: 'tool_result',
+      };
+    }
     default:
       return null;
   }
@@ -136,6 +163,8 @@ export type StreamAccumulator = {
   answer: string;
   errored: boolean;
   firstChunkAt: null | number;
+  // Text written after a tool call starts a new paragraph in the saved answer.
+  segmentBreak?: boolean;
 };
 
 export const applyStreamEvent = (
@@ -157,6 +186,7 @@ export const applyStreamEvent = (
     case 'reset':
       state.answer = '';
       state.firstChunkAt = null; // so TTFT tracks the post-tool answer, not a preamble
+      state.segmentBreak = false;
       break;
     case 'status':
       break;
@@ -166,7 +196,21 @@ export const applyStreamEvent = (
       break;
     case 'token':
       state.firstChunkAt ??= Date.now();
+      if (state.segmentBreak === true) {
+        const text = event.text.trimStart();
+        if (text === '') {
+          break;
+        }
+        state.answer = `${state.answer.trimEnd()}\n\n${text}`;
+        state.segmentBreak = false;
+        break;
+      }
       state.answer += event.text;
+      break;
+    case 'tool_call':
+      state.segmentBreak = state.answer !== '';
+      break;
+    case 'tool_result':
       break;
   }
 };

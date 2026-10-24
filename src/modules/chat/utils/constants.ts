@@ -42,6 +42,8 @@ export const localizeStreamEvent = (event: StreamEvent): StreamEvent => {
     case 'status':
     case 'thinking':
     case 'token':
+    case 'tool_call':
+    case 'tool_result':
       return event;
     default:
       return assertNever(event);
