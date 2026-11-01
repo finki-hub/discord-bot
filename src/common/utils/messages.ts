@@ -9,11 +9,7 @@ import {
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
 
-import {
-  labels,
-  toolStatusLabels,
-  toolStepLabels,
-} from '@/translations/labels.js';
+import { labels, toolStatusLabels } from '@/translations/labels.js';
 
 type EventProducer = (
   emit: (event: StreamEvent) => Promise<void>,
@@ -23,6 +19,9 @@ type StreamableInteraction =
   | ChatInputCommandInteraction
   | MessageContextMenuCommandInteraction
   | UserContextMenuCommandInteraction;
+
+// Answers often end with a link, and its preview card would dwarf the answer.
+const NO_EMBEDS = { flags: MessageFlags.SuppressEmbeds } as const;
 
 type StreamReplyOptions = {
   language?: string;
@@ -216,27 +215,6 @@ const formatToolStep = (step: ToolStep): string => {
   return `-# ${icon} ${toSubtext(step.label)} · ${marker}${summary}`;
 };
 
-const plural = (count: number, one: string, many: string): string =>
-  `${count} ${count === 1 ? one : many}`;
-
-const summarizeToolSteps = (steps: ToolStep[]): string => {
-  if (steps.length === 0) {
-    return '';
-  }
-  const searches = steps.filter((step) => step.name === SEARCH_TOOL).length;
-  const tools = steps.length - searches;
-  // A step without a result by the end of the answer never finished.
-  const failed = steps.filter((step) => step.state !== 'done').length;
-  const parts = [
-    searches > 0 &&
-      plural(searches, toolStepLabels.search, toolStepLabels.searchPlural),
-    tools > 0 && plural(tools, toolStepLabels.tool, toolStepLabels.toolPlural),
-    failed > 0 &&
-      `⚠️ ${plural(failed, toolStepLabels.failed, toolStepLabels.failedPlural)}`,
-  ].filter((part) => part !== false);
-  return `-# ${searches > 0 ? '🔎' : '🛠️'} ${parts.join(' · ')}`;
-};
-
 // Wrap a single logical line to `width`, breaking on a space where possible so a
 // blockquote line never exceeds the message split window (see formatReasoning).
 const wrapLine = (line: string, width: number): string[] => {
@@ -278,17 +256,13 @@ const blockText = (block: StreamBlock): string =>
   block.type === 'text' ? block.text.trim() : '';
 
 // While streaming, tool steps sit inline between the text written around them;
-// the finished answer keeps only the text plus a one-line summary at the bottom,
-// right above the timing footnote.
+// the finished answer keeps only the text.
 const composeToolBody = (view: StreamView): string => {
   if (view.finished) {
-    const texts = view.blocks.map(blockText).filter((text) => text !== '');
-    const steps = view.blocks
-      .filter((block) => block.type === 'tool')
-      .map((block) => block.step);
-    return [texts.join('\n\n'), summarizeToolSteps(steps)]
-      .filter((part) => part !== '')
-      .join('\n');
+    return view.blocks
+      .map(blockText)
+      .filter((text) => text !== '')
+      .join('\n\n');
   }
 
   const lines = view.blocks
@@ -418,7 +392,7 @@ const applyViewEvent = (view: StreamView, event: StreamEvent): FlushMode => {
       return 'now';
     }
     case 'reset':
-      // Drop any pre-tool answer preamble so TTFT tracks the real answer;
+      // Drop any pre-tool answer preamble so only the real answer remains;
       // accumulated reasoning and tool steps are preserved.
       view.blocks = view.blocks.filter((block) => block.type === 'tool');
       view.hidden = [];
@@ -565,7 +539,10 @@ export const safeStreamReplyToInteraction = async (
     useCodeBlock = false,
   } = options ?? {};
 
-  const baseOptions = mentionUsers ? {} : { allowedMentions: { users: [] } };
+  const baseOptions = {
+    ...NO_EMBEDS,
+    ...(!mentionUsers && { allowedMentions: { users: [] } }),
+  };
   const formatContent = (text: string) =>
     useCodeBlock ? codeBlock(language, text) : text;
 
@@ -617,7 +594,7 @@ export const safeStreamReplyToInteraction = async (
 
     const existing = sentMessages[index];
     if (existing !== undefined) {
-      await existing.edit({ content: formatContent(content) });
+      await existing.edit({ ...NO_EMBEDS, content: formatContent(content) });
 
       return;
     }
@@ -648,6 +625,7 @@ export const safeStreamReplyToMessage = async (
   } = options ?? {};
 
   const baseOptions = {
+    ...NO_EMBEDS,
     allowedMentions: {
       repliedUser: false,
       ...(!mentionUsers && { users: [] }),
@@ -669,7 +647,7 @@ export const safeStreamReplyToMessage = async (
 
     const existing = sentMessages[index];
     if (existing !== undefined) {
-      await existing.edit({ content: formatContent(content) });
+      await existing.edit({ ...NO_EMBEDS, content: formatContent(content) });
 
       return;
     }

@@ -1,5 +1,5 @@
-import type { Message } from 'discord.js';
-
+import { type Message, MessageFlags } from 'discord.js';
+import { setTimeout as delay } from 'node:timers/promises';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
@@ -75,5 +75,36 @@ test('a tool step skipped by the edit throttle still appears while the search ru
   search.resolve(undefined);
   await vi.runAllTimersAsync();
   await reply;
-  expect(contents.at(-1)).toBe('Прво ќе проверам.\n-# 🔎 1 пребарување');
+  expect(contents.at(-1)).toBe('Прво ќе проверам.');
+});
+
+test('streamed messages never show link previews', async () => {
+  const payloads: Array<{ flags?: unknown }> = [];
+  const sent = {
+    edit: async (payload: { flags?: unknown }) => {
+      payloads.push(payload);
+      return sent;
+    },
+  };
+  const message = {
+    reply: async (payload: { flags?: unknown }) => {
+      payloads.push(payload);
+      return sent;
+    },
+  } as unknown as Message;
+
+  const reply = safeStreamReplyToMessage(message, async (emit) => {
+    await emit({ text: 'Види https://finki.ukim.mk', type: 'token' });
+    // Past the edit throttle, so the next token edits the sent message.
+    await delay(2_000);
+    await emit({ text: ' за повеќе.', type: 'token' });
+    await emit({ type: 'done' });
+  });
+  await vi.runAllTimersAsync();
+  await reply;
+
+  expect(payloads.length).toBeGreaterThan(1);
+  for (const payload of payloads) {
+    expect(payload.flags).toBe(MessageFlags.SuppressEmbeds);
+  }
 });

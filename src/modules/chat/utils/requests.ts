@@ -162,7 +162,6 @@ const toStreamEvent = (sse: {
 export type StreamAccumulator = {
   answer: string;
   errored: boolean;
-  firstChunkAt: null | number;
   // Text written after a tool call starts a new paragraph in the saved answer.
   segmentBreak?: boolean;
 };
@@ -177,7 +176,7 @@ export const applyStreamEvent = (
     case 'error':
       // An `interrupted` error is emitted only after tokens have already
       // streamed, so the partial answer is valid and worth keeping (history,
-      // feedback, timing). Other codes (no_answer, agent_error) arrive after a
+      // feedback). Other codes (no_answer, agent_error) arrive after a
       // `reset`, leaving no answer to save.
       if (event.code !== 'interrupted') {
         state.errored = true;
@@ -185,17 +184,14 @@ export const applyStreamEvent = (
       break;
     case 'reset':
       state.answer = '';
-      state.firstChunkAt = null; // so TTFT tracks the post-tool answer, not a preamble
       state.segmentBreak = false;
       break;
     case 'status':
       break;
     case 'thinking':
-      // Reasoning is display-only: it must not enter the saved answer or count
-      // toward time-to-first-token, which tracks the first answer token.
+      // Reasoning is display-only: it must not enter the saved answer.
       break;
     case 'token':
-      state.firstChunkAt ??= Date.now();
       if (state.segmentBreak === true) {
         const text = event.text.trimStart();
         if (text === '') {

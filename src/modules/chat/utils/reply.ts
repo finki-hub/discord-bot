@@ -55,7 +55,7 @@ const appendAnswerFootnote = async ({
   lastMessage: Message | undefined;
   message: Message;
   persistence: { markNoticeShown: () => void; noticePending: boolean };
-  timing: { firstChunkAt: null | number; startedAt: number };
+  timing: { startedAt: number };
 }) => {
   // Thread members already see the notice in the thread's welcome message.
   if (inChatThread || !persistence.noticePending) {
@@ -232,7 +232,6 @@ export const handleChatMessage = async (message: Message) => {
     const state: StreamAccumulator = {
       answer: '',
       errored: false,
-      firstChunkAt: null,
     };
     const startedAt = Date.now();
     const capture: { responseId: null | string } = { responseId: null };
@@ -271,7 +270,7 @@ export const handleChatMessage = async (message: Message) => {
         lastMessage: messages.at(-1),
         message,
         persistence,
-        timing: { firstChunkAt: state.firstChunkAt, startedAt },
+        timing: { startedAt },
       });
 
       await finalizeChatAnswer({
