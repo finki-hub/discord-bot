@@ -19,11 +19,10 @@ afterEach(() => {
 });
 
 const options = {
-  firstChunkAt: null,
   startedAt: 0,
   notice: commandResponses.chatStorageNotice,
 };
-const footnote = `\n-# ⏱ 0ms\n-# ${commandResponses.chatStorageNotice}`;
+const footnote = `\n-# ⏱ 0ms · ${commandResponses.chatStorageNotice}`;
 
 test.each([0, 1])(
   'notice boundary overflow=%s never truncates the answer',

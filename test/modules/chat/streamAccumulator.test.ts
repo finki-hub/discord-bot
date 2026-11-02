@@ -7,7 +7,6 @@ describe('stream accumulator', () => {
     const state = {
       answer: 'partial answer',
       errored: false,
-      firstChunkAt: 1,
     };
 
     applyStreamEvent(state, {
@@ -19,24 +18,21 @@ describe('stream accumulator', () => {
     expect(state.errored).toBe(false);
   });
 
-  test('clears answer timing when a stream resets', () => {
+  test('clears the answer when a stream resets', () => {
     const state = {
       answer: 'partial answer',
       errored: false,
-      firstChunkAt: 1 as null | number,
     };
 
     applyStreamEvent(state, { type: 'reset' });
 
     expect(state.answer).toBe('');
-    expect(state.firstChunkAt).toBeNull();
   });
 
   test('marks sponsored quota errors as terminal', () => {
     const state = {
       answer: '',
       errored: false,
-      firstChunkAt: null,
     };
 
     applyStreamEvent(state, {

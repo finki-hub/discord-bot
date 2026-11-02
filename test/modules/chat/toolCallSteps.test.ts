@@ -244,7 +244,6 @@ describe('tool call stream events', () => {
     const state: StreamAccumulator = {
       answer: '',
       errored: false,
-      firstChunkAt: null,
     };
 
     for (const event of [
@@ -265,7 +264,6 @@ describe('tool call stream events', () => {
     const state: StreamAccumulator = {
       answer: '',
       errored: false,
-      firstChunkAt: null,
     };
 
     for (const event of [
@@ -329,10 +327,7 @@ describe('tool call stream events', () => {
           .some((content) => content.includes('Пребарувам…')),
       ).toBe(false);
       expect(finalBody(contents)).toBe(
-        [
-          'Ќе пребарам.\n\nМеѓу пребарувања.\n\nКонечен одговор.',
-          '-# 🔎 3 пребарувања · ⚠️ 1 неуспешно',
-        ].join('\n'),
+        'Ќе пребарам.\n\nМеѓу пребарувања.\n\nКонечен одговор.',
       );
     },
   );
@@ -350,9 +345,7 @@ describe('tool call stream events', () => {
       ]);
 
       expect(contents).toContain('Пребарувам…');
-      expect(finalBody(contents)).toBe(
-        'Прво ќе проверам.\n\nОдговор.\n-# 🔎 1 пребарување',
-      );
+      expect(finalBody(contents)).toBe('Прво ќе проверам.\n\nОдговор.');
     },
   );
 

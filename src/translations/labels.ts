@@ -11,7 +11,6 @@ export const labels = {
   description: 'Опис',
   email: 'Електронска пошта',
   enrolledStudents: 'Запишани студенти',
-  firstToken: 'прв токен',
   floor: 'Кат',
   free: 'Бесплатно',
   level: 'Ниво',
@@ -43,12 +42,3 @@ export const labels = {
 export const toolStatusLabels = new Map<string, string>([
   ['recommend_thesis_committee', '👥 Составувам комисија…'],
 ]);
-
-export const toolStepLabels = {
-  failed: 'неуспешно',
-  failedPlural: 'неуспешни',
-  search: 'пребарување',
-  searchPlural: 'пребарувања',
-  tool: 'алатка',
-  toolPlural: 'алатки',
-};

@@ -123,7 +123,6 @@ export const handlePromptWithStreaming = async (
     const state: StreamAccumulator = {
       answer: '',
       errored: false,
-      firstChunkAt: null,
     };
     const startedAt = Date.now();
     const capture: { responseId: null | string } = { responseId: null };
@@ -172,7 +171,6 @@ export const handlePromptWithStreaming = async (
       );
 
       noticePending = !(await appendTimingFootnote(messages.at(-1), {
-        firstChunkAt: state.firstChunkAt,
         notice: commandResponses.chatStorageNotice,
         startedAt,
       }));
