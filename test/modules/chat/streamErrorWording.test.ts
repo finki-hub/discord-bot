@@ -13,4 +13,3 @@ test.each([
     localizeStreamEvent({ code, message: 'raw API text', type: 'error' }),
   ).toStrictEqual({ code, message, type: 'error' });
 });
-
