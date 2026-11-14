@@ -2,13 +2,23 @@ import {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
+  LabelBuilder,
   type Message,
+  ModalBuilder,
+  StringSelectMenuBuilder,
+  TextInputBuilder,
+  TextInputStyle,
 } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
 import { getFeedbackProperty } from '@/configuration/bot/index.js';
+import { FEEDBACK_REASONS } from '@/modules/chat/schemas/Chat.js';
+import { feedbackReasonComponents } from '@/translations/components.js';
 
 const FEEDBACK_BUTTON_ID = 'chatFeedback';
+export const FEEDBACK_REASON_ID = 'chatFeedbackReason';
+export const FEEDBACK_REASON_FIELD = 'reason';
+export const FEEDBACK_COMMENT_FIELD = 'comment';
 const MAX_TRACKED_RESPONSES = 1_000;
 
 // Best-effort enrichment cache: a miss never blocks recording feedback, because
@@ -100,6 +110,45 @@ export const buildFeedbackRow = (
       .setStyle(dislikeStyle),
   );
 };
+
+// Offered with the private thanks for a dislike; only the asker can open it.
+export const buildFeedbackReasonRow = (responseId: string, askerId: string) =>
+  new ActionRowBuilder<ButtonBuilder>().addComponents(
+    new ButtonBuilder()
+      .setCustomId(`${FEEDBACK_REASON_ID}:${responseId}:${askerId}`)
+      .setLabel(feedbackReasonComponents.button)
+      .setStyle(ButtonStyle.Secondary),
+  );
+
+export const buildFeedbackReasonModal = (responseId: string) =>
+  new ModalBuilder()
+    .setCustomId(`${FEEDBACK_REASON_ID}:${responseId}`)
+    .setTitle(feedbackReasonComponents.title)
+    .addLabelComponents(
+      new LabelBuilder()
+        .setLabel(feedbackReasonComponents.reasonLabel)
+        .setStringSelectMenuComponent(
+          new StringSelectMenuBuilder()
+            .setCustomId(FEEDBACK_REASON_FIELD)
+            .setMinValues(1)
+            .setMaxValues(1)
+            .addOptions(
+              FEEDBACK_REASONS.map((reason) => ({
+                label: feedbackReasonComponents.reasons[reason],
+                value: reason,
+              })),
+            ),
+        ),
+      new LabelBuilder()
+        .setLabel(feedbackReasonComponents.commentLabel)
+        .setTextInputComponent(
+          new TextInputBuilder()
+            .setCustomId(FEEDBACK_COMMENT_FIELD)
+            .setStyle(TextInputStyle.Paragraph)
+            .setRequired(false)
+            .setMaxLength(1_000),
+        ),
+    );
 
 // The customId carries the response id and asker id, so the click handler is
 // restart-safe and works on both surfaces (interactionMetadata is null on

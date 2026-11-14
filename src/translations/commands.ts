@@ -52,7 +52,10 @@ export const commandResponses = {
   configurationReloading: 'Се освежува конфигурацијата...',
   dataReloaded: 'Податоците се освежени.',
   dataReloading: 'Се освежуваат податоците...',
+  feedbackReasonSaved: 'Причината е зачувана. Ви благодариме!',
   feedbackRecorded: 'Ви благодариме на повратната информација!',
+  feedbackRecordedAskReason:
+    'Ви благодариме на повратната информација! Ако сакате, наведете што не беше во ред.',
   home: 'https://github.com/finki-hub/discord-bot',
   ticketClosed: 'Тикетот е затворен.',
   ticketMessageSent: 'Пораката за тикети е испратена.',

@@ -9,6 +9,7 @@ import { getMemberFromGuild } from '@/common/utils/guild.js';
 import { name as chatFeedbackButtonId } from '@/modules/chat/commands/button/chatFeedback.js';
 import { name as chatCommandId } from '@/modules/chat/commands/chat/chat.js';
 import { name as credentialsCommandId } from '@/modules/chat/commands/chat/credentials.js';
+import { FEEDBACK_REASON_ID as chatFeedbackReasonButtonId } from '@/modules/chat/utils/feedback.js';
 import { name as helpCommandId } from '@/modules/help/commands/chat/help.js';
 import { name as listCommandsButtonId } from '@/modules/list/commands/button/listCommands.js';
 import { name as listLinksButtonId } from '@/modules/list/commands/button/listLinks.js';
@@ -32,6 +33,8 @@ const nonDeferredCommands = new Set<string>([
   `${credentialsCommandId} set`,
   `${ticketCommandId} list`,
   chatFeedbackButtonId,
+  // Opens a modal, which cannot follow a deferred reply.
+  chatFeedbackReasonButtonId,
   helpCommandId,
   listCommandId,
   listCommandsButtonId,

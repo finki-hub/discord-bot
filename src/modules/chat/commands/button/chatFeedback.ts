@@ -4,6 +4,7 @@ import { logger } from '@/common/logger/index.js';
 import { errorCategory } from '@/common/utils/safeError.js';
 import { FeedbackOptionsSchema } from '@/modules/chat/schemas/Chat.js';
 import {
+  buildFeedbackReasonRow,
   buildFeedbackRow,
   getFeedbackContext,
   isFeedbackEnabled,
@@ -100,8 +101,14 @@ const recordFeedback = async (
     return;
   }
 
+  // A dislike also offers a private form for what went wrong.
   await interaction.followUp({
-    content: commandResponses.feedbackRecorded,
+    ...(action === 'dislike'
+      ? {
+          components: [buildFeedbackReasonRow(responseId, askerId)],
+          content: commandResponses.feedbackRecordedAskReason,
+        }
+      : { content: commandResponses.feedbackRecorded }),
     flags: MessageFlags.Ephemeral,
   });
 
