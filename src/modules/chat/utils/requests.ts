@@ -8,6 +8,7 @@ import type { StreamEvent } from '@/common/types/StreamEvent.js';
 
 import { logger } from '@/common/logger/index.js';
 import { errorCategory } from '@/common/utils/safeError.js';
+import { withTimeout } from '@/common/utils/timeout.js';
 import { getApiKey, getChatbotUrl } from '@/configuration/environment.js';
 import { QuestionsSchema } from '@/modules/faq/schemas/Question.js';
 import { labels } from '@/translations/labels.js';
@@ -34,6 +35,11 @@ import {
   isModelSelectable,
   ModelCatalogResponseSchema,
 } from '../schemas/Model.js';
+import {
+  CHAT_CONNECT_TIMEOUT_MS,
+  CHAT_REQUEST_TIMEOUT_MS,
+  CHAT_STREAM_IDLE_TIMEOUT_MS,
+} from './constants.js';
 import { sanitizeOptions } from './utils.js';
 
 // Await each event so the consumer finishes sending/editing its reply before the
@@ -225,6 +231,43 @@ const authHeaders = (): Record<string, string> => {
   };
 };
 
+type FetchOptions = NonNullable<Parameters<typeof fetch>[1]>;
+
+const fetchWithTimeout = (
+  input: string | URL,
+  init: FetchOptions = {},
+): Promise<Response> =>
+  fetch(input, {
+    ...init,
+    signal: AbortSignal.timeout(CHAT_REQUEST_TIMEOUT_MS),
+  });
+
+// Streaming responses can legitimately stay open for minutes, so only the
+// initial connection is bounded here; each read is bounded separately.
+const fetchStreamResponse = async (
+  input: string | URL,
+  init: FetchOptions,
+): Promise<Response> => {
+  const controller = new AbortController();
+  const connectTimer = setTimeout(() => {
+    controller.abort();
+  }, CHAT_CONNECT_TIMEOUT_MS);
+
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch (error) {
+    if (controller.signal.aborted) {
+      throw new Error('LLM_TIMEOUT', { cause: error });
+    }
+    throw error;
+  } finally {
+    clearTimeout(connectTimer);
+  }
+};
+
+const readStreamChunk = (reader: ReadableStreamDefaultReader<Uint8Array>) =>
+  withTimeout(reader.read(), CHAT_STREAM_IDLE_TIMEOUT_MS, 'LLM_TIMEOUT');
+
 const parseSafeDetail = async (response: Response): Promise<string> => {
   try {
     const json = await response.json();
@@ -245,7 +288,7 @@ export const listCredentials = async (
     throw new ChatApiError(503, 'Chatbot URL not configured');
   }
 
-  const result = await fetch(
+  const result = await fetchWithTimeout(
     `${chatbotUrl}/chat/state/users/${userId}/credentials`,
     {
       headers: authHeaders(),
@@ -271,7 +314,7 @@ export const upsertCredential = async (
     throw new ChatApiError(503, 'Chatbot URL not configured');
   }
 
-  const result = await fetch(
+  const result = await fetchWithTimeout(
     `${chatbotUrl}/chat/state/users/${userId}/credentials/${provider}`,
     {
       body: JSON.stringify(credential),
@@ -298,7 +341,7 @@ export const deleteCredential = async (
     throw new ChatApiError(503, 'Chatbot URL not configured');
   }
 
-  const result = await fetch(
+  const result = await fetchWithTimeout(
     `${chatbotUrl}/chat/state/users/${userId}/credentials/${provider}`,
     {
       headers: authHeaders(),
@@ -324,7 +367,7 @@ export const deleteChatHistory = async (
   }
 
   try {
-    const result = await fetch(
+    const result = await fetchWithTimeout(
       `${chatbotUrl}/chat/state/users/${userId}/history`,
       {
         headers: authHeaders(),
@@ -371,7 +414,7 @@ export const sendPrompt = async (
     throw new Error('LLM_UNAVAILABLE');
   }
 
-  const result = await fetch(`${chatbotUrl}/chat/`, {
+  const result = await fetchStreamResponse(`${chatbotUrl}/chat/`, {
     body: JSON.stringify(sanitizeOptions(options)),
     headers: {
       Accept: 'text/event-stream',
@@ -414,14 +457,23 @@ export const sendPrompt = async (
 
     const reader: ReadableStreamDefaultReader<Uint8Array> =
       result.body.getReader();
-    const decoder = new TextDecoder();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
+
+    try {
+      const decoder = new TextDecoder();
+      while (true) {
+        const { done, value } = await readStreamChunk(reader);
+        if (done) {
+          break;
+        }
+        parser.feed(decoder.decode(value, { stream: true }));
+        await drainEvents(pendingEvents, onEvent);
       }
-      parser.feed(decoder.decode(value, { stream: true }));
-      await drainEvents(pendingEvents, onEvent);
+    } finally {
+      try {
+        await reader.cancel();
+      } catch {
+        // The stream may already be closed or errored.
+      }
     }
 
     if (receivedEvents === 0) {
@@ -516,7 +568,7 @@ export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {
   }
 
   try {
-    const result = await fetch(url, {
+    const result = await fetchWithTimeout(url, {
       headers: {
         'Content-Type': 'application/json',
       },
@@ -547,7 +599,7 @@ export const getSupportedModels = async (userId: string) => {
   try {
     const url = new URL(`${chatbotUrl}/chat/models`);
     url.searchParams.set('user_id', userId);
-    const result = await fetch(url, {
+    const result = await fetchWithTimeout(url, {
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
@@ -604,7 +656,7 @@ export const fillEmbeddings = async (
     throw new Error('LLM_UNAVAILABLE');
   }
 
-  const result = await fetch(`${chatbotUrl}/questions/fill`, {
+  const result = await fetchStreamResponse(`${chatbotUrl}/questions/fill`, {
     body: JSON.stringify(sanitizeOptions(options)),
     headers: {
       Accept: 'text/event-stream',
@@ -629,15 +681,24 @@ export const fillEmbeddings = async (
 
   const reader: ReadableStreamDefaultReader<Uint8Array> =
     result.body.getReader();
-  const decoder = new TextDecoder();
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) {
-      break;
+
+  try {
+    const decoder = new TextDecoder();
+    while (true) {
+      const { done, value } = await readStreamChunk(reader);
+      if (done) {
+        break;
+      }
+      hasChunks = true;
+      parser.feed(decoder.decode(value, { stream: true }));
+      await drainChunks(pendingChunks, onChunk);
     }
-    hasChunks = true;
-    parser.feed(decoder.decode(value, { stream: true }));
-    await drainChunks(pendingChunks, onChunk);
+  } finally {
+    try {
+      await reader.cancel();
+    } catch {
+      // The stream may already be closed or errored.
+    }
   }
 
   if (!hasChunks) {
@@ -673,7 +734,7 @@ export const getUnembeddedQuestions = async (
   }
 
   try {
-    const result = await fetch(url, {
+    const result = await fetchWithTimeout(url, {
       headers: {
         'Content-Type': 'application/json',
       },
