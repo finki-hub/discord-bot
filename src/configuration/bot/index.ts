@@ -1,4 +1,5 @@
 import { logger } from '@/common/logger/index.js';
+import { errorCategory } from '@/common/utils/safeError.js';
 import {
   type BotConfig,
   type BotConfigKeys,
@@ -6,7 +7,6 @@ import {
   type FullyRequiredBotConfig,
   type MultiGuildConfig,
 } from '@/modules/admin/schemas/BotConfig.js';
-import { configErrorFunctions } from '@/translations/errors.js';
 
 import { DEFAULT_CONFIGURATION } from './defaults.js';
 import {
@@ -16,17 +16,34 @@ import {
 
 type ConfigShape = NonNullable<BotConfig>;
 
-const configState: { multiGuildConfig: MultiGuildConfig | undefined } = {
+const configState: {
+  multiGuildConfig: MultiGuildConfig | undefined;
+  persistenceBlocked: boolean;
+} = {
   multiGuildConfig: undefined,
+  persistenceBlocked: false,
 };
 
 const setMultiGuildConfig = (value: MultiGuildConfig) => {
   configState.multiGuildConfig = value;
 };
 
+const setPersistenceBlocked = (value: boolean) => {
+  configState.persistenceBlocked = value;
+};
+
 const getLoadedConfigState = async (): Promise<MultiGuildConfig> => {
   if (configState.multiGuildConfig === undefined) {
-    setMultiGuildConfig((await getConfigFile()) ?? {});
+    try {
+      setMultiGuildConfig(await getConfigFile());
+      setPersistenceBlocked(false);
+    } catch (error) {
+      // Keep serving defaults in memory, but never write them over a
+      // configuration file that could not be read or validated.
+      setMultiGuildConfig({});
+      setPersistenceBlocked(true);
+      logger.error(`Failed loading configuration (${errorCategory(error)})`);
+    }
   }
 
   return configState.multiGuildConfig ?? {};
@@ -36,6 +53,10 @@ const getGuildConfig = async (guildId: string): Promise<ConfigShape> => {
   const currentConfig = await getLoadedConfigState();
 
   if (currentConfig[guildId] === undefined) {
+    if (configState.persistenceBlocked) {
+      return DEFAULT_CONFIGURATION;
+    }
+
     logger.info(`Initializing default configuration for guild ${guildId}`);
     currentConfig[guildId] = BotConfigSchema.parse(DEFAULT_CONFIGURATION);
     setMultiGuildConfig(currentConfig);
@@ -46,16 +67,19 @@ const getGuildConfig = async (guildId: string): Promise<ConfigShape> => {
 };
 
 export const reloadConfig = async () => {
-  const currentConfig = await getConfigFile();
-
   try {
-    setMultiGuildConfig(currentConfig ?? {});
+    const loadedConfig = await getConfigFile();
+    setMultiGuildConfig(loadedConfig);
+    setPersistenceBlocked(false);
     logger.info('Configuration reloaded');
   } catch (error) {
-    setMultiGuildConfig({});
-
-    logger.warn(configErrorFunctions.invalidConfiguration(error));
-    logger.error(`Failed reloading configuration\n${String(error)}`);
+    // Preserve the last known-good in-memory configuration and block writes so
+    // a transient failure cannot be persisted as defaults.
+    if (configState.multiGuildConfig === undefined) {
+      setMultiGuildConfig({});
+    }
+    setPersistenceBlocked(true);
+    logger.error(`Failed reloading configuration (${errorCategory(error)})`);
   }
 };
 
@@ -72,6 +96,13 @@ export const setConfigProperty = async <T extends BotConfigKeys>(
   value: ConfigShape[T],
   guildId: string,
 ) => {
+  if (configState.persistenceBlocked) {
+    logger.warn(
+      'Configuration write skipped because configuration persistence is blocked',
+    );
+    return null;
+  }
+
   const guildConfig = await getGuildConfig(guildId);
   guildConfig[key] = value;
   const currentConfig = await getLoadedConfigState();
@@ -95,6 +126,13 @@ export const setGuildConfigFull = async (
   guildId: string,
   config: BotConfig,
 ): Promise<BotConfig | null> => {
+  if (configState.persistenceBlocked) {
+    logger.warn(
+      'Configuration write skipped because configuration persistence is blocked',
+    );
+    return null;
+  }
+
   const validated = BotConfigSchema.parse(config);
   const currentConfig = await getLoadedConfigState();
   currentConfig[guildId] = validated;

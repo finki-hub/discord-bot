@@ -3,6 +3,8 @@ import type { LogEntry } from 'winston';
 import { WebhookClient } from 'discord.js';
 import TransportStream from 'winston-transport';
 
+import type { MultiGuildConfig } from '@/modules/admin/schemas/BotConfig.js';
+
 import { errorCategory } from '@/common/utils/safeError.js';
 import { getConfig } from '@/configuration/bot/file.js';
 
@@ -56,8 +58,15 @@ export class WebhookTransport extends TransportStream {
       return null;
     }
 
-    const config = await getConfig();
-    const webhookUrl = config?.[guildId]?.errorWebhook;
+    // A failed configuration read must not recurse through this transport.
+    let config: MultiGuildConfig;
+    try {
+      config = await getConfig();
+    } catch {
+      return null;
+    }
+
+    const webhookUrl = config[guildId]?.errorWebhook;
 
     if (webhookUrl === undefined) {
       return null;

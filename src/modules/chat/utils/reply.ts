@@ -18,6 +18,7 @@ import {
   LLM_ERRORS,
   localizeStreamEvent,
   PRIVATE_STREAM_ERROR_CODES,
+  TRANSIENT_LLM_ERRORS,
 } from './constants.js';
 import {
   getConversationHistory,
@@ -125,8 +126,8 @@ const handleConversationError = async (
     throw error;
   }
 
-  if (error.message === 'LLM_UNAVAILABLE') {
-    logger.warn(`LLM unavailable when executing ${COMMAND_LABEL}`, {
+  if (TRANSIENT_LLM_ERRORS.has(error.message)) {
+    logger.warn(`Transient LLM failure when executing ${COMMAND_LABEL}`, {
       guildId: message.guild?.id,
     });
   } else {
