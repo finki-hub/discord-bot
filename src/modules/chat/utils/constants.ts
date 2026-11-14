@@ -6,12 +6,17 @@ import {
   commandErrors,
 } from '@/translations/commands.js';
 
+// API stream error codes get their own wording: `interrupted` follows a partial
+// answer that stays visible, so a generic "sending failed" would mislead.
 export const LLM_ERRORS: Record<string, string> = {
+  agent_error: commandErrors.agentError,
   credential_required: commandErrors.credentialRequired,
   free_tier_unavailable: commandErrors.freeTierUnavailable,
+  interrupted: commandErrors.answerInterrupted,
   LLM_DISABLED: commandErrors.llmDisabled,
   LLM_NOT_READY: commandErrors.llmNotReady,
   LLM_UNAVAILABLE: commandErrors.llmUnavailable,
+  no_answer: commandErrors.noAnswer,
   sponsored_request_in_progress: commandErrors.sponsoredRequestInProgress,
 } as const;
 
