@@ -54,13 +54,25 @@ export const SendPromptOptionsSchema = z
 
 export type SendPromptOptions = z.infer<typeof SendPromptOptionsSchema>;
 
+export const FEEDBACK_REASONS = [
+  'wrong',
+  'outdated',
+  'incomplete',
+  'off_topic',
+  'other',
+] as const;
+
+export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
+
 export const FeedbackOptionsSchema = z
   .object({
     channelId: z.string().optional(),
     client: z.enum(['discord', 'web']),
     clientRef: z.string().optional(),
+    comment: z.string().trim().max(1_000).optional(),
     feedbackType: z.enum(['like', 'dislike']),
     guildId: z.string().optional(),
+    reason: z.enum(FEEDBACK_REASONS).optional(),
     responseId: z.string(),
     userId: z.string(),
   })
@@ -68,8 +80,10 @@ export const FeedbackOptionsSchema = z
     channel_id: data.channelId,
     client: data.client,
     client_ref: data.clientRef,
+    comment: data.comment === '' ? undefined : data.comment,
     feedback_type: data.feedbackType,
     guild_id: data.guildId,
+    reason: data.reason,
     response_id: data.responseId,
     user_id: data.userId,
   }));
