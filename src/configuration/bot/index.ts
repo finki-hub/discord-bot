@@ -10,11 +10,15 @@ import {
 
 import { DEFAULT_CONFIGURATION } from './defaults.js';
 import {
+  ConfigFileError,
   getConfig as getConfigFile,
   setConfig as setConfigFile,
 } from './file.js';
 
 type ConfigShape = NonNullable<BotConfig>;
+
+const configFailureReason = (error: unknown): string =>
+  error instanceof ConfigFileError ? error.message : errorCategory(error);
 
 const configState: {
   multiGuildConfig: MultiGuildConfig | undefined;
@@ -42,7 +46,9 @@ const getLoadedConfigState = async (): Promise<MultiGuildConfig> => {
       // configuration file that could not be read or validated.
       setMultiGuildConfig({});
       setPersistenceBlocked(true);
-      logger.error(`Failed loading configuration (${errorCategory(error)})`);
+      logger.error(
+        `Failed loading configuration (${configFailureReason(error)})`,
+      );
     }
   }
 
@@ -66,12 +72,14 @@ const getGuildConfig = async (guildId: string): Promise<ConfigShape> => {
   return currentConfig[guildId] ?? DEFAULT_CONFIGURATION;
 };
 
-export const reloadConfig = async () => {
+export const reloadConfig = async (): Promise<boolean> => {
   try {
     const loadedConfig = await getConfigFile();
     setMultiGuildConfig(loadedConfig);
     setPersistenceBlocked(false);
     logger.info('Configuration reloaded');
+
+    return true;
   } catch (error) {
     // Preserve the last known-good in-memory configuration and block writes so
     // a transient failure cannot be persisted as defaults.
@@ -79,7 +87,11 @@ export const reloadConfig = async () => {
       setMultiGuildConfig({});
     }
     setPersistenceBlocked(true);
-    logger.error(`Failed reloading configuration (${errorCategory(error)})`);
+    logger.error(
+      `Failed reloading configuration (${configFailureReason(error)})`,
+    );
+
+    return false;
   }
 };
 

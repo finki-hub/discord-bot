@@ -211,15 +211,13 @@ const handleConfigSet = async (interaction: ChatInputCommandInteraction) => {
 const handleConfigReload = async (interaction: ChatInputCommandInteraction) => {
   await interaction.editReply(commandResponses.configurationReloading);
 
-  try {
-    await reloadConfig();
+  if (await reloadConfig()) {
     await interaction.editReply(commandResponses.configurationReloaded);
-  } catch (error) {
-    logger.error(`Failed reloading configuration\n${String(error)}`, {
-      guildId: interaction.guild?.id,
-    });
-    await interaction.editReply(commandErrors.configurationSavingFailed);
+
+    return;
   }
+
+  await interaction.editReply(commandErrors.configurationReloadFailed);
 };
 
 const handleConfigData = async (interaction: ChatInputCommandInteraction) => {

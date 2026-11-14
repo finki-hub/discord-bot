@@ -1,7 +1,15 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- configuration paths are supplied by the application and tests */
 
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 
 import {
@@ -49,9 +57,23 @@ const deserializeConfig = (parsed: unknown): unknown => {
   return result;
 };
 
+const getExistingMode = async (filePath: string): Promise<null | number> => {
+  try {
+    const fileStats = await stat(filePath);
+    // eslint-disable-next-line no-bitwise -- POSIX permission bits
+    return fileStats.mode & 0o777;
+  } catch {
+    return null;
+  }
+};
+
 const writeConfigFile = async (filePath: string, content: string) => {
   const directory = dirname(filePath);
   await mkdir(directory, { recursive: true });
+
+  // Replacing a file with a rename also replaces its inode, so carry the
+  // existing mode across explicitly instead of falling back to the umask.
+  const existingMode = await getExistingMode(filePath);
 
   // Write beside the target and rename so an interrupted write can never leave
   // a truncated configuration behind.
@@ -62,6 +84,9 @@ const writeConfigFile = async (filePath: string, content: string) => {
 
   try {
     await writeFile(temporaryPath, content, 'utf8');
+    if (existingMode !== null) {
+      await chmod(temporaryPath, existingMode);
+    }
     await rename(temporaryPath, filePath);
   } catch (error) {
     try {

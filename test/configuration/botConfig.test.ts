@@ -11,15 +11,25 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('@/common/logger/index.js', () => ({ logger: mocks.logger }));
-vi.mock('@/configuration/bot/file.js', () => ({
-  getConfig: mocks.getConfig,
-  setConfig: mocks.setConfig,
-}));
+vi.mock('@/configuration/bot/file.js', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>(
+    '@/configuration/bot/file.js',
+  );
+
+  return {
+    ...actual,
+    getConfig: mocks.getConfig,
+    setConfig: mocks.setConfig,
+  };
+});
 
 const loadConfig = async () => {
   vi.resetModules();
 
-  return import('@/configuration/bot/index.js');
+  const fileModule = await import('@/configuration/bot/file.js');
+  const configModule = await import('@/configuration/bot/index.js');
+
+  return { ...configModule, ConfigFileError: fileModule.ConfigFileError };
 };
 
 beforeEach(() => {
@@ -35,7 +45,7 @@ test('a failed load keeps defaults in memory and blocks persistence', async () =
   const { getConfigProperty, reloadConfig, setConfigProperty } =
     await loadConfig();
 
-  await reloadConfig();
+  await expect(reloadConfig()).resolves.toBe(false);
 
   await expect(getConfigProperty('feedback', 'guild')).resolves.toEqual({
     enabled: true,
@@ -49,6 +59,19 @@ test('a failed load keeps defaults in memory and blocks persistence', async () =
   );
 });
 
+test('a known configuration failure logs its safe reason', async () => {
+  const { ConfigFileError, reloadConfig } = await loadConfig();
+  mocks.getConfig.mockRejectedValueOnce(
+    new ConfigFileError('Invalid bot configuration JSON'),
+  );
+
+  await expect(reloadConfig()).resolves.toBe(false);
+
+  expect(mocks.logger.error).toHaveBeenCalledExactlyOnceWith(
+    'Failed reloading configuration (Invalid bot configuration JSON)',
+  );
+});
+
 test('a successful load restores normal persistence', async () => {
   const storedConfig = { guild: { feedback: { enabled: false } } };
   mocks.getConfig.mockResolvedValueOnce(storedConfig);
@@ -56,7 +79,7 @@ test('a successful load restores normal persistence', async () => {
   const { getConfigProperty, reloadConfig, setConfigProperty } =
     await loadConfig();
 
-  await reloadConfig();
+  await expect(reloadConfig()).resolves.toBe(true);
 
   await expect(getConfigProperty('feedback', 'guild')).resolves.toEqual({
     enabled: false,

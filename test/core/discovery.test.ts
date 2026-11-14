@@ -12,6 +12,18 @@ import {
 } from '@/core/utils/events.js';
 import { getModules } from '@/core/utils/modules.js';
 
+const mocks = vi.hoisted(() => ({
+  captureException: vi.fn<() => void>(),
+}));
+
+vi.mock('@/common/services/analytics.js', async () => {
+  const actual = await vi.importActual<Record<string, unknown>>(
+    '@/common/services/analytics.js',
+  );
+
+  return { ...actual, captureException: mocks.captureException };
+});
+
 vi.mock('@/core/client.js', async () => {
   const { EventEmitter } = await import('node:events');
 
@@ -25,6 +37,7 @@ const originalLoggerSilent = logger.silent;
 
 beforeEach(() => {
   logger.silent = true;
+  mocks.captureException.mockReset();
 });
 
 afterEach(() => {
@@ -65,5 +78,10 @@ test('contains rejected event handlers instead of rejecting', async () => {
   await expect(execute()).resolves.toBeUndefined();
   expect(error).toHaveBeenCalledExactlyOnceWith(
     'Event handler interactionCreate failed (type_error)',
+  );
+  expect(mocks.captureException).toHaveBeenCalledExactlyOnceWith(
+    expect.any(TypeError),
+    null,
+    { phase: 'event_handler' },
   );
 });

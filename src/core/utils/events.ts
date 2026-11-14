@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { logger } from '@/common/logger/index.js';
 import { ClientEventSchema } from '@/common/schemas/ClientEvent.js';
+import { captureException } from '@/common/services/analytics.js';
 import { errorCategory } from '@/common/utils/safeError.js';
 
 import { client } from '../client.js';
@@ -25,6 +26,7 @@ export const createSafeEventExecutor =
       logger.error(
         `Event handler ${eventName} failed (${errorCategory(error)})`,
       );
+      captureException(error, null, { phase: 'event_handler' });
     }
   };
 

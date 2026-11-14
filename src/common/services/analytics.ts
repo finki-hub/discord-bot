@@ -214,7 +214,11 @@ const EXCEPTION_COMMANDS = new Set([
   'Prompt context command',
 ]);
 const EXCEPTION_SURFACES = new Set(['interaction', 'reply', 'thread']);
-const EXCEPTION_PHASES = new Set(['uncaught_exception', 'unhandled_rejection']);
+const EXCEPTION_PHASES = new Set([
+  'event_handler',
+  'uncaught_exception',
+  'unhandled_rejection',
+]);
 
 const allowedLabel = (value: string | undefined, allowed: Set<string>) => {
   if (value === undefined) return null;

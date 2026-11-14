@@ -119,6 +119,8 @@ export const commandErrors = {
   commandGuildOnly: 'Оваа команда може да се користи само на сервер.',
   commandNoPermission: 'Немате дозвола да ја извршите командата.',
   commandNotFound: 'Командата не постои.',
+  configurationReloadFailed:
+    'Неуспешно освежување на конфигурацијата. Проверете ги логовите за повеќе детали.',
   configurationSavingFailed: 'Зачувувањето на конфигурацијата беше неуспешно.',
   courseNotFound: 'Предметот не постои.',
   credentialRequired:

@@ -426,7 +426,11 @@ export const sendPrompt = async (
   });
 
   if (result.status === 503) {
-    const text = await result.text();
+    const text = await withTimeout(
+      result.text(),
+      CHAT_REQUEST_TIMEOUT_MS,
+      'LLM_TIMEOUT',
+    );
 
     if (text.includes('not ready')) {
       throw new Error('LLM_NOT_READY');

@@ -1,6 +1,13 @@
 /* eslint-disable security/detect-non-literal-fs-filename -- test paths are created in a temporary directory */
 
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  chmod,
+  mkdtemp,
+  readFile,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, expect, test } from 'vitest';
@@ -64,3 +71,21 @@ test('round-trips configuration through an atomic replacement', async () => {
   await expect(setConfig(config, filePath)).resolves.toEqual(config);
   await expect(getConfig(filePath)).resolves.toEqual(config);
 });
+
+test.skipIf(process.platform === 'win32')(
+  'preserves restrictive permissions when replacing the file',
+  async () => {
+    const filePath = await makeConfigPath();
+    await expect(setConfig({}, filePath)).resolves.toEqual({});
+    await chmod(filePath, 0o600);
+
+    await expect(setConfig({ guild: {} }, filePath)).resolves.toEqual({
+      guild: {},
+    });
+
+    const fileStats = await stat(filePath);
+    // eslint-disable-next-line no-bitwise -- POSIX permission bits
+    const fileMode = fileStats.mode & 0o777;
+    expect(fileMode).toBe(0o600);
+  },
+);
