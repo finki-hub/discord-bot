@@ -30,6 +30,30 @@ export const createSafeEventExecutor =
     }
   };
 
+const attachEventFromFile = async (file: string) => {
+  try {
+    const rawEvent: unknown = await import(
+      pathToFileURL(join(EVENTS_DIRECTORY, file)).href
+    );
+    const event = ClientEventSchema.parse(rawEvent);
+    const execute = createSafeEventExecutor(event.name, event.execute);
+
+    if (event.once) {
+      client.once(event.name, execute);
+    } else {
+      client.on(event.name, execute);
+    }
+
+    logger.debug(
+      `Attached event listener: ${event.name} (${event.once ? 'once' : 'on'})`,
+    );
+  } catch (error) {
+    logger.error(
+      `Failed to attach event listener from ${file}: ${String(error)}`,
+    );
+  }
+};
+
 export const attachEventListeners = async () => {
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- the events directory is derived from the running module location
   const eventEntries = await readdir(EVENTS_DIRECTORY);
@@ -39,27 +63,6 @@ export const attachEventListeners = async () => {
 
   logger.debug(`Found ${eventFiles.length} event file(s)`);
 
-  for (const file of eventFiles) {
-    try {
-      const rawEvent: unknown = await import(
-        pathToFileURL(join(EVENTS_DIRECTORY, file)).href
-      );
-      const event = ClientEventSchema.parse(rawEvent);
-      const execute = createSafeEventExecutor(event.name, event.execute);
-
-      if (event.once) {
-        client.once(event.name, execute);
-      } else {
-        client.on(event.name, execute);
-      }
-
-      logger.debug(
-        `Attached event listener: ${event.name} (${event.once ? 'once' : 'on'})`,
-      );
-    } catch (error) {
-      logger.error(
-        `Failed to attach event listener from ${file}: ${String(error)}`,
-      );
-    }
-  }
+  // Event modules are independent, so load and attach them concurrently.
+  await Promise.all(eventFiles.map((file) => attachEventFromFile(file)));
 };
