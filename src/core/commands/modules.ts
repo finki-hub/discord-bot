@@ -2,6 +2,8 @@ import type { Dirent } from 'node:fs';
 
 import { Collection, REST, Routes } from 'discord.js';
 import { readdir } from 'node:fs/promises';
+import { join } from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { logger } from '@/common/logger/index.js';
 import { getApplicationId, getToken } from '@/configuration/environment.js';
@@ -22,29 +24,38 @@ const contextCommands = new Collection<string, ContextMenuCommand>();
 const modalCommands = new Collection<string, ModalCommand>();
 const commandModules = new Collection<string, string>();
 
-const getCommandImportPath = (dirent: Dirent) => {
+// Discovery follows the running code, so `tsx src/index.ts` scans `src/modules`
+// while the built bot scans `dist/modules`.
+const MODULES_DIRECTORY = fileURLToPath(
+  new URL('../../modules/', import.meta.url),
+);
+const COMMAND_FILE_PATTERN = /\.(?:js|ts)$/u;
+
+const isCommandFile = (file: Dirent): boolean =>
+  file.isFile() &&
+  COMMAND_FILE_PATTERN.test(file.name) &&
+  !file.name.endsWith('.d.ts');
+
+const getCommandImportUrl = (dirent: Dirent) => {
   if (dirent.isDirectory()) {
     throw new Error(`Expected a file, but got a directory: ${dirent.name}`);
   }
 
-  const path = dirent.parentPath.replaceAll('\\', '/');
-  return `${path.replace('dist', '../../')}/${dirent.name}`;
+  return pathToFileURL(join(dirent.parentPath, dirent.name)).href;
 };
 
 const getModuleCommands = async (module: string) => {
   try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- module names come from discovered local build output directories
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- module names come from discovered local module directories
     const commandsContents = await readdir(
-      `./dist/modules/${module}/commands`,
+      join(MODULES_DIRECTORY, module, 'commands'),
       {
         recursive: true,
         withFileTypes: true,
       },
     );
 
-    return commandsContents.filter(
-      (file) => file.isFile() && file.name.endsWith('.js'),
-    );
+    return commandsContents.filter(isCommandFile);
   } catch (error) {
     logger.debug(
       `Failed reading commands directory for module ${module}\n${String(error)}`,
@@ -190,8 +201,8 @@ const loadCommand = async (
   module: string,
 ): Promise<boolean> => {
   try {
-    const importPath = getCommandImportPath(command);
-    const commandData = (await import(importPath)) as
+    const importUrl = getCommandImportUrl(command);
+    const commandData = (await import(importUrl)) as
       | AutocompleteCommand
       | ButtonCommand
       | ChatCommand
@@ -228,7 +239,7 @@ const loadCommand = async (
   }
 };
 
-const refreshCommands = async () => {
+export const loadCommands = async () => {
   chatCommands.clear();
   buttonCommands.clear();
   autocompleteCommands.clear();
@@ -271,7 +282,7 @@ export const getModalCommand = (name: string) => modalCommands.get(name);
 export const getCommandModule = (name: string) => commandModules.get(name);
 
 export const registerCommands = async () => {
-  await refreshCommands();
+  await loadCommands();
 
   const rest = new REST().setToken(getToken());
   const commandsToRegister = [];

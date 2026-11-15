@@ -28,6 +28,10 @@ import {
 } from '@/modules/chat/schemas/Model.js';
 import { getCommonCommand } from '@/modules/chat/utils/chatCommand.js';
 import {
+  LLM_ERRORS,
+  TRANSIENT_LLM_ERRORS,
+} from '@/modules/chat/utils/constants.js';
+import {
   forgetConversations,
   getUserConversationIds,
 } from '@/modules/chat/utils/conversation.js';
@@ -386,18 +390,18 @@ const handleChatEmbed = async (interaction: ChatInputCommandInteraction) => {
       });
     });
   } catch (error) {
-    const isLLMUnavailable =
-      Error.isError(error) && error.message === 'LLM_UNAVAILABLE';
+    const llmErrorMessage =
+      Error.isError(error) && TRANSIENT_LLM_ERRORS.has(error.message)
+        ? LLM_ERRORS[error.message]
+        : undefined;
 
-    if (!isLLMUnavailable) {
+    if (llmErrorMessage === undefined) {
       logger.error(`Failed executing chat embed command\n${String(error)}`, {
         guildId: interaction.guild?.id,
       });
     }
 
-    const errorMessage = isLLMUnavailable
-      ? commandErrors.llmUnavailable
-      : commandErrors.unknownChatError;
+    const errorMessage = llmErrorMessage ?? commandErrors.unknownChatError;
 
     await (interaction.deferred || interaction.replied
       ? interaction.editReply(errorMessage)

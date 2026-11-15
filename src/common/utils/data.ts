@@ -4,8 +4,12 @@ import { type ZodType } from 'zod';
 import { logger } from '@/common/logger/index.js';
 import { getDataStorageUrl } from '@/configuration/environment.js';
 
+const DATA_FETCH_TIMEOUT_MS = 30_000;
+
 export const fetchJsonFromUrl = async (url: string) => {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    signal: AbortSignal.timeout(DATA_FETCH_TIMEOUT_MS),
+  });
 
   if (!response.ok) {
     throw new Error(

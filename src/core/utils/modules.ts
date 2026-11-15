@@ -1,12 +1,20 @@
 import { readdir } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 
 import { logger } from '@/common/logger/index.js';
 
 import { ModuleSchema } from '../lib/Module.js';
 
+// Discovery follows the running code, so `tsx src/index.ts` scans `src/modules`
+// while the built bot scans `dist/modules`.
+const MODULES_DIRECTORY = fileURLToPath(
+  new URL('../../modules/', import.meta.url),
+);
+
 export const getModules = async () => {
   try {
-    const modulesContents = await readdir('./dist/modules', {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename -- the modules directory is derived from the running module location
+    const modulesContents = await readdir(MODULES_DIRECTORY, {
       withFileTypes: true,
     });
 

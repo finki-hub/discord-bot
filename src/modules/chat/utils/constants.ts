@@ -6,6 +6,12 @@ import {
   commandErrors,
 } from '@/translations/commands.js';
 
+// A request that never answers must eventually release the interaction and stop
+// consuming a stream reader.
+export const CHAT_CONNECT_TIMEOUT_MS = 30_000;
+export const CHAT_REQUEST_TIMEOUT_MS = 10_000;
+export const CHAT_STREAM_IDLE_TIMEOUT_MS = 120_000;
+
 // API stream error codes get their own wording: `interrupted` follows a partial
 // answer that stays visible, so a generic "sending failed" would mislead.
 export const LLM_ERRORS: Record<string, string> = {
@@ -15,10 +21,17 @@ export const LLM_ERRORS: Record<string, string> = {
   interrupted: commandErrors.answerInterrupted,
   LLM_DISABLED: commandErrors.llmDisabled,
   LLM_NOT_READY: commandErrors.llmNotReady,
+  LLM_TIMEOUT: commandErrors.llmTimeout,
   LLM_UNAVAILABLE: commandErrors.llmUnavailable,
   no_answer: commandErrors.noAnswer,
   sponsored_request_in_progress: commandErrors.sponsoredRequestInProgress,
 } as const;
+
+// Expected transport failures: log them as warnings, not captured exceptions.
+export const TRANSIENT_LLM_ERRORS: ReadonlySet<string> = new Set([
+  'LLM_TIMEOUT',
+  'LLM_UNAVAILABLE',
+]);
 
 export const PRIVATE_STREAM_ERROR_CODES: ReadonlySet<string> = new Set([
   'credential_required',

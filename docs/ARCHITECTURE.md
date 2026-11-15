@@ -116,7 +116,7 @@ export const execute = async (...[client]: ClientEvents[typeof name]) => {
 };
 ```
 
-The event discovery system (`core/utils/events.ts`) reads all `.js` files from the events directory, validates them against `ClientEventSchema`, and attaches them to the client.
+The event discovery system (`core/utils/events.ts`) reads the event module files from the events directory (`.ts` in development, `.js` in the build), validates them against `ClientEventSchema`, and attaches them to the client.
 
 ---
 
@@ -500,10 +500,10 @@ The project uses:
 
 ```bash
 npm run build      # Build the project (TypeScript → JavaScript)
-npm run dev        # Run with hot reloading (watches for changes)
+npm run dev        # Run directly from TypeScript source (no build step)
 npm run start:env  # Run with .env loaded
 npm run lint       # Run ESLint
-npm run lint:fix   # Run ESLint with auto-fix
+npm run format     # Run ESLint with auto-fix
 ```
 
 ### Build Output

@@ -26,6 +26,7 @@ import {
   LLM_ERRORS,
   localizeStreamEvent,
   PRIVATE_STREAM_ERROR_CODES,
+  TRANSIENT_LLM_ERRORS,
 } from './constants.js';
 import { registerConversation } from './conversation.js';
 import { attachFeedbackButtons, rememberFeedbackContext } from './feedback.js';
@@ -42,6 +43,7 @@ const EPHEMERAL_ERROR_CODES = new Set([
   ...PRIVATE_STREAM_ERROR_CODES,
   'LLM_DISABLED',
   'LLM_NOT_READY',
+  'LLM_TIMEOUT',
   'LLM_UNAVAILABLE',
 ]);
 
@@ -204,8 +206,8 @@ export const handlePromptWithStreaming = async (
       throw error;
     }
 
-    if (error.message === 'LLM_UNAVAILABLE') {
-      logger.warn('LLM unavailable when streaming chat response', {
+    if (TRANSIENT_LLM_ERRORS.has(error.message)) {
+      logger.warn('Transient LLM failure when streaming chat response', {
         guildId: interaction.guild?.id,
       });
     } else {

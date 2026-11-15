@@ -1,8 +1,7 @@
-/* eslint-disable @typescript-eslint/restrict-template-expressions -- winston formatter values are stringified for logging output */
-
 import { createLogger, format, transports } from 'winston';
 import DailyRotateFile from 'winston-daily-rotate-file';
 
+import { formatLogLine } from './format.js';
 import { WebhookTransport } from './webhookTransport.js';
 
 export const logger = createLogger({
@@ -26,10 +25,7 @@ export const logger = createLogger({
             warn: 'yellow',
           },
         }),
-        format.printf(
-          ({ level, message, timestamp }) =>
-            `${timestamp} - ${level}: ${message}`,
-        ),
+        format.printf(formatLogLine),
       ),
       handleExceptions: false,
       level: 'info',
@@ -44,10 +40,7 @@ export const logger = createLogger({
         format.errors({
           stack: true,
         }),
-        format.printf(
-          ({ level, message, timestamp }) =>
-            `${timestamp} - ${level}: ${message}`,
-        ),
+        format.printf(formatLogLine),
       ),
       handleExceptions: false,
       level: 'debug',

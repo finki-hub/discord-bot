@@ -122,6 +122,8 @@ export const commandErrors = {
   commandGuildOnly: 'Оваа команда може да се користи само на сервер.',
   commandNoPermission: 'Немате дозвола да ја извршите командата.',
   commandNotFound: 'Командата не постои.',
+  configurationReloadFailed:
+    'Неуспешно освежување на конфигурацијата. Проверете ги логовите за повеќе детали.',
   configurationSavingFailed: 'Зачувувањето на конфигурацијата беше неуспешно.',
   courseNotFound: 'Предметот не постои.',
   credentialRequired:
@@ -148,6 +150,7 @@ export const commandErrors = {
   linksFetchFailed: 'Преземањето на линковите беше неуспешно.',
   llmDisabled: 'Јазичниот модел е исклучен.',
   llmNotReady: 'Јазичниот модел не е спремен. Обидете се подоцна.',
+  llmTimeout: 'Јазичниот модел не одговори навреме. Обидете се повторно.',
   llmUnavailable: 'Јазичниот модел не е достапен. Обидете се подоцна.',
   noAnswer:
     'Не успеав да составам одговор. Обидете се да го преформулирате прашањето.',
