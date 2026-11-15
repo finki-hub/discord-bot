@@ -1,6 +1,7 @@
 import { Cron } from 'croner';
 
 import { logger } from '@/common/logger/index.js';
+import { runSafely } from '@/common/utils/runSafely.js';
 import { labels } from '@/translations/labels.js';
 
 import { DATE_FORMATTER, TICKETS_CHECK_INTERVAL } from './utils/constants.js';
@@ -30,8 +31,8 @@ export const init = () => {
   const cronJobs: Cron[] = [
     new Cron(
       convertMillisecondsToCronJob(TICKETS_CHECK_INTERVAL),
-      { name: 'maintainTickets' },
-      maintainTickets,
+      { name: 'maintainTickets', protect: true },
+      () => runSafely('Ticket maintenance', maintainTickets),
     ),
   ];
 

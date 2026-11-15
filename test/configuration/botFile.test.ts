@@ -72,6 +72,19 @@ test('round-trips configuration through an atomic replacement', async () => {
   await expect(getConfig(filePath)).resolves.toEqual(config);
 });
 
+test('serializes concurrent configuration writes', async () => {
+  const filePath = await makeConfigPath();
+
+  await expect(
+    Promise.all([
+      setConfig({ first: {} }, filePath),
+      setConfig({ second: {} }, filePath),
+    ]),
+  ).resolves.toEqual([{ first: {} }, { second: {} }]);
+
+  await expect(getConfig(filePath)).resolves.toEqual({ second: {} });
+});
+
 test.skipIf(process.platform === 'win32')(
   'preserves restrictive permissions when replacing the file',
   async () => {

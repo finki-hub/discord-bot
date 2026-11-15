@@ -12,12 +12,14 @@ import {
 } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 
+import { SerialQueue } from '@/common/utils/serialQueue.js';
 import {
   type MultiGuildConfig,
   MultiGuildConfigSchema,
 } from '@/modules/admin/schemas/BotConfig.js';
 
 const DEFAULT_CONFIG_FILE_PATH = join(process.cwd(), 'config', 'bot.json');
+const configWriteQueue = new SerialQueue();
 
 export class ConfigFileError extends Error {
   constructor(message: string, options?: ErrorOptions) {
@@ -102,7 +104,9 @@ const createEmptyConfig = async (
   filePath: string,
 ): Promise<MultiGuildConfig> => {
   const emptyConfig: MultiGuildConfig = {};
-  await writeConfigFile(filePath, serializeConfig(emptyConfig));
+  await configWriteQueue.run(() =>
+    writeConfigFile(filePath, serializeConfig(emptyConfig)),
+  );
   return emptyConfig;
 };
 
@@ -153,7 +157,9 @@ export const setConfig = async (
   try {
     const validated = MultiGuildConfigSchema.parse(config);
 
-    await writeConfigFile(filePath, serializeConfig(validated));
+    await configWriteQueue.run(() =>
+      writeConfigFile(filePath, serializeConfig(validated)),
+    );
 
     return validated;
   } catch {

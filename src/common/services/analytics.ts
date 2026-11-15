@@ -215,6 +215,7 @@ const EXCEPTION_COMMANDS = new Set([
 ]);
 const EXCEPTION_SURFACES = new Set(['interaction', 'reply', 'thread']);
 const EXCEPTION_PHASES = new Set([
+  'background_task',
   'event_handler',
   'uncaught_exception',
   'unhandled_rejection',

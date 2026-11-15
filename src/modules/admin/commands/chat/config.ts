@@ -10,6 +10,7 @@ import { createChatCommandChoices } from '@/common/commands/chat.js';
 import { executeSubcommand } from '@/common/commands/subcommands.js';
 import { logger } from '@/common/logger/index.js';
 import { Role } from '@/common/schemas/Role.js';
+import { runSafely } from '@/common/utils/runSafely.js';
 import {
   getConfigKeys,
   getConfigProperty,
@@ -170,11 +171,9 @@ const handleConfigSet = async (interaction: ChatInputCommandInteraction) => {
     return;
   }
 
-  const rawNewConfig = await setConfigProperty(
-    key,
-    parsedValue.data,
-    interaction.guild.id,
-  );
+  const guildId = interaction.guild.id;
+
+  const rawNewConfig = await setConfigProperty(key, parsedValue.data, guildId);
 
   if (rawNewConfig === null) {
     await interaction.editReply(commandErrors.configurationSavingFailed);
@@ -190,7 +189,7 @@ const handleConfigSet = async (interaction: ChatInputCommandInteraction) => {
     2,
   );
 
-  void refreshOnConfigChange(key, interaction.guild.id);
+  void runSafely('Config refresh', () => refreshOnConfigChange(key, guildId));
 
   if (newProperty.length > 2_000) {
     await interaction.editReply({

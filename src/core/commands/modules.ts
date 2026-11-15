@@ -16,6 +16,11 @@ import {
   type ModalCommand,
 } from '../lib/Command.js';
 import { getModules } from '../utils/modules.js';
+import {
+  commandRegistrationHash,
+  readCommandRegistrationMarker,
+  writeCommandRegistrationMarker,
+} from './commandRegistration.js';
 
 const chatCommands = new Collection<string, ChatCommand>();
 const buttonCommands = new Collection<string, ButtonCommand>();
@@ -285,6 +290,7 @@ export const registerCommands = async () => {
   await loadCommands();
 
   const rest = new REST().setToken(getToken());
+  const applicationId = getApplicationId();
   const commandsToRegister = [];
 
   for (const [, command] of chatCommands) {
@@ -295,15 +301,34 @@ export const registerCommands = async () => {
     commandsToRegister.push(command.data.toJSON());
   }
 
+  const hash = commandRegistrationHash(applicationId, commandsToRegister);
+  const marker = await readCommandRegistrationMarker();
+
+  if (marker?.applicationId === applicationId && marker.hash === hash) {
+    logger.info('Application commands unchanged; skipping registration');
+
+    return;
+  }
+
   logger.info(
     `Registering ${commandsToRegister.length} command(s) with Discord...`,
   );
 
   try {
-    await rest.put(Routes.applicationCommands(getApplicationId()), {
+    await rest.put(Routes.applicationCommands(applicationId), {
       body: commandsToRegister,
     });
     logger.info('Commands registered');
+
+    const markerSaved = await writeCommandRegistrationMarker({
+      applicationId,
+      hash,
+    });
+    if (!markerSaved) {
+      logger.warn(
+        'Failed saving command registration marker; commands will be registered again on next startup',
+      );
+    }
   } catch (error) {
     logger.error(`Failed registering application commands\n${String(error)}`);
   }
