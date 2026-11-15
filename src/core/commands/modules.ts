@@ -290,7 +290,6 @@ export const registerCommands = async () => {
   await loadCommands();
 
   const rest = new REST().setToken(getToken());
-  const applicationId = getApplicationId();
   const commandsToRegister = [];
 
   for (const [, command] of chatCommands) {
@@ -301,20 +300,21 @@ export const registerCommands = async () => {
     commandsToRegister.push(command.data.toJSON());
   }
 
-  const hash = commandRegistrationHash(applicationId, commandsToRegister);
-  const marker = await readCommandRegistrationMarker();
-
-  if (marker?.applicationId === applicationId && marker.hash === hash) {
-    logger.info('Application commands unchanged; skipping registration');
-
-    return;
-  }
-
-  logger.info(
-    `Registering ${commandsToRegister.length} command(s) with Discord...`,
-  );
-
   try {
+    const applicationId = getApplicationId();
+    const hash = commandRegistrationHash(applicationId, commandsToRegister);
+    const marker = await readCommandRegistrationMarker();
+
+    if (marker?.applicationId === applicationId && marker.hash === hash) {
+      logger.info('Application commands unchanged; skipping registration');
+
+      return;
+    }
+
+    logger.info(
+      `Registering ${commandsToRegister.length} command(s) with Discord...`,
+    );
+
     await rest.put(Routes.applicationCommands(applicationId), {
       body: commandsToRegister,
     });

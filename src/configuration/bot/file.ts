@@ -100,55 +100,7 @@ const writeConfigFile = async (filePath: string, content: string) => {
   }
 };
 
-const createEmptyConfig = async (
-  filePath: string,
-): Promise<MultiGuildConfig> => {
-  const emptyConfig: MultiGuildConfig = {};
-  await configWriteQueue.run(async () => {
-    // A concurrent write may have created the file after the caller's failed
-    // read; never replace a real configuration with an empty one.
-    try {
-      await readFile(filePath, 'utf8');
-      return;
-    } catch (error) {
-      if (!(
-        Error.isError(error) &&
-        'code' in error &&
-        error.code === 'ENOENT'
-      )) {
-        throw error;
-      }
-    }
-
-    await writeConfigFile(filePath, serializeConfig(emptyConfig));
-  });
-  return emptyConfig;
-};
-
-export const getConfig = async (
-  filePath = DEFAULT_CONFIG_FILE_PATH,
-): Promise<MultiGuildConfig> => {
-  let fileContent: string;
-
-  try {
-    fileContent = await readFile(filePath, 'utf8');
-  } catch (error) {
-    if (Error.isError(error) && 'code' in error && error.code === 'ENOENT') {
-      try {
-        return await createEmptyConfig(filePath);
-      } catch (createError) {
-        throw new ConfigFileError(
-          'Failed creating the bot configuration file',
-          { cause: createError },
-        );
-      }
-    }
-
-    throw new ConfigFileError('Failed reading the bot configuration file', {
-      cause: error,
-    });
-  }
-
+const parseConfigContent = (fileContent: string): MultiGuildConfig => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(fileContent);
@@ -163,6 +115,61 @@ export const getConfig = async (
   } catch (error) {
     throw new ConfigFileError('Invalid bot configuration', { cause: error });
   }
+};
+
+const createEmptyConfig = async (
+  filePath: string,
+): Promise<MultiGuildConfig> => {
+  const emptyConfig: MultiGuildConfig = {};
+  return configWriteQueue.run(async () => {
+    // A concurrent write may have created the file after the caller's failed
+    // read; return it instead of replacing it with an empty config.
+    try {
+      return parseConfigContent(await readFile(filePath, 'utf8'));
+    } catch (error) {
+      if (!(
+        Error.isError(error) &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      )) {
+        throw error;
+      }
+    }
+
+    await writeConfigFile(filePath, serializeConfig(emptyConfig));
+    return emptyConfig;
+  });
+};
+
+export const getConfig = async (
+  filePath = DEFAULT_CONFIG_FILE_PATH,
+): Promise<MultiGuildConfig> => {
+  let fileContent: string;
+
+  try {
+    fileContent = await readFile(filePath, 'utf8');
+  } catch (error) {
+    if (Error.isError(error) && 'code' in error && error.code === 'ENOENT') {
+      try {
+        return await createEmptyConfig(filePath);
+      } catch (createError) {
+        if (createError instanceof ConfigFileError) {
+          throw createError;
+        }
+
+        throw new ConfigFileError(
+          'Failed creating the bot configuration file',
+          { cause: createError },
+        );
+      }
+    }
+
+    throw new ConfigFileError('Failed reading the bot configuration file', {
+      cause: error,
+    });
+  }
+
+  return parseConfigContent(fileContent);
 };
 
 export const setConfig = async (

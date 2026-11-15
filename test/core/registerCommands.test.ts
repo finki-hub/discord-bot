@@ -7,6 +7,7 @@ import { registerCommands } from '@/core/commands/modules.js';
 type Marker = { applicationId: string; hash: string };
 
 const mocks = vi.hoisted(() => ({
+  getApplicationId: vi.fn<() => string>(),
   put: vi.fn<(route: string, options: { body: unknown }) => Promise<unknown>>(),
   readMarker: vi.fn<() => Promise<Marker | null>>(),
   writeMarker: vi.fn<(marker: Marker) => Promise<boolean>>(),
@@ -31,7 +32,7 @@ vi.mock('@/configuration/environment.js', async (importOriginal) => {
 
   return {
     ...actual,
-    getApplicationId: () => 'application',
+    getApplicationId: mocks.getApplicationId,
     getToken: () => 'token',
   };
 });
@@ -46,6 +47,8 @@ const originalLoggerSilent = logger.silent;
 
 beforeEach(() => {
   logger.silent = true;
+  mocks.getApplicationId.mockReset();
+  mocks.getApplicationId.mockReturnValue('application');
   mocks.put.mockReset();
   mocks.readMarker.mockReset();
   mocks.writeMarker.mockReset();
@@ -102,4 +105,15 @@ test('does not advance the marker when registration fails', async () => {
   await expect(registerCommands()).resolves.toBeUndefined();
 
   expect(mocks.writeMarker).not.toHaveBeenCalled();
+});
+
+test('logs and continues when the application ID cannot be read', async () => {
+  mocks.getApplicationId.mockImplementationOnce(() => {
+    throw new Error('missing application id');
+  });
+
+  await expect(registerCommands()).resolves.toBeUndefined();
+
+  expect(mocks.readMarker).not.toHaveBeenCalled();
+  expect(mocks.put).not.toHaveBeenCalled();
 });

@@ -88,8 +88,12 @@ test('serializes concurrent configuration writes', async () => {
 test('does not replace a configuration created during empty initialization', async () => {
   const filePath = await makeConfigPath();
 
-  await Promise.all([setConfig({ guild: {} }, filePath), getConfig(filePath)]);
+  const [, readResult] = await Promise.all([
+    setConfig({ guild: {} }, filePath),
+    getConfig(filePath),
+  ]);
 
+  expect(readResult).toEqual({ guild: {} });
   await expect(getConfig(filePath)).resolves.toEqual({ guild: {} });
 });
 
