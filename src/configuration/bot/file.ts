@@ -104,9 +104,24 @@ const createEmptyConfig = async (
   filePath: string,
 ): Promise<MultiGuildConfig> => {
   const emptyConfig: MultiGuildConfig = {};
-  await configWriteQueue.run(() =>
-    writeConfigFile(filePath, serializeConfig(emptyConfig)),
-  );
+  await configWriteQueue.run(async () => {
+    // A concurrent write may have created the file after the caller's failed
+    // read; never replace a real configuration with an empty one.
+    try {
+      await readFile(filePath, 'utf8');
+      return;
+    } catch (error) {
+      if (!(
+        Error.isError(error) &&
+        'code' in error &&
+        error.code === 'ENOENT'
+      )) {
+        throw error;
+      }
+    }
+
+    await writeConfigFile(filePath, serializeConfig(emptyConfig));
+  });
   return emptyConfig;
 };
 

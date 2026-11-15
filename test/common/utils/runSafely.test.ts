@@ -38,10 +38,28 @@ test('contains failures and reports them without rejecting', async () => {
 
   expect(mocks.logger.error).toHaveBeenCalledExactlyOnceWith(
     'Test job failed (type_error)',
+    {},
   );
   expect(mocks.captureException).toHaveBeenCalledExactlyOnceWith(
     expect.any(TypeError),
     null,
     { phase: 'background_task' },
+  );
+});
+
+test('passes guild context to the logger', async () => {
+  await expect(
+    runSafely(
+      'Test job',
+      async () => {
+        throw new TypeError('PRIVATE_DETAIL');
+      },
+      { guildId: 'guild' },
+    ),
+  ).resolves.toBeUndefined();
+
+  expect(mocks.logger.error).toHaveBeenCalledExactlyOnceWith(
+    'Test job failed (type_error)',
+    { guildId: 'guild' },
   );
 });

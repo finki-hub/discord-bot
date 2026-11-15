@@ -189,7 +189,9 @@ const handleConfigSet = async (interaction: ChatInputCommandInteraction) => {
     2,
   );
 
-  void runSafely('Config refresh', () => refreshOnConfigChange(key, guildId));
+  void runSafely('Config refresh', () => refreshOnConfigChange(key, guildId), {
+    guildId,
+  });
 
   if (newProperty.length > 2_000) {
     await interaction.editReply({

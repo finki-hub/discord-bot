@@ -85,6 +85,14 @@ test('serializes concurrent configuration writes', async () => {
   await expect(getConfig(filePath)).resolves.toEqual({ second: {} });
 });
 
+test('does not replace a configuration created during empty initialization', async () => {
+  const filePath = await makeConfigPath();
+
+  await Promise.all([setConfig({ guild: {} }, filePath), getConfig(filePath)]);
+
+  await expect(getConfig(filePath)).resolves.toEqual({ guild: {} });
+});
+
 test.skipIf(process.platform === 'win32')(
   'preserves restrictive permissions when replacing the file',
   async () => {
