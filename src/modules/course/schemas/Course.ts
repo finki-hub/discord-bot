@@ -28,7 +28,8 @@ export const CourseSchema = z
     ...buildAccreditationShape(),
     assistants: z.string().optional(),
     name: z.string(),
-    professors: z.string(),
+    // Left out for a master's course without known professors.
+    professors: z.string().default(''),
   })
   .catchall(z.string())
   .transform((data) => {
