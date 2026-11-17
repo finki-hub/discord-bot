@@ -1,6 +1,6 @@
 {
   "dependencies": {
-    "croner": "^11.0.0",
+    "croner": "^11.0.1",
     "discord-api-types": "^0.38.59",
     "discord.js": "^14.28.1",
     "eventsource-parser": "^4.1.3",
