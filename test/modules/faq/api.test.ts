@@ -1,6 +1,10 @@
 import { expect, test, vi } from 'vitest';
 
-import { getLink, getQuestion } from '@/modules/faq/utils/api.js';
+import {
+  getLink,
+  getQuestion,
+  getQuestionNames,
+} from '@/modules/faq/utils/api.js';
 
 const parseRequestUrl = (input: Parameters<typeof fetch>[0]): URL => {
   if (typeof input === 'string') return new URL(input);
@@ -57,4 +61,25 @@ test('encodes link names that contain URL delimiters', async () => {
     `/links/name/${encodeURIComponent(name)}`,
   );
   expect(result?.name).toBe(name);
+});
+
+test('reuses cached names after a failed refresh', async () => {
+  vi.stubEnv('CHATBOT_URL', 'https://chatbot.invalid');
+  let now = Temporal.Instant.from('2026-01-01T00:00:00Z').epochMilliseconds;
+  const nowSpy = vi.spyOn(Date, 'now').mockImplementation(() => now);
+  const fetchMock = vi
+    .fn<typeof fetch>()
+    .mockResolvedValueOnce(Response.json(['Прво', 'Второ']))
+    .mockResolvedValue(Response.json(null, { status: 500 }));
+  vi.stubGlobal('fetch', fetchMock);
+
+  await expect(getQuestionNames()).resolves.toEqual(['Прво', 'Второ']);
+
+  now += 61_000;
+  await expect(getQuestionNames()).resolves.toEqual(['Прво', 'Второ']);
+  await expect(getQuestionNames()).resolves.toEqual(['Прво', 'Второ']);
+
+  expect(fetchMock).toHaveBeenCalledTimes(2);
+
+  nowSpy.mockRestore();
 });
