@@ -80,6 +80,37 @@ const addUnavailableSection = (
     );
 };
 
+const addAccreditationSections = (
+  containerBuilder: ContainerBuilder,
+  course: Course,
+) => {
+  for (const year of ACCREDITATION_YEARS) {
+    containerBuilder.addSeparatorComponents((separator) =>
+      separator.setSpacing(SeparatorSpacingSize.Large),
+    );
+
+    if (course[`${year}-available`]) {
+      addCurriculumSection(containerBuilder, course, year);
+    } else {
+      addUnavailableSection(containerBuilder, year);
+    }
+  }
+};
+
+const addMastersSection = (containerBuilder: ContainerBuilder) => {
+  containerBuilder
+    .addSeparatorComponents((separator) =>
+      separator.setSpacing(SeparatorSpacingSize.Large),
+    )
+    .addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(heading(labels.mastersCourse, HeadingLevel.Three)),
+    )
+    .addSeparatorComponents((separator) => separator.setDivider(false))
+    .addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(`> ${labels.mastersCourseNote}`),
+    );
+};
+
 export const getCourseComponent = (course: Course) => {
   const containerBuilder = new ContainerBuilder();
 
@@ -87,18 +118,12 @@ export const getCourseComponent = (course: Course) => {
     textDisplay.setContent(heading(course.name, HeadingLevel.Two)),
   );
 
-  for (const year of ACCREDITATION_YEARS) {
-    containerBuilder.addSeparatorComponents((separator) =>
-      separator.setSpacing(SeparatorSpacingSize.Large),
-    );
-
-    const isAvailable = course[`${year}-available`];
-
-    if (isAvailable) {
-      addCurriculumSection(containerBuilder, course, year);
-    } else {
-      addUnavailableSection(containerBuilder, year);
-    }
+  // A master's course (cycle "second") is in no undergraduate
+  // accreditation: say so instead of two unavailable sections.
+  if (course['cycle'] === 'second') {
+    addMastersSection(containerBuilder);
+  } else {
+    addAccreditationSections(containerBuilder, course);
   }
 
   containerBuilder

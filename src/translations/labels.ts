@@ -17,6 +17,9 @@ export const labels = {
   link: 'Линк',
   links: 'Линкови',
   location: 'Локација',
+  mastersCourse: 'Магистерски студии',
+  mastersCourseNote:
+    'Предмет од магистерските студии; не е дел од додипломските акредитации.',
   mrbs: 'MRBS',
   name: 'Име',
   none: 'Нема',
