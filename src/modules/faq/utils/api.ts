@@ -127,7 +127,9 @@ export const getQuestion = async (name?: string) => {
   }
 
   try {
-    const result = await fetch(`${chatbotUrl}/questions/name/${name}`);
+    const result = await fetch(
+      `${chatbotUrl}/questions/name/${encodeURIComponent(name)}`,
+    );
 
     return result.ok ? QuestionSchema.parse(await result.json()) : null;
   } catch (error) {
@@ -211,7 +213,9 @@ export const getLink = async (name?: string) => {
   }
 
   try {
-    const result = await fetch(`${chatbotUrl}/links/name/${name}`);
+    const result = await fetch(
+      `${chatbotUrl}/links/name/${encodeURIComponent(name)}`,
+    );
 
     return result.ok ? LinkSchema.parse(await result.json()) : null;
   } catch (error) {
