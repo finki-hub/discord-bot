@@ -33,4 +33,19 @@ describe('the course card', () => {
       expect(text).not.toContain(labels.mastersCourse);
     }
   });
+
+  test('shows a course without professors as having none', () => {
+    const course = CourseSchema.parse({
+      '2018-available': 'FALSE',
+      '2023-available': 'FALSE',
+      cycle: 'second',
+      name: 'Далечинско сондирање',
+    });
+
+    expect(course.professors).toEqual([]);
+    // The card text is JSON, so the expected text is escaped the same way.
+    expect(textOf(course)).toContain(
+      JSON.stringify(`**${labels.professors}**\n${labels.none}`).slice(1, -1),
+    );
+  });
 });
