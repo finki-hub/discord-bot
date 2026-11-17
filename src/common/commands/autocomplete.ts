@@ -1,3 +1,6 @@
+// Discord caps choice names and string values at 100 characters. Values are
+// truncated rather than dropped because the current callers resolve a
+// selection through fuzzy search, so a prefix still identifies the entry.
 const MAX_CHOICE_NAME_LENGTH = 100;
 const MAX_CHOICE_VALUE_LENGTH = 100;
 const MAX_CHOICES = 25;
@@ -17,7 +20,9 @@ export const createAutocompleteOptions = (
 ) =>
   options
     .filter(([key]) => key.toLowerCase().includes(term.toLowerCase()))
-    .map(([, value]) => value)
-    .filter((value, index, array) => array.indexOf(value) === index)
-    .slice(0, MAX_CHOICES)
-    .map(toChoice);
+    .map(([, value]) => toChoice(value))
+    .filter(
+      (choice, index, array) =>
+        array.findIndex((item) => item.value === choice.value) === index,
+    )
+    .slice(0, MAX_CHOICES);

@@ -40,6 +40,22 @@ test('truncates names and values that exceed the Discord limits', () => {
   expect(option?.value).toBe(longName.slice(0, MAX_CHOICE_LENGTH));
 });
 
+test('collapses choices that become identical after truncation', () => {
+  const prefix = 'а'.repeat(MAX_CHOICE_LENGTH);
+  const first = `${prefix} прв`;
+  const second = `${prefix} втор`;
+
+  const options = createAutocompleteOptions(
+    [
+      [first, first],
+      [second, second],
+    ],
+    '',
+  );
+
+  expect(options).toHaveLength(1);
+});
+
 test('keeps names at the limit untouched', () => {
   const name = 'а'.repeat(MAX_CHOICE_LENGTH);
 
