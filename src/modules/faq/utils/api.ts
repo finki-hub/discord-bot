@@ -8,6 +8,7 @@ import { LinkSchema, LinksSchema } from '../schemas/Link.js';
 import { QuestionSchema, QuestionsSchema } from '../schemas/Question.js';
 
 const CACHE_TTL = 60 * 1_000;
+const FAILED_FETCH_RETRY_MS = 10_000;
 const AUTOCOMPLETE_FETCH_TIMEOUT = 2_000;
 const REQUEST_FETCH_TIMEOUT = 5_000;
 
@@ -16,13 +17,17 @@ const cacheState: {
     data: null | string[];
     timestamp: number;
   };
+  linkNamesFailedAt: number;
   questionNamesCache: null | {
     data: null | string[];
     timestamp: number;
   };
+  questionNamesFailedAt: number;
 } = {
   linkNamesCache: null,
+  linkNamesFailedAt: 0,
   questionNamesCache: null,
+  questionNamesFailedAt: 0,
 };
 
 const setQuestionNamesCache = (data: string[]) => {
@@ -65,12 +70,13 @@ const getCachedData = (
   cache: null | { data: null | string[]; timestamp: number },
 ): null | string[] => cache?.data ?? null;
 
-const extendCacheLifetime = (
-  cache: null | { data: null | string[]; timestamp: number },
-) => {
-  if (cache !== null) {
-    cache.timestamp = Date.now();
-  }
+const isInFailureBackoff = (failedAt: number) =>
+  Date.now() - failedAt < FAILED_FETCH_RETRY_MS;
+
+type FailureTimestampKey = 'linkNamesFailedAt' | 'questionNamesFailedAt';
+
+const setFailureTimestamp = (key: FailureTimestampKey, value: number) => {
+  cacheState[key] = value;
 };
 
 export const getQuestions = async () => {
@@ -98,6 +104,9 @@ export const getQuestionNames = async (useCache = true) => {
   if (useCache) {
     const cached = getValidCacheData(cacheState.questionNamesCache);
     if (cached !== null) return cached;
+    if (isInFailureBackoff(cacheState.questionNamesFailedAt)) {
+      return getCachedData(cacheState.questionNamesCache);
+    }
   }
 
   const chatbotUrl = getChatbotUrl();
@@ -113,18 +122,19 @@ export const getQuestionNames = async (useCache = true) => {
     );
 
     if (!result.ok) {
-      extendCacheLifetime(cacheState.questionNamesCache);
+      setFailureTimestamp('questionNamesFailedAt', Date.now());
       return getCachedData(cacheState.questionNamesCache);
     }
 
     const data = z.array(z.string()).parse(await result.json());
 
     setQuestionNamesCache(data);
+    setFailureTimestamp('questionNamesFailedAt', 0);
 
     return data;
   } catch (error) {
     logger.error(apiErrorFunctions.getQuestionNamesError(error));
-    extendCacheLifetime(cacheState.questionNamesCache);
+    setFailureTimestamp('questionNamesFailedAt', Date.now());
     return getCachedData(cacheState.questionNamesCache);
   }
 };
@@ -196,6 +206,9 @@ export const getLinkNames = async (useCache = true) => {
   if (useCache) {
     const cached = getValidCacheData(cacheState.linkNamesCache);
     if (cached !== null) return cached;
+    if (isInFailureBackoff(cacheState.linkNamesFailedAt)) {
+      return getCachedData(cacheState.linkNamesCache);
+    }
   }
 
   const chatbotUrl = getChatbotUrl();
@@ -211,18 +224,19 @@ export const getLinkNames = async (useCache = true) => {
     );
 
     if (!result.ok) {
-      extendCacheLifetime(cacheState.linkNamesCache);
+      setFailureTimestamp('linkNamesFailedAt', Date.now());
       return getCachedData(cacheState.linkNamesCache);
     }
 
     const data = z.array(z.string()).parse(await result.json());
 
     setLinkNamesCache(data);
+    setFailureTimestamp('linkNamesFailedAt', 0);
 
     return data;
   } catch (error) {
     logger.error(apiErrorFunctions.getLinkNamesError(error));
-    extendCacheLifetime(cacheState.linkNamesCache);
+    setFailureTimestamp('linkNamesFailedAt', Date.now());
     return getCachedData(cacheState.linkNamesCache);
   }
 };
