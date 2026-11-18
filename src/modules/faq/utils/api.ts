@@ -8,20 +8,26 @@ import { LinkSchema, LinksSchema } from '../schemas/Link.js';
 import { QuestionSchema, QuestionsSchema } from '../schemas/Question.js';
 
 const CACHE_TTL = 60 * 1_000;
-const MAX_FETCH_TIMEOUT = 2_000;
+const FAILED_FETCH_RETRY_MS = 10_000;
+const AUTOCOMPLETE_FETCH_TIMEOUT = 2_000;
+const REQUEST_FETCH_TIMEOUT = 5_000;
 
 const cacheState: {
   linkNamesCache: null | {
     data: null | string[];
     timestamp: number;
   };
+  linkNamesFailedAt: number;
   questionNamesCache: null | {
     data: null | string[];
     timestamp: number;
   };
+  questionNamesFailedAt: number;
 } = {
   linkNamesCache: null,
+  linkNamesFailedAt: 0,
   questionNamesCache: null,
+  questionNamesFailedAt: 0,
 };
 
 const setQuestionNamesCache = (data: string[]) => {
@@ -38,22 +44,15 @@ const setLinkNamesCache = (data: string[]) => {
   };
 };
 
-const fetchWithTimeout = async (url: string): Promise<Response> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, MAX_FETCH_TIMEOUT);
-
+const fetchWithTimeout = async (
+  url: string,
+  timeoutMs: number,
+): Promise<Response> => {
   try {
-    const response = await fetch(url, { signal: controller.signal });
-    clearTimeout(timeoutId);
-    return response;
+    return await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
   } catch (error) {
-    clearTimeout(timeoutId);
-    if (Error.isError(error) && error.name === 'AbortError') {
-      throw new Error(`Request timeout after ${MAX_FETCH_TIMEOUT}ms`, {
-        cause: error,
-      });
+    if (Error.isError(error) && error.name === 'TimeoutError') {
+      throw new Error(`Request timeout after ${timeoutMs}ms`, { cause: error });
     }
     throw error;
   }
@@ -71,6 +70,15 @@ const getCachedData = (
   cache: null | { data: null | string[]; timestamp: number },
 ): null | string[] => cache?.data ?? null;
 
+const isInFailureBackoff = (failedAt: number) =>
+  Date.now() - failedAt < FAILED_FETCH_RETRY_MS;
+
+type FailureTimestampKey = 'linkNamesFailedAt' | 'questionNamesFailedAt';
+
+const setFailureTimestamp = (key: FailureTimestampKey, value: number) => {
+  cacheState[key] = value;
+};
+
 export const getQuestions = async () => {
   const chatbotUrl = getChatbotUrl();
 
@@ -79,7 +87,10 @@ export const getQuestions = async () => {
   }
 
   try {
-    const result = await fetch(`${chatbotUrl}/questions/list`);
+    const result = await fetchWithTimeout(
+      `${chatbotUrl}/questions/list`,
+      REQUEST_FETCH_TIMEOUT,
+    );
 
     return result.ok ? QuestionsSchema.parse(await result.json()) : null;
   } catch (error) {
@@ -93,6 +104,9 @@ export const getQuestionNames = async (useCache = true) => {
   if (useCache) {
     const cached = getValidCacheData(cacheState.questionNamesCache);
     if (cached !== null) return cached;
+    if (isInFailureBackoff(cacheState.questionNamesFailedAt)) {
+      return getCachedData(cacheState.questionNamesCache);
+    }
   }
 
   const chatbotUrl = getChatbotUrl();
@@ -102,19 +116,25 @@ export const getQuestionNames = async (useCache = true) => {
   }
 
   try {
-    const result = await fetchWithTimeout(`${chatbotUrl}/questions/names`);
+    const result = await fetchWithTimeout(
+      `${chatbotUrl}/questions/names`,
+      AUTOCOMPLETE_FETCH_TIMEOUT,
+    );
 
     if (!result.ok) {
+      setFailureTimestamp('questionNamesFailedAt', Date.now());
       return getCachedData(cacheState.questionNamesCache);
     }
 
     const data = z.array(z.string()).parse(await result.json());
 
     setQuestionNamesCache(data);
+    setFailureTimestamp('questionNamesFailedAt', 0);
 
     return data;
   } catch (error) {
     logger.error(apiErrorFunctions.getQuestionNamesError(error));
+    setFailureTimestamp('questionNamesFailedAt', Date.now());
     return getCachedData(cacheState.questionNamesCache);
   }
 };
@@ -127,8 +147,9 @@ export const getQuestion = async (name?: string) => {
   }
 
   try {
-    const result = await fetch(
+    const result = await fetchWithTimeout(
       `${chatbotUrl}/questions/name/${encodeURIComponent(name)}`,
+      REQUEST_FETCH_TIMEOUT,
     );
 
     return result.ok ? QuestionSchema.parse(await result.json()) : null;
@@ -147,7 +168,10 @@ export const getNthQuestion = async (index?: number) => {
   }
 
   try {
-    const result = await fetch(`${chatbotUrl}/questions/nth/${index}`);
+    const result = await fetchWithTimeout(
+      `${chatbotUrl}/questions/nth/${index}`,
+      REQUEST_FETCH_TIMEOUT,
+    );
 
     return result.ok ? QuestionSchema.parse(await result.json()) : null;
   } catch (error) {
@@ -165,7 +189,10 @@ export const getLinks = async () => {
   }
 
   try {
-    const result = await fetch(`${chatbotUrl}/links/list`);
+    const result = await fetchWithTimeout(
+      `${chatbotUrl}/links/list`,
+      REQUEST_FETCH_TIMEOUT,
+    );
 
     return result.ok ? LinksSchema.parse(await result.json()) : null;
   } catch (error) {
@@ -179,6 +206,9 @@ export const getLinkNames = async (useCache = true) => {
   if (useCache) {
     const cached = getValidCacheData(cacheState.linkNamesCache);
     if (cached !== null) return cached;
+    if (isInFailureBackoff(cacheState.linkNamesFailedAt)) {
+      return getCachedData(cacheState.linkNamesCache);
+    }
   }
 
   const chatbotUrl = getChatbotUrl();
@@ -188,19 +218,25 @@ export const getLinkNames = async (useCache = true) => {
   }
 
   try {
-    const result = await fetchWithTimeout(`${chatbotUrl}/links/names`);
+    const result = await fetchWithTimeout(
+      `${chatbotUrl}/links/names`,
+      AUTOCOMPLETE_FETCH_TIMEOUT,
+    );
 
     if (!result.ok) {
+      setFailureTimestamp('linkNamesFailedAt', Date.now());
       return getCachedData(cacheState.linkNamesCache);
     }
 
     const data = z.array(z.string()).parse(await result.json());
 
     setLinkNamesCache(data);
+    setFailureTimestamp('linkNamesFailedAt', 0);
 
     return data;
   } catch (error) {
     logger.error(apiErrorFunctions.getLinkNamesError(error));
+    setFailureTimestamp('linkNamesFailedAt', Date.now());
     return getCachedData(cacheState.linkNamesCache);
   }
 };
@@ -213,8 +249,9 @@ export const getLink = async (name?: string) => {
   }
 
   try {
-    const result = await fetch(
+    const result = await fetchWithTimeout(
       `${chatbotUrl}/links/name/${encodeURIComponent(name)}`,
+      REQUEST_FETCH_TIMEOUT,
     );
 
     return result.ok ? LinkSchema.parse(await result.json()) : null;
@@ -233,7 +270,10 @@ export const getNthLink = async (index?: number) => {
   const chatbotUrl = getChatbotUrl();
 
   try {
-    const result = await fetch(`${chatbotUrl}/links/nth/${index}`);
+    const result = await fetchWithTimeout(
+      `${chatbotUrl}/links/nth/${index}`,
+      REQUEST_FETCH_TIMEOUT,
+    );
 
     return result.ok ? LinkSchema.parse(await result.json()) : null;
   } catch (error) {

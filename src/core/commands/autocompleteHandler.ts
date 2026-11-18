@@ -17,6 +17,8 @@ const isExpectedAutocompleteError = (error: unknown): boolean => {
 const respondWithNoAutocompleteChoices = async (
   interaction: AutocompleteInteraction,
 ) => {
+  if (interaction.responded) return;
+
   try {
     await interaction.respond([]);
   } catch (error) {
