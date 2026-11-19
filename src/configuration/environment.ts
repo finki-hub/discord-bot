@@ -51,6 +51,19 @@ export const getDataStorageUrl = () => {
   }
 };
 
+// FINKI Hub's Directus, read for the details courses.json does not carry.
+export const getDirectusUrl = () => {
+  try {
+    return z
+      .string()
+      .min(1)
+      .transform((url) => (url.endsWith('/') ? url.slice(0, -1) : url))
+      .parse(env['DIRECTUS_URL']);
+  } catch {
+    return 'https://data.finki-hub.com';
+  }
+};
+
 export const getPostHogKey = () => {
   try {
     return z.string().min(1).parse(env['POSTHOG_KEY']);

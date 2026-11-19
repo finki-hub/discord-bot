@@ -70,6 +70,7 @@ Use `.env.sample` as a starting point for local development. The runtime also re
 | `CHATBOT_URL`      | No       | URL of the [`finki-hub/chat-bot`](https://github.com/finki-hub/chat-bot) instance            |
 | `API_KEY`          | No       | Chat-bot API authentication for `/chat` and credential management requests; never a sponsored provider credential |
 | `DATA_STORAGE_URL` | No       | Base URL for data storage, without a trailing slash                                           |
+| `DIRECTUS_URL`     | No       | FINKI Hub Directus base URL for the course card's channel and "prerequisite for" lists (default `https://data.finki-hub.com`)|
 | `POSTHOG_KEY`      | No       | PostHog project key. Analytics are disabled when this is empty                               |
 | `POSTHOG_HOST`     | No       | PostHog ingest host. Defaults to `https://eu.i.posthog.com`                                  |
 | `POSTHOG_SALT`     | No       | Salt used to hash Discord user IDs. Required together with `POSTHOG_KEY` to enable analytics |
@@ -111,6 +112,8 @@ The data for informational commands is loaded from data storage if `DATA_STORAGE
 3. `sessions.json` - an object mapping session names to filenames
 4. `staff.json` - an array of the staff
 5. `anto.json` - an array of strings containing Anto quotes
+
+`/course` also reads FINKI Hub's Directus (`DIRECTUS_URL`) when it answers: the course's Discord channel, shown as a mention when a text channel of that name exists on the server, and the courses whose prerequisites name it. If Directus does not answer, the card is shown without them.
 
 If `DATA_STORAGE_URL` is not configured, these commands run without loaded data. You can manually trigger a data reload using the `/config data` command.
 
