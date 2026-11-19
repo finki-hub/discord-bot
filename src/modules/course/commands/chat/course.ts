@@ -8,6 +8,10 @@ import {
 } from 'discord.js';
 
 import { getMentionComponent } from '@/common/components/mention.js';
+import {
+  cardDetailsOutcome,
+  trackCardDetails,
+} from '@/common/services/analytics.js';
 import { getCourseComponent } from '@/modules/course/components/components.js';
 import { getCourse } from '@/modules/course/utils/data.js';
 import { getCourseDetails, nameKey } from '@/modules/course/utils/details.js';
@@ -67,7 +71,17 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
     return;
   }
 
+  const startedAt = Date.now();
   const details = await getCourseDetails(course.name);
+
+  trackCardDetails(interaction.user.id, {
+    card: 'course',
+    durationMs: Date.now() - startedAt,
+    outcome: cardDetailsOutcome(
+      details && details.channels.length + details.unlocks.length > 0,
+    ),
+    source: 'directus',
+  });
   const user = interaction.options.getUser('user');
 
   await interaction.editReply({
