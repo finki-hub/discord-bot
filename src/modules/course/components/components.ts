@@ -111,12 +111,40 @@ const addMastersSection = (containerBuilder: ContainerBuilder) => {
     );
 };
 
-export const getCourseComponent = (course: Course) => {
+// The most courses "Предуслов за" names before "+N".
+const UNLOCKS_SHOWN = 15;
+
+// What the card shows beside courses.json: the course's channels on this
+// server (as mentions) and the courses whose prerequisites name it.
+export type CourseExtras = {
+  channels?: string[];
+  unlocks?: string[];
+};
+
+const unlocksText = (unlocks: string[]) => {
+  const shown = unlocks.slice(0, UNLOCKS_SHOWN).join(', ');
+  const rest = unlocks.length - UNLOCKS_SHOWN;
+
+  return rest > 0 ? `${shown} (+${rest})` : shown;
+};
+
+export const getCourseComponent = (
+  course: Course,
+  extras: CourseExtras = {},
+) => {
   const containerBuilder = new ContainerBuilder();
 
   containerBuilder.addTextDisplayComponents((textDisplay) =>
     textDisplay.setContent(heading(course.name, HeadingLevel.Two)),
   );
+
+  if (extras.channels && extras.channels.length > 0) {
+    const channels = extras.channels.join(' ');
+
+    containerBuilder.addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(`**${labels.channel}:** ${channels}`),
+    );
+  }
 
   // A master's course (cycle "second") is in no undergraduate
   // accreditation: say so instead of two unavailable sections.
@@ -124,6 +152,23 @@ export const getCourseComponent = (course: Course) => {
     addMastersSection(containerBuilder);
   } else {
     addAccreditationSections(containerBuilder, course);
+  }
+
+  if (extras.unlocks && extras.unlocks.length > 0) {
+    const unlocks = unlocksText(extras.unlocks);
+
+    containerBuilder
+      .addSeparatorComponents((separator) =>
+        separator.setSpacing(SeparatorSpacingSize.Large),
+      )
+      .addTextDisplayComponents((textDisplay) =>
+        textDisplay.setContent(
+          heading(labels.prerequisiteFor, HeadingLevel.Three),
+        ),
+      )
+      .addTextDisplayComponents((textDisplay) =>
+        textDisplay.setContent(unlocks),
+      );
   }
 
   containerBuilder
