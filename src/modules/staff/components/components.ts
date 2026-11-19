@@ -12,11 +12,27 @@ import {
   strikethrough,
 } from 'discord.js';
 
+import { type Consultation } from '@/modules/staff/utils/consultations.js';
 import { labels } from '@/translations/labels.js';
 
 import { type Staff } from '../schemas/Staff.js';
 
-export const getStaffComponent = (information: Staff) => {
+// One consultation as "**среда 25.11.** 16:00–18:00 · ТМФ 320".
+const consultationLine = ({ date, day, from, room, to }: Consultation) => {
+  const [dayOfMonth, month] = date.split('-', 2);
+  const when = `**${day} ${dayOfMonth}.${month}.**`;
+
+  return room.length > 0
+    ? `${when} ${from}–${to} · ${room}`
+    : `${when} ${from}–${to}`;
+};
+
+// `consultations`: the coming ones, an empty list for none scheduled, or
+// null when unknown (the card then keeps only the link).
+export const getStaffComponent = (
+  information: Staff,
+  consultations: Consultation[] | null = null,
+) => {
   const containerBuilder = new ContainerBuilder();
 
   const displayName = information.active
@@ -58,6 +74,23 @@ export const getStaffComponent = (information: Staff) => {
         `**${labels.email}:**\n${hyperlink(information.email, mailtoLink)}`,
       );
     });
+
+  if (consultations !== null) {
+    const lines =
+      consultations.length > 0
+        ? consultations.map((consultation) => consultationLine(consultation))
+        : [labels.noConsultations];
+
+    containerBuilder
+      .addSeparatorComponents((separator) =>
+        separator.setSpacing(SeparatorSpacingSize.Large),
+      )
+      .addTextDisplayComponents((textDisplay) =>
+        textDisplay.setContent(
+          `**${labels.consultations}**\n${lines.join('\n')}`,
+        ),
+      );
+  }
 
   const actionRow = new ActionRowBuilder<ButtonBuilder>();
 

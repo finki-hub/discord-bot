@@ -6,6 +6,7 @@ import {
 
 import { getMentionComponent } from '@/common/components/mention.js';
 import { getStaffComponent } from '@/modules/staff/components/components.js';
+import { getConsultations } from '@/modules/staff/utils/consultations.js';
 import { getStaff } from '@/modules/staff/utils/data.js';
 import { getClosestStaff } from '@/modules/staff/utils/search.js';
 import { commandDescriptions, commandErrors } from '@/translations/commands.js';
@@ -42,10 +43,12 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
     return;
   }
 
+  const consultations = await getConsultations(information.name);
+
   await interaction.editReply({
     components: [
       ...(user ? [getMentionComponent(user)] : []),
-      getStaffComponent(information),
+      getStaffComponent(information, consultations),
     ],
     flags: MessageFlags.IsComponentsV2,
   });
