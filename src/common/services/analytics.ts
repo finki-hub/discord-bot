@@ -170,6 +170,52 @@ export const trackInteraction = (
   });
 };
 
+// Whether a card's extra data came back: the course card's channel and
+// "prerequisite for" lists (Directus), the staff card's consultations
+// (pubapi). `empty` is an answer with nothing to show.
+type CardDetailsEventProps = {
+  card: 'course' | 'staff';
+  durationMs: number;
+  outcome: 'empty' | 'ok' | 'unavailable';
+  source: 'directus' | 'pubapi';
+};
+
+// The outcome of a card's extra data: null when it did not come back, else
+// whether it had anything to show.
+export const cardDetailsOutcome = (
+  shown: boolean | null,
+): CardDetailsEventProps['outcome'] => {
+  if (shown === null) {
+    return 'unavailable';
+  }
+
+  return shown ? 'ok' : 'empty';
+};
+
+export const trackCardDetails = (
+  userId: string,
+  props: CardDetailsEventProps,
+): void => {
+  const { client } = state;
+
+  if (client === null) {
+    return;
+  }
+
+  client.capture({
+    distinctId: hashUserId(userId),
+    event: 'card_details',
+    properties: {
+      card: props.card,
+      duration_ms: props.durationMs,
+      outcome: props.outcome,
+      service: SERVICE,
+      source: props.source,
+      ...getRevisionProperties(),
+    },
+  });
+};
+
 type LifecycleEventProps = {
   guildCount?: number;
   guildId?: string;

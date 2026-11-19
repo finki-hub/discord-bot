@@ -4,8 +4,10 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import { logger } from '@/common/logger/index.js';
 import {
   captureException,
+  cardDetailsOutcome,
   initAnalytics,
   shutdownAnalytics,
+  trackCardDetails,
   trackCommandInvoked,
   trackInteraction,
   trackLifecycle,
@@ -236,5 +238,48 @@ describe('analytics exception capture', () => {
     expect(debug).toHaveBeenCalledExactlyOnceWith(
       'Failed capturing exception in PostHog',
     );
+  });
+});
+
+describe('card details analytics', () => {
+  beforeEach(() => {
+    vi.stubEnv('POSTHOG_KEY', 'test-key');
+    vi.stubEnv('POSTHOG_SALT', 'test-salt');
+    vi.stubGlobal('__APP_REVISION__', undefined);
+    postHog.capture.mockClear();
+    initAnalytics();
+  });
+
+  afterEach(async () => {
+    await shutdownAnalytics();
+  });
+
+  test('maps what came back to an outcome', () => {
+    expect(cardDetailsOutcome(null)).toBe('unavailable');
+    expect(cardDetailsOutcome(false)).toBe('empty');
+    expect(cardDetailsOutcome(true)).toBe('ok');
+  });
+
+  test('records the card, source, outcome and duration under a hashed user', () => {
+    trackCardDetails('discord-user', {
+      card: 'staff',
+      durationMs: 840,
+      outcome: 'ok',
+      source: 'pubapi',
+    });
+
+    expect(postHog.capture).toHaveBeenCalledWith({
+      distinctId: createHash('sha256')
+        .update('test-saltdiscord-user')
+        .digest('hex'),
+      event: 'card_details',
+      properties: {
+        card: 'staff',
+        duration_ms: 840,
+        outcome: 'ok',
+        service: 'discord-bot',
+        source: 'pubapi',
+      },
+    });
   });
 });
