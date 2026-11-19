@@ -44,18 +44,18 @@ There is also a dev container available. To use it, just clone the repository, d
 
 ## Development Commands
 
-| Command             | Description                                      |
-| ------------------- | ------------------------------------------------ |
-| `npm run dev`       | Run the bot directly from `src/index.ts`         |
-| `npm run build`     | Build the bot into `dist/`                       |
-| `npm run start`     | Run the built bot using platform env. variables  |
-| `npm run start:env` | Run the built bot and load `.env`                |
-| `npm run check`     | Type-check the TypeScript project                |
-| `npm run lint`      | Run ESLint                                       |
-| `npm run format`    | Run ESLint with auto-fix                         |
-| `npm test`          | Run the Vitest suite once                        |
-| `npm run test:watch`| Run Vitest in watch mode                         |
-| `npm run clean`     | Remove `dist/`                                   |
+| Command              | Description                                     |
+| -------------------- | ----------------------------------------------- |
+| `npm run dev`        | Run the bot directly from `src/index.ts`        |
+| `npm run build`      | Build the bot into `dist/`                      |
+| `npm run start`      | Run the built bot using platform env. variables |
+| `npm run start:env`  | Run the built bot and load `.env`               |
+| `npm run check`      | Type-check the TypeScript project               |
+| `npm run lint`       | Run ESLint                                      |
+| `npm run format`     | Run ESLint with auto-fix                        |
+| `npm test`           | Run the Vitest suite once                       |
+| `npm run test:watch` | Run Vitest in watch mode                        |
+| `npm run clean`      | Remove `dist/`                                  |
 
 ## Configuration
 
@@ -63,18 +63,20 @@ There is also a dev container available. To use it, just clone the repository, d
 
 Use `.env.sample` as a starting point for local development. The runtime also recognizes these optional variables when they are provided by Docker Compose or the host environment:
 
-| Variable           | Required | Description                                                                                  |
-| ------------------ | -------- | -------------------------------------------------------------------------------------------- |
-| `TOKEN`            | Yes      | Discord bot token                                                                            |
-| `APPLICATION_ID`   | Yes      | Discord application ID                                                                       |
-| `CHATBOT_URL`      | No       | URL of the [`finki-hub/chat-bot`](https://github.com/finki-hub/chat-bot) instance            |
-| `API_KEY`          | No       | Chat-bot API authentication for `/chat` and credential management requests; never a sponsored provider credential |
-| `DATA_STORAGE_URL` | No       | Base URL for data storage, without a trailing slash                                           |
-| `DIRECTUS_URL`     | No       | FINKI Hub Directus base URL for the course card's channel and "prerequisite for" lists (default `https://data.finki-hub.com`)|
-| `POSTHOG_KEY`      | No       | PostHog project key. Analytics are disabled when this is empty                               |
-| `POSTHOG_HOST`     | No       | PostHog ingest host. Defaults to `https://eu.i.posthog.com`                                  |
-| `POSTHOG_SALT`     | No       | Salt used to hash Discord user IDs. Required together with `POSTHOG_KEY` to enable analytics |
-| `TZ`               | No       | Timezone, for example `Europe/Berlin`                                                        |
+| Variable           | Required | Description                                                                                                                   |
+| ------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `TOKEN`            | Yes      | Discord bot token                                                                                                             |
+| `APPLICATION_ID`   | Yes      | Discord application ID                                                                                                        |
+| `CHATBOT_URL`      | No       | URL of the [`finki-hub/chat-bot`](https://github.com/finki-hub/chat-bot) instance                                             |
+| `API_KEY`          | No       | Chat-bot API authentication for `/chat` and credential management requests; never a sponsored provider credential             |
+| `DATA_STORAGE_URL` | No       | Base URL for data storage, without a trailing slash                                                                           |
+| `DIRECTUS_URL`     | No       | FINKI Hub Directus base URL for the course card's channel and "prerequisite for" lists (default `https://data.finki-hub.com`) |
+| `PUBAPI_URL`       | No       | FINKI public APIs MCP (SSE) URL for staff consultations (default `https://pubapi.finki.ukim.mk/sse`)                          |
+| `PUBAPI_API_KEY`   | No       | API key for FINKI public APIs; without it `/staff` shows only the consultations link                                          |
+| `POSTHOG_KEY`      | No       | PostHog project key. Analytics are disabled when this is empty                                                                |
+| `POSTHOG_HOST`     | No       | PostHog ingest host. Defaults to `https://eu.i.posthog.com`                                                                   |
+| `POSTHOG_SALT`     | No       | Salt used to hash Discord user IDs. Required together with `POSTHOG_KEY` to enable analytics                                  |
+| `TZ`               | No       | Timezone, for example `Europe/Berlin`                                                                                         |
 
 If `DATA_STORAGE_URL` is not set, data-backed features start with empty data and periodic data reloads are disabled. If `CHATBOT_URL` is not set, FAQ, link, and chat-bot features are disabled or return unavailable responses.
 
@@ -113,7 +115,7 @@ The data for informational commands is loaded from data storage if `DATA_STORAGE
 4. `staff.json` - an array of the staff
 5. `anto.json` - an array of strings containing Anto quotes
 
-`/course` also reads FINKI Hub's Directus (`DIRECTUS_URL`) when it answers: the course's Discord channel, shown as a mention when a text channel of that name exists on the server, and the courses whose prerequisites name it. If Directus does not answer, the card is shown without them.
+`/course` also reads FINKI Hub's Directus (`DIRECTUS_URL`) when it answers: the course's Discord channel, shown as a mention when a text channel of that name exists on the server, and the courses whose prerequisites name it. If Directus does not answer, the card is shown without them. `/staff` lists the staff member's consultations of the coming week (day, date, time, room) from FINKI's public APIs when `PUBAPI_API_KEY` is set; otherwise, or if they do not answer, it keeps only the consultations link.
 
 If `DATA_STORAGE_URL` is not configured, these commands run without loaded data. You can manually trigger a data reload using the `/config data` command.
 

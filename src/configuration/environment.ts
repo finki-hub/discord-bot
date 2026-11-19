@@ -64,6 +64,24 @@ export const getDirectusUrl = () => {
   }
 };
 
+// FINKI's public APIs (pubapi), an MCP server over SSE, read for staff
+// consultations. Without a key the staff card shows only the link.
+export const getPubapiUrl = () => {
+  try {
+    return z.string().min(1).parse(env['PUBAPI_URL']);
+  } catch {
+    return 'https://pubapi.finki.ukim.mk/sse';
+  }
+};
+
+export const getPubapiApiKey = () => {
+  try {
+    return z.string().min(1).parse(env['PUBAPI_API_KEY']);
+  } catch {
+    return null;
+  }
+};
+
 export const getPostHogKey = () => {
   try {
     return z.string().min(1).parse(env['POSTHOG_KEY']);
