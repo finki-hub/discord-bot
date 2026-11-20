@@ -4,9 +4,11 @@ import {
   ChannelType,
   type ChatInputCommandInteraction,
   type Collection,
+  EmbedBuilder,
   type Guild,
   type Message,
   MessageFlags,
+  type ModalSubmitInteraction,
   roleMention,
   type TextChannel,
   ThreadAutoArchiveDuration,
@@ -30,6 +32,7 @@ import { type Ticket } from '../schemas/Ticket.js';
 import {
   MAX_TICKET_INACTIVITY_MILLISECONDS,
   TICKET_ABANDON_TIMEOUT_MILLISECONDS,
+  TICKET_REQUEST_FOOTER,
 } from './constants.js';
 
 const TICKET_NAME_SEPARATOR = ' - ';
@@ -37,17 +40,22 @@ const TICKET_NAME_SEPARATOR = ' - ';
 const isHumanMessage = (message: Message): boolean =>
   !message.author.bot && !message.system;
 
+const isTicketRequest = (message: Message): boolean =>
+  message.author.bot &&
+  message.embeds.some((embed) => embed.footer?.text === TICKET_REQUEST_FOOTER);
+
 // Recent messages may all be the bot on a long ticket; the first user message
-// is near the start.
-const hasHumanMessageAtStart = async (
-  thread: AnyThreadChannel,
-): Promise<boolean> => {
+// is near the start. A modal-created ticket is already started by its request
+// embed, before the first human reply.
+const hasTicketStarted = async (thread: AnyThreadChannel): Promise<boolean> => {
   const earliestMessages = await thread.messages.fetch({
     after: thread.id,
     limit: 10,
   });
 
-  return earliestMessages.some((message) => isHumanMessage(message));
+  return earliestMessages.some(
+    (message) => isHumanMessage(message) || isTicketRequest(message),
+  );
 };
 
 const resolveTicketThread = async (
@@ -108,8 +116,10 @@ export const getActiveTicketsSorted = async (
 };
 
 export const createTicket = async (
-  interaction: ButtonInteraction | ChatInputCommandInteraction,
+  interaction:
+    ButtonInteraction | ChatInputCommandInteraction | ModalSubmitInteraction,
   ticketMetadata: Ticket,
+  options: { description?: string; memberIds?: string[] } = {},
 ): Promise<void> => {
   if (interaction.guild === null) {
     return;
@@ -121,6 +131,21 @@ export const createTicket = async (
     return;
   }
 
+  const activeTickets = await getActiveTickets(interaction.guild);
+  const existingTicket = activeTickets?.find(
+    (thread) =>
+      thread.name ===
+      `${interaction.user.tag}${TICKET_NAME_SEPARATOR}${ticketMetadata.name}`,
+  );
+
+  if (existingTicket !== undefined) {
+    await interaction.editReply(
+      ticketMessageFunctions.ticketExisting(existingTicket.url),
+    );
+
+    return;
+  }
+
   const ticketChannel = await ticketsChannel.threads.create({
     autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
     invitable: false,
@@ -128,9 +153,44 @@ export const createTicket = async (
     type: ChannelType.PrivateThread,
   });
 
+  // Role mentions invite small roles, but explicit membership also covers
+  // large roles and makes the requester's access deterministic.
+  const memberIds = new Set([
+    interaction.user.id,
+    ...(options.memberIds ?? []),
+  ]);
+  for (const memberId of memberIds) {
+    try {
+      await ticketChannel.members.add(memberId);
+    } catch (error: unknown) {
+      logger.warn(
+        `Failed adding member ${memberId} to ticket ${ticketChannel.id}\n${String(error)}`,
+        { guildId: interaction.guild.id },
+      );
+    }
+  }
+
   await ticketChannel.send(
     ticketMessageFunctions.ticketCreated(interaction.user.id),
   );
+
+  if (options.description !== undefined) {
+    const request = new EmbedBuilder()
+      .setAuthor({
+        iconURL: interaction.user.displayAvatarURL(),
+        name: interaction.user.tag,
+      })
+      .setDescription(options.description)
+      .setFooter({ text: TICKET_REQUEST_FOOTER })
+      .setTimestamp();
+
+    await ticketChannel.send({ embeds: [request] });
+    await ticketChannel.send(
+      ticketMessageFunctions.ticketStarted(
+        ticketMetadata.roles.map((role) => roleMention(role)).join(' '),
+      ),
+    );
+  }
 
   const components = getTicketCloseComponents(ticketChannel.id);
   await ticketChannel.send({
@@ -211,7 +271,11 @@ export const handleTicketMessage = async (message: Message): Promise<void> => {
       limit: 50,
     });
 
-    if (previousMessages.some((previous) => isHumanMessage(previous))) {
+    if (
+      previousMessages.some(
+        (previous) => isHumanMessage(previous) || isTicketRequest(previous),
+      )
+    ) {
       return;
     }
 
@@ -284,12 +348,7 @@ const maintainTicketThreads = async (
   guildId: string,
 ) => {
   for (const thread of ticketThreads.values()) {
-    const messages = await thread.messages.fetch();
-    const isStarted =
-      messages.some((message) => isHumanMessage(message)) ||
-      (await hasHumanMessageAtStart(thread));
-
-    if (!isStarted) {
+    if (!(await hasTicketStarted(thread))) {
       if (
         thread.createdTimestamp !== null &&
         Date.now() - thread.createdTimestamp >
@@ -301,7 +360,11 @@ const maintainTicketThreads = async (
       continue;
     }
 
-    const lastMessage = thread.lastMessage;
+    let lastMessage = thread.lastMessage;
+    if (lastMessage === null) {
+      const latestMessages = await thread.messages.fetch({ limit: 1 });
+      lastMessage = latestMessages.first() ?? null;
+    }
 
     if (lastMessage === null) {
       continue;

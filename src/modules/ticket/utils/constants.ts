@@ -18,3 +18,8 @@ export const MAX_TICKET_INACTIVITY_MILLISECONDS =
   ALLOWED_INACTIVITY_DAYS * 86_400_000;
 
 export const TICKETS_PER_PAGE = 8;
+
+// Marks the initial request embedded when a ticket is created from the modal.
+// It also lets maintenance recognize the ticket as started without fetching the
+// whole thread history.
+export const TICKET_REQUEST_FOOTER = 'Барање за тикет';
