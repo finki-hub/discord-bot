@@ -1,30 +1,32 @@
 import { type Role as DiscordRole, type Guild } from 'discord.js';
 
-const fetchedGuilds = new WeakSet<Guild>();
-const inFlightMemberFetches = new WeakMap<Guild, Promise<void>>();
+// Fetching every member of a guild is expensive, so a guild's in-flight or
+// completed fetch is kept here: concurrent calls share one request and later
+// calls reuse the completed fetch, while a failed fetch is dropped so it can
+// be retried. The GuildMembers intent keeps the cache current afterwards, but
+// Discord omits members from GUILD_CREATE for large guilds, so a fresh
+// identify resets the cache rather than trusting data from the last session.
+const memberFetches = new WeakMap<Guild, Promise<void>>();
 
 const ensureGuildMembersFetched = async (guild: Guild): Promise<void> => {
-  if (fetchedGuilds.has(guild)) {
-    return;
-  }
+  const existingFetch = memberFetches.get(guild);
 
-  const existingFetch = inFlightMemberFetches.get(guild);
   if (existingFetch !== undefined) {
     await existingFetch;
     return;
   }
 
-  const fetchPromise = (async () => {
+  const memberFetch = (async () => {
     await guild.members.fetch();
-    fetchedGuilds.add(guild);
   })();
 
-  inFlightMemberFetches.set(guild, fetchPromise);
+  memberFetches.set(guild, memberFetch);
 
   try {
-    await fetchPromise;
-  } finally {
-    inFlightMemberFetches.delete(guild);
+    await memberFetch;
+  } catch (error) {
+    memberFetches.delete(guild);
+    throw error;
   }
 };
 
@@ -55,4 +57,10 @@ export const getMembersByRoleIds = async (
     .filter((role) => role !== undefined);
 
   return getMembersByRoles(rolesList);
+};
+
+export const resetGuildMembersCache = (guilds: Iterable<Guild>): void => {
+  for (const guild of guilds) {
+    memberFetches.delete(guild);
+  }
 };

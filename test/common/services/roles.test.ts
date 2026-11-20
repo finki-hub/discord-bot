@@ -1,7 +1,10 @@
 import { Collection, type Guild, type Role } from 'discord.js';
 import { describe, expect, test, vi } from 'vitest';
 
-import { getMembersByRoleIds } from '@/common/services/roles.js';
+import {
+  getMembersByRoleIds,
+  resetGuildMembersCache,
+} from '@/common/services/roles.js';
 
 type FakeMember = { id: string; roles: string[] };
 
@@ -93,6 +96,20 @@ describe('getMembersByRoleIds', () => {
     await expect(getMembersByRoleIds(guild, ['fss'])).resolves.toEqual(['u1']);
 
     expect(fetchMembers).toHaveBeenCalledOnce();
+  });
+
+  test('fetches guild members again after the cache is reset', async () => {
+    const { fetchMembers, guild } = createFakeGuild({
+      remoteMembers: [{ id: 'u1', roles: ['fss'] }],
+      remoteRoles: ['fss'],
+    });
+
+    await expect(getMembersByRoleIds(guild, ['fss'])).resolves.toEqual(['u1']);
+
+    resetGuildMembersCache([guild]);
+
+    await expect(getMembersByRoleIds(guild, ['fss'])).resolves.toEqual(['u1']);
+    expect(fetchMembers).toHaveBeenCalledTimes(2);
   });
 
   test('deduplicates concurrent guild member fetches for the same guild', async () => {
