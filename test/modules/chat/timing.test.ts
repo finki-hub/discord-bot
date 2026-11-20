@@ -43,6 +43,19 @@ test.each([0, 1])(
   },
 );
 
+test('uses the supplied edit instead of re-fetching ephemeral messages', async () => {
+  const edit = vi.fn<(message: Message, content: string) => Promise<void>>(
+    async () => {},
+  );
+  const message = { content: 'answer' } as Message;
+
+  await expect(
+    appendTimingFootnote(message, { ...options, edit }),
+  ).resolves.toBe(true);
+
+  expect(edit).toHaveBeenCalledWith(message, `answer${footnote}`);
+});
+
 test('missing messages and failed edits request fallback instead of throwing', async () => {
   await expect(appendTimingFootnote(undefined, options)).resolves.toBe(false);
   const message = {

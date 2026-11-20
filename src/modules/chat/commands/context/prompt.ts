@@ -20,8 +20,9 @@ export const data = new ContextMenuCommandBuilder()
   .setName(name)
   .setType(ApplicationCommandType.Message);
 
-export const execute = async (
+export const executePromptContext = async (
   interaction: MessageContextMenuCommandInteraction,
+  commandLabel: string,
 ) => {
   const prompt = interaction.targetMessage.content;
 
@@ -56,9 +57,11 @@ export const execute = async (
     userId: chatUser.id,
   });
 
-  await handlePromptWithStreaming(
-    interaction,
-    options,
-    'Prompt context command',
-  );
+  await handlePromptWithStreaming(interaction, options, commandLabel);
+};
+
+export const execute = async (
+  interaction: MessageContextMenuCommandInteraction,
+) => {
+  await executePromptContext(interaction, 'Prompt context command');
 };

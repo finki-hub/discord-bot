@@ -1,5 +1,8 @@
 import {
+  ApplicationCommandOptionType,
+  type ChatInputCommandInteraction,
   DiscordAPIError,
+  type InteractionDeferReplyOptions,
   MessageFlags,
   type RepliableInteraction,
 } from 'discord.js';
@@ -45,6 +48,19 @@ const nonDeferredCommands = new Set<string>([
 
 export const shouldDeferCommand = (...commandNames: string[]): boolean =>
   commandNames.every((commandName) => !nonDeferredCommands.has(commandName));
+
+// A boolean `private` option is the chat-command opt-in for an ephemeral
+// response. The handler must decide this before deferring, because a public
+// deferral cannot be turned private later.
+export const getDeferReplyOptions = (
+  interaction: ChatInputCommandInteraction,
+): InteractionDeferReplyOptions | undefined => {
+  const option = interaction.options.get('private');
+  return option?.type === ApplicationCommandOptionType.Boolean &&
+    option.value === true
+    ? { flags: MessageFlags.Ephemeral }
+    : undefined;
+};
 
 export const isMissingPermissionsError = (error: unknown): boolean =>
   error instanceof DiscordAPIError &&

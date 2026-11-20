@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import type { SendPromptOptions } from '@/modules/chat/schemas/Chat.js';
 
 import { logger } from '@/common/logger/index.js';
+import { safeStreamReplyToInteraction } from '@/common/utils/messages.js';
 import { execute as executeChat } from '@/modules/chat/commands/chat/chat.js';
 import { execute as executeCredentials } from '@/modules/chat/commands/chat/credentials.js';
 import { clearChatUserCache } from '@/modules/chat/utils/identity.js';
@@ -173,6 +174,44 @@ describe('ephemeral chat output', () => {
     expect(callsOf(driver.state, 'delete')).toHaveLength(1);
     expect(callsOf(driver.state, 'edit')).toHaveLength(0);
     expectEphemeral(callsOf(driver.state, 'followUp'));
+  });
+
+  test('streams long private answers into ephemeral follow-ups', async () => {
+    const driver = fakeInteraction('ask', '', MODEL_USER_ID);
+    await driver.interaction.deferReply({ flags: MessageFlags.Ephemeral });
+
+    const editMessage = vi.fn<
+      (
+        message: unknown,
+        payload: { content?: string },
+      ) => Promise<{
+        content: string;
+        id: string;
+      }>
+    >(async (_message, payload) => ({
+      content: payload.content ?? '',
+      id: 'webhook-edit',
+    }));
+    Object.assign(driver.interaction, {
+      webhook: {
+        deleteMessage: vi.fn<() => Promise<void>>(async () => {}),
+        editMessage,
+      },
+    });
+
+    await safeStreamReplyToInteraction(driver.interaction, async (emit) => {
+      await emit({ text: 'a'.repeat(2_100), type: 'token' });
+      // Force an edit while streaming so the follow-up itself is refreshed.
+      await emit({ code: 'interrupted', message: 'partial', type: 'error' });
+    });
+
+    const followUp = callsOf(driver.state, 'followUp')[0];
+    expect(payloadFlags(followUp?.payload)).toBe(
+      // eslint-disable-next-line no-bitwise -- combining distinct message flags
+      MessageFlags.SuppressEmbeds | MessageFlags.Ephemeral,
+    );
+    expect(callsOf(driver.state, 'reply')).toHaveLength(0);
+    expect(editMessage).toHaveBeenCalledOnce();
   });
 
   test('settles a public deferral before a private transport error', async () => {

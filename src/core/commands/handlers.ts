@@ -11,6 +11,7 @@ import { commandErrors } from '@/translations/commands.js';
 
 import {
   errorName,
+  getDeferReplyOptions,
   getSurface,
   hasInteractionCommandPermission,
   isMissingPermissionsError,
@@ -40,7 +41,7 @@ export const handleChatInputCommand = async (
 
   if (shouldDeferCommand(commandWithSubcommand, interaction.commandName)) {
     try {
-      await interaction.deferReply();
+      await interaction.deferReply(getDeferReplyOptions(interaction));
     } catch (error) {
       const caughtError =
         error instanceof Error ? error : new Error(String(error));

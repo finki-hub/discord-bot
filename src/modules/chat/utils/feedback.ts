@@ -4,6 +4,7 @@ import {
   ButtonStyle,
   LabelBuilder,
   type Message,
+  type MessageEditOptions,
   ModalBuilder,
   StringSelectMenuBuilder,
   TextInputBuilder,
@@ -155,11 +156,13 @@ export const buildFeedbackReasonModal = (responseId: string) =>
 // thread/message-sourced buttons).
 export const attachFeedbackButtons = async ({
   askerId,
+  edit,
   guildId,
   message,
   responseId,
 }: {
   askerId: string;
+  edit?: (message: Message, options: MessageEditOptions) => Promise<unknown>;
   guildId: null | string;
   message: Message | undefined;
   responseId: null | string;
@@ -173,7 +176,8 @@ export const attachFeedbackButtons = async ({
   }
 
   try {
-    await message.edit({ components: [buildFeedbackRow(responseId, askerId)] });
+    const options = { components: [buildFeedbackRow(responseId, askerId)] };
+    await (edit === undefined ? message.edit(options) : edit(message, options));
   } catch (error) {
     logger.warn(`Failed attaching feedback buttons\n${String(error)}`, {
       guildId: guildId ?? undefined,

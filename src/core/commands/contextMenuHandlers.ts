@@ -1,6 +1,7 @@
 import {
   inlineCode,
   type MessageContextMenuCommandInteraction,
+  MessageFlags,
   type UserContextMenuCommandInteraction,
 } from 'discord.js';
 
@@ -46,7 +47,11 @@ const executeContextMenuCommand = async (
   const startedAt = Date.now();
   try {
     if (shouldDeferCommand(command.name)) {
-      await interaction.deferReply();
+      await interaction.deferReply(
+        command.ephemeral === true
+          ? { flags: MessageFlags.Ephemeral }
+          : undefined,
+      );
     }
     await command.execute(interaction);
     trackInteraction(interaction.user.id, {

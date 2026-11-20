@@ -44,6 +44,8 @@ export type CommandPermissions = {
 
 export type ContextMenuCommand = {
   data: ContextMenuCommandBuilder;
+  // Defer the response ephemerally before executing the command.
+  ephemeral?: boolean;
   execute: (interaction: ContextMenuCommandInteraction) => Promise<void>;
   name: string;
 };
