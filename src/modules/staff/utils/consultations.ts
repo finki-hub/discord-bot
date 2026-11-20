@@ -96,7 +96,7 @@ const readSlots = async (name: string, url: string, apiKey: string) => {
   const headers = { 'X-Api-Key': apiKey };
   const transport = new SSEClientTransport(new URL(url), {
     eventSourceInit: {
-      fetch: async (input, init) =>
+      fetch: (input, init) =>
         fetch(input, {
           ...init,
           headers: { ...init.headers, ...headers },
