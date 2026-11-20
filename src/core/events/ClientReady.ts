@@ -12,9 +12,12 @@ export const once = true;
 export const execute = async (...[client]: ClientEvents[typeof name]) => {
   await client.guilds.fetch();
 
-  for (const guild of client.guilds.cache.values()) {
-    await initializeChannels(guild.id);
-  }
+  // Each guild's channels are independent of the others'.
+  await Promise.all(
+    client.guilds.cache
+      .values()
+      .map(async (guild) => initializeChannels(guild.id)),
+  );
 
   await client.application.commands.fetch();
 
