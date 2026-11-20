@@ -51,10 +51,10 @@ describe('/ask command', () => {
     vi.clearAllMocks();
   });
 
-  test('exposes only the prompt option', () => {
+  test('exposes prompt and private options', () => {
     const optionNames = data.toJSON().options?.map((option) => option.name);
 
-    expect(optionNames).toEqual(['prompt']);
+    expect(optionNames).toEqual(['prompt', 'private']);
   });
 
   test('disables reasoning without reading an interaction option', async () => {

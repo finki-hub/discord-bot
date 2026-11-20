@@ -23,6 +23,10 @@ type StreamableInteraction =
 // Answers often end with a link, and its preview card would dwarf the answer.
 const NO_EMBEDS = { flags: MessageFlags.SuppressEmbeds } as const;
 
+const EPHEMERAL_NO_EMBEDS_FLAGS =
+  // eslint-disable-next-line no-bitwise -- combining distinct message flag bits
+  MessageFlags.SuppressEmbeds | MessageFlags.Ephemeral;
+
 type StreamReplyOptions = {
   language?: string;
   mentionUsers?: boolean;
@@ -512,6 +516,8 @@ const runStreaming = async (
 const pruneSurplusMessages = async (
   sentMessages: Message[],
   keepCount: number,
+  deleteMessage: (message: Message) => Promise<unknown> = (message) =>
+    message.delete(),
 ): Promise<void> => {
   const surplus = sentMessages.slice(keepCount);
   if (surplus.length === 0) {
@@ -521,7 +527,7 @@ const pruneSurplusMessages = async (
   sentMessages.length = keepCount;
   for (const surplusMessage of surplus) {
     try {
-      await surplusMessage.delete();
+      await deleteMessage(surplusMessage);
     } catch {
       // Best-effort: the follow-up may already be gone.
     }
@@ -543,6 +549,10 @@ export const safeStreamReplyToInteraction = async (
     ...NO_EMBEDS,
     ...(!mentionUsers && { allowedMentions: { users: [] } }),
   };
+  const ephemeral = interaction.ephemeral === true;
+  const replyOptions = ephemeral
+    ? { ...baseOptions, flags: EPHEMERAL_NO_EMBEDS_FLAGS }
+    : baseOptions;
   const formatContent = (text: string) =>
     useCodeBlock ? codeBlock(language, text) : text;
 
@@ -573,7 +583,7 @@ export const safeStreamReplyToInteraction = async (
           }
 
           await interaction.reply({
-            ...baseOptions,
+            ...replyOptions,
             content: formatContent(content),
           });
 
@@ -583,10 +593,13 @@ export const safeStreamReplyToInteraction = async (
         const first = await sendReply();
         rememberReply(first);
       } else {
-        await interaction.editReply({
+        // Keep the stored message's content current: ephemeral replies cannot
+        // be fetched again, and the footnote relies on this object.
+        const edited = await interaction.editReply({
           ...baseOptions,
           content: formatContent(content),
         });
+        rememberReply(edited);
       }
 
       return;
@@ -594,20 +607,36 @@ export const safeStreamReplyToInteraction = async (
 
     const existing = sentMessages[index];
     if (existing !== undefined) {
-      await existing.edit({ ...NO_EMBEDS, content: formatContent(content) });
+      if (ephemeral) {
+        // Ephemeral follow-ups live on the interaction webhook, not in the
+        // channel, so they must be edited through it.
+        const edited = await interaction.webhook.editMessage(existing, {
+          ...baseOptions,
+          content: formatContent(content),
+        });
+        rememberFollowUp(index, edited);
+      } else {
+        await existing.edit({ ...NO_EMBEDS, content: formatContent(content) });
+      }
 
       return;
     }
 
     const sent = await interaction.followUp({
-      ...baseOptions,
+      ...replyOptions,
       content: formatContent(content),
     });
     rememberFollowUp(index, sent);
   };
 
   await runStreaming(produce, flush, (keepCount) =>
-    pruneSurplusMessages(sentMessages, keepCount),
+    pruneSurplusMessages(
+      sentMessages,
+      keepCount,
+      ephemeral
+        ? (message) => interaction.webhook.deleteMessage(message)
+        : undefined,
+    ),
   );
 
   return sentMessages;

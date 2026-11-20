@@ -8,13 +8,16 @@ const formatDuration = (ms: number) =>
   ms >= 1_000 ? `${(ms / 1_000).toFixed(1)}s` : `${Math.round(ms)}ms`;
 
 type FootnoteOptions = {
+  // Ephemeral messages cannot be re-fetched, so callers editing one pass its
+  // current edit path instead.
+  readonly edit?: (message: Message, content: string) => Promise<unknown>;
   readonly notice?: string;
   readonly startedAt: number;
 };
 
 export const appendTimingFootnote = async (
   message: Message | undefined,
-  { notice, startedAt }: FootnoteOptions,
+  { edit, notice, startedAt }: FootnoteOptions,
 ) => {
   if (message === undefined) {
     return false;
@@ -28,14 +31,19 @@ export const appendTimingFootnote = async (
     // interaction handle on slash commands, or the message reply on continuations),
     // so the cached Message may still hold its first-flush content. Reading
     // message.content here without re-fetching would clobber the finished answer
-    // with just its first chunk.
-    const current = await message.fetch();
+    // with just its first chunk. Ephemeral messages cannot be re-fetched, so
+    // their caller supplies an edit path and keeps the cached content current.
+    const current = edit === undefined ? await message.fetch() : message;
 
     if (current.content.length + footnote.length > MAX_MESSAGE_LENGTH) {
       return false;
     }
 
-    await current.edit({ content: current.content + footnote });
+    if (edit === undefined) {
+      await current.edit({ content: current.content + footnote });
+    } else {
+      await edit(current, current.content + footnote);
+    }
     return true;
   } catch (error) {
     logger.warn(`Failed appending timing footnote\n${String(error)}`, {

@@ -1,6 +1,8 @@
 import {
   type ChatInputCommandInteraction,
+  type Message,
   type MessageContextMenuCommandInteraction,
+  type MessageEditOptions,
   MessageFlags,
   type UserContextMenuCommandInteraction,
 } from 'discord.js';
@@ -99,6 +101,88 @@ const replyStreamError = async (
       }));
 };
 
+type FinalizeAnswerOptions = {
+  readonly capture: { responseId: null | string };
+  readonly commandLabel: string;
+  readonly conversationId: string;
+  readonly interaction: StreamableInteraction;
+  readonly messages: Message[];
+  readonly options: SendPromptOptions;
+  readonly startedAt: number;
+  readonly state: StreamAccumulator;
+};
+
+const finalizeAnswer = async ({
+  capture,
+  commandLabel,
+  conversationId,
+  interaction,
+  messages,
+  options,
+  startedAt,
+  state,
+}: FinalizeAnswerOptions): Promise<boolean> => {
+  const lastMessage = messages.at(-1);
+  const ephemeral = interaction.ephemeral === true;
+  const editEphemeralMessage = ephemeral
+    ? (message: Message, content: string) =>
+        interaction.webhook.editMessage(message, { content })
+    : undefined;
+  const editEphemeralComponents = ephemeral
+    ? (message: Message, editOptions: MessageEditOptions) =>
+        interaction.webhook.editMessage(message, editOptions)
+    : undefined;
+
+  const messageIds = messages.map((message) => message.id);
+  registerConversation(
+    messageIds,
+    [
+      ...options.messages,
+      { content: state.answer.slice(0, 2_000), role: 'assistant' },
+    ],
+    {
+      accountId: options.user_id,
+      conversationId,
+      userId: interaction.user.id,
+    },
+  );
+
+  const noticePending = !(await appendTimingFootnote(lastMessage, {
+    ...(editEphemeralMessage !== undefined && { edit: editEphemeralMessage }),
+    notice: commandResponses.chatStorageNotice,
+    startedAt,
+  }));
+
+  const { responseId } = capture;
+  if (responseId !== null) {
+    trackMessageAnswered(interaction.user.id, {
+      channelId: interaction.channelId,
+      command: commandLabel,
+      guildId: interaction.guild?.id ?? null,
+      responseId,
+      surface: 'interaction',
+    });
+    rememberFeedbackContext(responseId, {
+      answer: state.answer,
+      conversationId,
+      question: options.messages.at(-1)?.content,
+      userId: interaction.user.id,
+      userIds: [interaction.user.id],
+    });
+    await attachFeedbackButtons({
+      askerId: interaction.user.id,
+      ...(editEphemeralComponents !== undefined && {
+        edit: editEphemeralComponents,
+      }),
+      guildId: interaction.guild?.id ?? null,
+      message: lastMessage,
+      responseId,
+    });
+  }
+
+  return noticePending;
+};
+
 export const handlePromptWithStreaming = async (
   interaction:
     | ChatInputCommandInteraction
@@ -158,48 +242,16 @@ export const handlePromptWithStreaming = async (
 
     noticePending = true;
     if (hasSavableAnswer(state)) {
-      const messageIds = messages.map((message) => message.id);
-      registerConversation(
-        messageIds,
-        [
-          ...options.messages,
-          { content: state.answer.slice(0, 2_000), role: 'assistant' },
-        ],
-        {
-          accountId: options.user_id,
-          conversationId,
-          userId: interaction.user.id,
-        },
-      );
-
-      noticePending = !(await appendTimingFootnote(messages.at(-1), {
-        notice: commandResponses.chatStorageNotice,
+      noticePending = await finalizeAnswer({
+        capture,
+        commandLabel,
+        conversationId,
+        interaction,
+        messages,
+        options,
         startedAt,
-      }));
-
-      const { responseId } = capture;
-      if (responseId !== null) {
-        trackMessageAnswered(interaction.user.id, {
-          channelId: interaction.channelId,
-          command: commandLabel,
-          guildId: interaction.guild?.id ?? null,
-          responseId,
-          surface: 'interaction',
-        });
-        rememberFeedbackContext(responseId, {
-          answer: state.answer,
-          conversationId,
-          question: options.messages.at(-1)?.content,
-          userId: interaction.user.id,
-          userIds: [interaction.user.id],
-        });
-        await attachFeedbackButtons({
-          askerId: interaction.user.id,
-          guildId: interaction.guild?.id ?? null,
-          message: messages.at(-1),
-          responseId,
-        });
-      }
+        state,
+      });
     }
   } catch (error) {
     if (!Error.isError(error)) {

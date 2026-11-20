@@ -21,12 +21,13 @@ import { getSupportedModels, getValidatedInferenceModel } from './requests.js';
 import { handlePromptWithStreaming } from './streaming.js';
 
 type CommonCommandOptions = {
+  readonly allowPrivate?: boolean;
   readonly allowReasoning?: boolean;
 };
 
 export const getCommonCommand = (
   name: keyof typeof commandDescriptions,
-  { allowReasoning = true }: CommonCommandOptions = {},
+  { allowPrivate = false, allowReasoning = true }: CommonCommandOptions = {},
 ) => {
   const data = new SlashCommandBuilder()
     .setName(name)
@@ -38,6 +39,15 @@ export const getCommonCommand = (
         .setRequired(true)
         .setMaxLength(2_000),
     );
+
+  if (allowPrivate) {
+    data.addBooleanOption((option) =>
+      option
+        .setName('private')
+        .setDescription('Прикажи го одговорот само тебе')
+        .setRequired(false),
+    );
+  }
 
   if (allowReasoning) {
     data.addBooleanOption((option) =>
