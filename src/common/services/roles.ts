@@ -1,32 +1,58 @@
 import { type Role as DiscordRole, type Guild } from 'discord.js';
 
-const getMembersByRoles = async (
-  guild: Guild,
-  rolesWithMembers: DiscordRole[],
-) => {
-  await guild.roles.fetch();
+const fetchedGuilds = new WeakSet<Guild>();
+const inFlightMemberFetches = new WeakMap<Guild, Promise<void>>();
 
-  const members = rolesWithMembers.map((role) => role.members.keys());
+const ensureGuildMembersFetched = async (guild: Guild): Promise<void> => {
+  if (fetchedGuilds.has(guild)) {
+    return;
+  }
 
+  const existingFetch = inFlightMemberFetches.get(guild);
+  if (existingFetch !== undefined) {
+    await existingFetch;
+    return;
+  }
+
+  const fetchPromise = (async () => {
+    await guild.members.fetch();
+    fetchedGuilds.add(guild);
+  })();
+
+  inFlightMemberFetches.set(guild, fetchPromise);
+
+  try {
+    await fetchPromise;
+  } finally {
+    inFlightMemberFetches.delete(guild);
+  }
+};
+
+const getMembersByRoles = (rolesWithMembers: DiscordRole[]) => {
   const uniqueMembers = new Set<string>();
-  for (const iterator of members) {
-    const ids = Array.from(iterator);
 
-    for (const id of ids) {
-      uniqueMembers.add(id);
+  for (const role of rolesWithMembers) {
+    for (const memberId of role.members.keys()) {
+      uniqueMembers.add(memberId);
     }
   }
 
   return Array.from(uniqueMembers);
 };
 
-export const getMembersByRoleIds = (
+export const getMembersByRoleIds = async (
   guild: Guild,
   roleIdsWithMembers: string[],
-) => {
+): Promise<string[]> => {
+  if (roleIdsWithMembers.length === 0) {
+    return [];
+  }
+
+  await Promise.all([guild.roles.fetch(), ensureGuildMembersFetched(guild)]);
+
   const rolesList = roleIdsWithMembers
-    .map((role) => guild.roles.cache.get(role))
+    .map((roleId) => guild.roles.cache.get(roleId))
     .filter((role) => role !== undefined);
 
-  return getMembersByRoles(guild, rolesList);
+  return getMembersByRoles(rolesList);
 };
