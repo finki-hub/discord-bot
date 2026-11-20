@@ -16,16 +16,16 @@ const mocks = vi.hoisted(() => ({
   getCommandModule: vi.fn<(name: string) => string>(() => 'chat'),
   getContextMenuCommand:
     vi.fn<(name: string) => ContextMenuCommand | undefined>(),
+}));
+
+vi.mock('@/common/logger/index.js', () => ({
   logger: {
     error: vi.fn<(...arguments_: unknown[]) => void>(),
     info: vi.fn<(...arguments_: unknown[]) => void>(),
   },
-  trackInteraction: vi.fn<(...arguments_: unknown[]) => void>(),
 }));
-
-vi.mock('@/common/logger/index.js', () => ({ logger: mocks.logger }));
 vi.mock('@/common/services/analytics.js', () => ({
-  trackInteraction: mocks.trackInteraction,
+  trackInteraction: vi.fn<(...arguments_: unknown[]) => void>(),
 }));
 vi.mock('@/core/commands/modules.js', () => ({
   getChatCommand: mocks.getChatCommand,
