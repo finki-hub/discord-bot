@@ -8,6 +8,7 @@ import { executePromptContext } from './prompt.js';
 
 export const name = 'Prompt Privately';
 
+// A separate command keeps the existing public `Prompt` behavior unchanged.
 // The context-menu handler defers with this before the command executes.
 export const ephemeral = true;
 
