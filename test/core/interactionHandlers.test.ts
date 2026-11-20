@@ -1,4 +1,8 @@
-import { type ChatInputCommandInteraction, MessageFlags } from 'discord.js';
+import {
+  ApplicationCommandOptionType,
+  type ChatInputCommandInteraction,
+  MessageFlags,
+} from 'discord.js';
 import { beforeEach, expect, test, vi } from 'vitest';
 
 import type { ChatCommand } from '@/core/lib/Command.js';
@@ -27,7 +31,10 @@ vi.mock('@/core/commands/modules.js', () => ({
   getCommandModule: mocks.getCommandModule,
 }));
 
-const fakeInteraction = (privateOption: boolean) => {
+const fakeInteraction = (
+  privateOption: boolean,
+  privateType = ApplicationCommandOptionType.Boolean,
+) => {
   const deferReply = vi.fn<(payload?: unknown) => Promise<void>>(
     async () => {},
   );
@@ -37,7 +44,8 @@ const fakeInteraction = (privateOption: boolean) => {
     guild: null,
     guildId: null,
     options: {
-      getBoolean: (name: string) => (name === 'private' ? privateOption : null),
+      get: (name: string) =>
+        name === 'private' ? { type: privateType, value: privateOption } : null,
       getSubcommand: () => null,
       getSubcommandGroup: () => null,
     },
@@ -67,6 +75,18 @@ test('defers a private ask ephemerally before executing it', async () => {
 
 test('keeps a public ask public', async () => {
   const { deferReply, interaction } = fakeInteraction(false);
+
+  await handleChatInputCommand(interaction);
+
+  expect(deferReply).toHaveBeenCalledWith(undefined);
+  expect(mocks.execute).toHaveBeenCalledWith(interaction);
+});
+
+test('ignores a non-boolean private option', async () => {
+  const { deferReply, interaction } = fakeInteraction(
+    true,
+    ApplicationCommandOptionType.String,
+  );
 
   await handleChatInputCommand(interaction);
 

@@ -123,14 +123,19 @@ const finalizeAnswer = async ({
   state,
 }: FinalizeAnswerOptions): Promise<boolean> => {
   const lastMessage = messages.at(-1);
+  const originalMessageId = messages[0]?.id;
   const ephemeral = interaction.ephemeral === true;
   const editEphemeralMessage = ephemeral
     ? (message: Message, content: string) =>
-        interaction.webhook.editMessage(message, { content })
+        message.id === originalMessageId
+          ? interaction.editReply({ content })
+          : interaction.webhook.editMessage(message, { content })
     : undefined;
   const editEphemeralComponents = ephemeral
     ? (message: Message, editOptions: MessageEditOptions) =>
-        interaction.webhook.editMessage(message, editOptions)
+        message.id === originalMessageId
+          ? interaction.editReply(editOptions)
+          : interaction.webhook.editMessage(message, editOptions)
     : undefined;
 
   const messageIds = messages.map((message) => message.id);

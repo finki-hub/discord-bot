@@ -1,5 +1,8 @@
-import type { Message } from 'discord.js';
-
+import {
+  type Message,
+  type MessageEditOptions,
+  MessageFlags,
+} from 'discord.js';
 import { randomUUID } from 'node:crypto';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -30,7 +33,18 @@ const mocks = vi.hoisted(() => ({
   answer: 'answer',
   content: 'answer',
   edit: vi.fn<(value: { content: string }) => Promise<void>>(async () => {}),
-  attachFeedbackButtons: vi.fn<() => Promise<void>>(async () => {}),
+  attachFeedbackButtons: vi.fn<
+    (options: {
+      askerId: string;
+      edit?: (
+        message: Message,
+        options: MessageEditOptions,
+      ) => Promise<unknown>;
+      guildId: null | string;
+      message: Message | undefined;
+      responseId: null | string;
+    }) => Promise<void>
+  >(async () => {}),
   rememberFeedbackContext: vi.fn<() => void>(),
   sendPrompt:
     vi.fn<
@@ -68,6 +82,7 @@ async function streamReply(
   mocks.nextMessage += 1;
   return [
     {
+      content: mocks.content,
       id: `answer-${mocks.nextMessage}`,
       fetch: async () => ({ content: mocks.content, edit: mocks.edit }),
     },
@@ -154,6 +169,35 @@ describe('conversation session lifecycle', () => {
     expect(mocks.edit.mock.calls[0]?.[0].content).toContain(
       commandResponses.chatStorageNotice,
     );
+  });
+
+  test('edits a single-message private answer through the original response', async () => {
+    const { interaction } = driver();
+    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
+    const editReply = vi.spyOn(interaction, 'editReply');
+    const webhookEdit = vi.fn<
+      (message: unknown, options: unknown) => Promise<unknown>
+    >(async () => ({}));
+    Object.assign(interaction, {
+      webhook: { editMessage: webhookEdit },
+    });
+
+    await ask(interaction);
+
+    const footnotePayload = editReply.mock.calls[0]?.[0] as
+      undefined | { content?: null | string };
+    expect(footnotePayload?.content ?? '').toContain(
+      commandResponses.chatStorageNotice,
+    );
+    expect(mocks.edit).not.toHaveBeenCalled();
+    expect(webhookEdit).not.toHaveBeenCalled();
+
+    const request = mocks.attachFeedbackButtons.mock.calls.at(-1)?.[0];
+    expect(request?.edit).toBeDefined();
+    await request?.edit?.({ id: 'answer-1' } as Message, { components: [] });
+
+    expect(webhookEdit).not.toHaveBeenCalled();
+    expect(editReply).toHaveBeenLastCalledWith({ components: [] });
   });
 
   test.each([false, true])(
