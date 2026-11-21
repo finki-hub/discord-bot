@@ -1,8 +1,9 @@
 /* eslint-disable camelcase -- SSE payload fields mirror the backend wire contract. */
 
+import type { z } from 'zod';
+
 import { createParser } from 'eventsource-parser';
 import { setTimeout as delay } from 'node:timers/promises';
-import { z } from 'zod';
 
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
 
@@ -26,14 +27,10 @@ import {
   ChatApiError,
   type ChatHistoryDeleted,
   ChatHistoryDeletedSchema,
-  type CredentialProvider,
-  type CredentialPublic,
-  CredentialPublicSchema,
-  type CredentialUpsert,
   SafeErrorDetailSchema,
 } from '../schemas/Credentials.js';
 import {
-  isModelSelectable,
+  isFreeModelSelectable,
   ModelCatalogResponseSchema,
 } from '../schemas/Model.js';
 import {
@@ -278,84 +275,6 @@ const parseSafeDetail = async (response: Response): Promise<string> => {
   } catch {
     return `HTTP ${response.status}`;
   }
-};
-
-export const listCredentials = async (
-  userId: string,
-): Promise<CredentialPublic[]> => {
-  const chatbotUrl = getChatbotUrl();
-
-  if (chatbotUrl === null) {
-    throw new ChatApiError(503, 'Chatbot URL not configured');
-  }
-
-  const result = await fetchWithTimeout(
-    `${chatbotUrl}/chat/state/users/${userId}/credentials`,
-    {
-      headers: authHeaders(),
-    },
-  );
-
-  if (!result.ok) {
-    const detail = await parseSafeDetail(result);
-    throw new ChatApiError(result.status, detail);
-  }
-
-  return z.array(CredentialPublicSchema).parse(await result.json());
-};
-
-export const upsertCredential = async (
-  userId: string,
-  provider: CredentialProvider,
-  credential: CredentialUpsert,
-): Promise<CredentialPublic> => {
-  const chatbotUrl = getChatbotUrl();
-
-  if (chatbotUrl === null) {
-    throw new ChatApiError(503, 'Chatbot URL not configured');
-  }
-
-  const result = await fetchWithTimeout(
-    `${chatbotUrl}/chat/state/users/${userId}/credentials/${provider}`,
-    {
-      body: JSON.stringify(credential),
-      headers: authHeaders(),
-      method: 'PUT',
-    },
-  );
-
-  if (!result.ok) {
-    const detail = await parseSafeDetail(result);
-    throw new ChatApiError(result.status, detail);
-  }
-
-  return CredentialPublicSchema.parse(await result.json());
-};
-
-export const deleteCredential = async (
-  userId: string,
-  provider: CredentialProvider,
-): Promise<void> => {
-  const chatbotUrl = getChatbotUrl();
-
-  if (chatbotUrl === null) {
-    throw new ChatApiError(503, 'Chatbot URL not configured');
-  }
-
-  const result = await fetchWithTimeout(
-    `${chatbotUrl}/chat/state/users/${userId}/credentials/${provider}`,
-    {
-      headers: authHeaders(),
-      method: 'DELETE',
-    },
-  );
-
-  if (result.ok || result.status === 204) {
-    return;
-  }
-
-  const detail = await parseSafeDetail(result);
-  throw new ChatApiError(result.status, detail);
 };
 
 export const deleteChatHistory = async (
@@ -607,6 +526,7 @@ const fetchModelCatalog = async (
   try {
     const url = new URL(`${chatbotUrl}/chat/models`);
     url.searchParams.set('user_id', userId);
+    url.searchParams.set('interface', 'discord');
     const result = await fetchWithTimeout(url, {
       headers: {
         'Content-Type': 'application/json',
@@ -688,7 +608,7 @@ export const getValidatedInferenceModel = async (
     catalog === null ||
     catalog.models.some(
       ({ availability, id }) =>
-        id === configuredModel && isModelSelectable({ availability }),
+        id === configuredModel && isFreeModelSelectable({ availability }),
     )
   ) {
     return configuredModel;
@@ -696,7 +616,7 @@ export const getValidatedInferenceModel = async (
   logger.warn(
     `Ignoring unsupported configured inference model: ${configuredModel}`,
   );
-  return catalog.models.find(isModelSelectable)?.id;
+  return catalog.models.find(isFreeModelSelectable)?.id;
 };
 
 export const fillEmbeddings = async (

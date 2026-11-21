@@ -1,15 +1,6 @@
 /* eslint-disable camelcase, unicorn/custom-error-definition -- API payload fields intentionally use snake_case */
 import { z } from 'zod';
 
-export const CredentialProviderSchema = z.enum([
-  'anthropic',
-  'google',
-  'ollama',
-  'openai',
-]);
-
-export type CredentialProvider = z.infer<typeof CredentialProviderSchema>;
-
 export const ChatUserSchema = z.object({
   id: z.uuid(),
   provider: z.string(),
@@ -26,22 +17,6 @@ export const ChatUserUpsertSchema = z.object({
 });
 
 export type ChatUserUpsert = z.infer<typeof ChatUserUpsertSchema>;
-
-export const CredentialPublicSchema = z.object({
-  base_url: z.string().nullable().optional(),
-  has_api_key: z.boolean(),
-  provider: CredentialProviderSchema,
-});
-
-export type CredentialPublic = z.infer<typeof CredentialPublicSchema>;
-
-export const CredentialUpsertSchema = z.object({
-  api_key: z.string().min(1),
-  base_url: z.url({ protocol: /^https$/u }).optional(),
-  provider: CredentialProviderSchema,
-});
-
-export type CredentialUpsert = z.infer<typeof CredentialUpsertSchema>;
 
 export const ChatHistoryDeletedSchema = z.object({
   deleted_conversations: z.number().int().nonnegative(),

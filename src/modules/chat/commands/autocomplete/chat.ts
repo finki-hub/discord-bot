@@ -3,7 +3,7 @@ import type { AutocompleteInteraction } from 'discord.js';
 import { withTimeout } from '@/common/utils/timeout.js';
 import {
   formatModelLabel,
-  isModelSelectable,
+  isFreeModelSelectable,
   type ModelCatalogResponse,
 } from '@/modules/chat/schemas/Model.js';
 import { resolveChatUser } from '@/modules/chat/utils/identity.js';
@@ -35,7 +35,7 @@ export const getModelAutocompleteChoices = (
   const normalizedQuery = query.toLocaleLowerCase();
 
   return catalog.models
-    .filter(isModelSelectable)
+    .filter(isFreeModelSelectable)
     .filter(
       ({ id, name: modelName }) =>
         id.toLocaleLowerCase().includes(normalizedQuery) ||

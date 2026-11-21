@@ -28,7 +28,7 @@ type CatalogPayload = {
 };
 
 const availabilityCases = [
-  { availability: 'byok', selectable: true, sponsored: false },
+  { availability: 'byok', selectable: false, sponsored: false },
   { availability: 'sponsored', selectable: true, sponsored: true },
   { availability: 'both', selectable: true, sponsored: true },
   { availability: 'unavailable', selectable: false, sponsored: false },

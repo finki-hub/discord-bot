@@ -46,6 +46,15 @@ export const isModelSelectable = (
   model: Pick<ModelDescriptor, 'availability'>,
 ): boolean => model.availability !== 'unavailable';
 
+// The Discord bot uses only the free/sponsored pool; BYOK models belong to the
+// web app. A catalog without availability metadata is treated as free.
+export const isFreeModelSelectable = (
+  model: Pick<ModelDescriptor, 'availability'>,
+): boolean =>
+  model.availability === undefined ||
+  model.availability === 'both' ||
+  model.availability === 'sponsored';
+
 export const formatModelLabel = (model: ModelDescriptor): string => {
   const baseLabel = `${model.name} (${model.provider})`;
   const hasSponsoredAccess =

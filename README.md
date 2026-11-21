@@ -120,15 +120,7 @@ Exam sessions and their schedule files are managed in Directus. `/session` links
 
 This project features integration with [`finki-hub/chat-bot`](https://github.com/finki-hub/chat-bot) for enabling FAQ, links, and LLM chat functionality. The Discord bot communicates with the chat bot using REST endpoints. If they are deployed in Docker, they should be on the same network to be able to communicate.
 
-Set both `CHATBOT_URL` and `API_KEY` to enable chat. Each Discord user can manage their provider credentials with `/credentials list`, `/credentials set`, and `/credentials delete`; provider keys are sent directly to the chat backend and are never stored by this bot. Hosted and Ollama models require the corresponding user credential.
-
-The Discord experience is sponsored/BYOK-first: when a user has a provider
-credential, that BYOK credential is used first and is sent directly to the chat
-backend, never stored by this bot. If the chat backend advertises a sponsored
-free tier for a user without a provider credential, the backend may serve that
-free fallback and owns the quota accounting. A disabled, unavailable, or
-exhausted sponsored tier must not be worked around by reusing `API_KEY`; the
-user should wait for the next UTC reset or configure their own BYOK credential.
+Set both `CHATBOT_URL` and `API_KEY` to enable chat. The Discord bot uses only the chat backend's sponsored free pool; provider credentials are managed in the web app, not in Discord. The private `/chat models` view shows the free models and remaining quota. If the sponsored tier is disabled, unavailable, or exhausted, use the web app or wait for the next UTC reset; do not work around it by reusing `API_KEY`.
 
 Use the private `/chat models` view for availability and remaining quota. Do not
 log provider keys, provider URLs, quota internals, or raw provider errors, and do
