@@ -31,11 +31,15 @@ import { getTicketCloseComponents } from '../components/components.js';
 import { type Ticket } from '../schemas/Ticket.js';
 import {
   MAX_THREAD_NAME_LENGTH,
-  MAX_TICKET_INACTIVITY_MILLISECONDS,
   TICKET_ABANDON_TIMEOUT_MILLISECONDS,
   TICKET_REQUEST_FOOTER,
   TICKET_START_LOOKBACK_LIMIT,
 } from './constants.js';
+import {
+  getInactivityAction,
+  getInactivityContext,
+  sendTicketReminder,
+} from './inactivity.js';
 
 const TICKET_NAME_SEPARATOR = ' - ';
 const THREAD_MEMBER_ADD_CONCURRENCY = 5;
@@ -468,6 +472,20 @@ const deleteTicketThread = async (
   }
 };
 
+const deleteStaleTicketReminder = async (
+  reminder: Message,
+  guildId: string,
+): Promise<void> => {
+  try {
+    await reminder.delete();
+  } catch (error: unknown) {
+    logger.warn(
+      `Failed deleting stale inactivity reminder ${reminder.id}\n${String(error)}`,
+      { guildId },
+    );
+  }
+};
+
 const maintainTicketThreads = async (
   ticketThreads: Collection<string, AnyThreadChannel>,
   guildId: string,
@@ -485,21 +503,31 @@ const maintainTicketThreads = async (
       continue;
     }
 
-    let lastMessage = thread.lastMessage;
-    if (lastMessage === null) {
-      const latestMessages = await thread.messages.fetch({ limit: 1 });
-      lastMessage = latestMessages.first() ?? null;
-    }
+    const inactivity = await getInactivityContext(thread);
 
-    if (lastMessage === null) {
+    if (inactivity === null) {
       continue;
     }
 
-    if (
-      Date.now() - lastMessage.createdAt.getTime() >
-      MAX_TICKET_INACTIVITY_MILLISECONDS
-    ) {
+    if (inactivity.staleReminder !== null) {
+      await deleteStaleTicketReminder(inactivity.staleReminder, guildId);
+    }
+
+    const action = getInactivityAction({
+      lastActivity: inactivity.lastActivity,
+      lastReminderStage: inactivity.lastReminderStage,
+      now: Date.now(),
+    });
+
+    if (action.type === 'close') {
       await closeTicket(thread.id, guildId);
+    } else if (action.type === 'remind') {
+      await sendTicketReminder(thread, {
+        daysLeft: action.daysLeft,
+        guildId,
+        lastActivity: inactivity.lastActivity,
+        stage: action.stage,
+      });
     }
   }
 };
