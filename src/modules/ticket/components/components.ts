@@ -6,6 +6,7 @@ import {
 } from 'discord.js';
 
 import { getPaginationComponent } from '@/common/components/pagination.js';
+import { truncateButtonLabel } from '@/common/utils/limits.js';
 import { TICKETS_PER_PAGE } from '@/modules/ticket/utils/constants.js';
 import { componentMessages } from '@/translations/components.js';
 import { emojis } from '@/translations/emojis.js';
@@ -14,6 +15,9 @@ import { labels } from '@/translations/labels.js';
 import { type Ticket } from '../schemas/Ticket.js';
 
 const TICKET_LIST_BUTTON_ID = 'ticketList';
+
+// A message holds five rows of five buttons.
+const MAX_TICKET_BUTTONS = 25;
 
 const dateFormatter = new Intl.DateTimeFormat('mk-MK', {
   dateStyle: 'long',
@@ -35,7 +39,7 @@ const buildTicketCreateButtons = (
 
     const button = new ButtonBuilder()
       .setCustomId(`ticketCreate:${ticketType.id}`)
-      .setLabel(`${index + 1} ${ticketType.name}`)
+      .setLabel(truncateButtonLabel(`${index + 1} ${ticketType.name}`))
       .setStyle(ButtonStyle.Success)
       .setEmoji(emojis[(index + 1).toString()] ?? '🔒');
 
@@ -48,9 +52,11 @@ const buildTicketCreateButtons = (
 export const getTicketCreateComponents = (ticketTypes: Ticket[]) => {
   const components = [];
 
-  for (let index = 0; index < ticketTypes.length; index += 5) {
+  const shownTypes = ticketTypes.slice(0, MAX_TICKET_BUTTONS);
+
+  for (let index = 0; index < shownTypes.length; index += 5) {
     const row = new ActionRowBuilder<ButtonBuilder>();
-    const buttons = buildTicketCreateButtons(ticketTypes, index);
+    const buttons = buildTicketCreateButtons(shownTypes, index);
 
     row.addComponents(buttons);
     components.push(row);

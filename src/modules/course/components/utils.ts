@@ -90,6 +90,31 @@ export const getRetiredStaff = (...nameGroups: string[][]): string[] => {
       );
 };
 
+// The most names of one group a card lists without links before "(+N)".
+const PLAIN_STAFF_SHOWN = 15;
+
+const plainNames = (entries: StaffEntry[]) => {
+  const shown = entries.slice(0, PLAIN_STAFF_SHOWN).map(({ name }) => name);
+  const rest = entries.length - PLAIN_STAFF_SHOWN;
+
+  return (rest > 0 ? [...shown, `(+${rest})`] : shown).join('\n');
+};
+
+// The staff without profile links, for a card too long to carry them.
+export const listStaff = (names: string[]): string[] => {
+  const active = resolveStaff(names).filter((entry) => entry.active);
+
+  return active.length === 0 ? [labels.none] : [plainNames(active)];
+};
+
+export const listRetiredStaff = (...nameGroups: string[][]): string[] => {
+  const retired = nameGroups
+    .flatMap((names) => resolveStaff(names))
+    .filter((entry) => !entry.active);
+
+  return retired.length === 0 ? [] : [strikethrough(plainNames(retired))];
+};
+
 const ParticipantSchema = z
   .tuple([z.string().regex(/^\d{4}\/\d{4}$/u), z.coerce.number().nonnegative()])
   .transform(([year, count]) => ({ count, year }));
