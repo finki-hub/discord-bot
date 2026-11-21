@@ -1,6 +1,7 @@
 /* eslint-disable camelcase -- API payload fields use snake_case */
 import type { User } from 'discord.js';
 
+import { capMap, setNewest } from '@/common/utils/maps.js';
 import { getApiKey, getChatbotUrl } from '@/configuration/environment.js';
 
 import {
@@ -11,6 +12,9 @@ import {
   ChatUserUpsertSchema,
   SafeErrorDetailSchema,
 } from '../schemas/Credentials.js';
+
+const USER_CACHE_LIMIT = 10_000;
+const USER_REQUEST_TIMEOUT_MS = 10_000;
 
 const parseSafeDetail = async (response: Response): Promise<string> => {
   try {
@@ -68,12 +72,18 @@ export const resolveChatUser = async (
   let result: Response;
   try {
     result = await fetch(`${chatbotUrl}/chat/state/users`, {
-      ...(signal !== undefined && { signal }),
       body: JSON.stringify(body),
       headers: authHeaders(),
       method: 'POST',
+      signal: signal ?? AbortSignal.timeout(USER_REQUEST_TIMEOUT_MS),
     });
   } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.name === 'TimeoutError' || error.name === 'AbortError')
+    ) {
+      throw new ChatApiError(503, 'Chatbot request timed out');
+    }
     if (error instanceof TypeError) {
       throw new ChatApiError(503, 'Chatbot request failed');
     }
@@ -86,7 +96,8 @@ export const resolveChatUser = async (
   }
 
   const user = ChatUserSchema.parse(await result.json());
-  userCache.set(discordUser.id, { profile: body, user });
+  setNewest(userCache, discordUser.id, { profile: body, user });
+  capMap(userCache, USER_CACHE_LIMIT);
   return user;
 };
 

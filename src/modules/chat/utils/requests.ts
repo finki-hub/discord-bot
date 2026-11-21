@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
 
 import { logger } from '@/common/logger/index.js';
+import { capMap, setNewest } from '@/common/utils/maps.js';
 import { errorCategory } from '@/common/utils/safeError.js';
 import { withTimeout } from '@/common/utils/timeout.js';
 import { getApiKey, getChatbotUrl } from '@/configuration/environment.js';
@@ -387,14 +388,22 @@ export const deleteChatHistory = async (
   }
 };
 
+type ModelCatalog = z.infer<typeof ModelCatalogResponseSchema>;
+
 const modelCatalogCache = new Map<
   string,
-  { expiresAt: number; value: z.infer<typeof ModelCatalogResponseSchema> }
+  { expiresAt: number; value: ModelCatalog }
 >();
+const modelCatalogFailures = new Map<string, number>();
+const modelCatalogRequests = new Map<string, Promise<ModelCatalog | null>>();
 const MODEL_CATALOG_CACHE_MS = 5 * 60 * 1_000;
+const MODEL_CATALOG_CACHE_LIMIT = 1_000;
+const MODEL_CATALOG_FAILURE_RETRY_MS = 10_000;
 
 export const invalidateModelCatalog = (userId: string): void => {
   modelCatalogCache.delete(userId);
+  modelCatalogFailures.delete(userId);
+  modelCatalogRequests.delete(userId);
 };
 
 export const sendPrompt = async (
@@ -590,6 +599,43 @@ export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {
   }
 };
 
+const fetchModelCatalog = async (
+  userId: string,
+  chatbotUrl: string,
+  apiKey: string,
+): Promise<ModelCatalog | null> => {
+  try {
+    const url = new URL(`${chatbotUrl}/chat/models`);
+    url.searchParams.set('user_id', userId);
+    const result = await fetchWithTimeout(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+      },
+    });
+
+    if (!result.ok || !result.body || result.status !== 200) {
+      setNewest(modelCatalogFailures, userId, Date.now());
+      capMap(modelCatalogFailures, MODEL_CATALOG_CACHE_LIMIT);
+      return null;
+    }
+
+    const catalog = ModelCatalogResponseSchema.parse(await result.json());
+    modelCatalogFailures.delete(userId);
+    setNewest(modelCatalogCache, userId, {
+      expiresAt: Date.now() + MODEL_CATALOG_CACHE_MS,
+      value: catalog,
+    });
+    capMap(modelCatalogCache, MODEL_CATALOG_CACHE_LIMIT);
+    return catalog;
+  } catch (error) {
+    logger.error(`Failed getting supported models\n${String(error)}`);
+    setNewest(modelCatalogFailures, userId, Date.now());
+    capMap(modelCatalogFailures, MODEL_CATALOG_CACHE_LIMIT);
+    return null;
+  }
+};
+
 export const getSupportedModels = async (userId: string) => {
   const chatbotUrl = getChatbotUrl();
   const apiKey = getApiKey();
@@ -603,29 +649,30 @@ export const getSupportedModels = async (userId: string) => {
     return cached.value;
   }
 
-  try {
-    const url = new URL(`${chatbotUrl}/chat/models`);
-    url.searchParams.set('user_id', userId);
-    const result = await fetchWithTimeout(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-      },
-    });
-
-    if (!result.ok || !result.body || result.status !== 200) {
-      return null;
-    }
-
-    const catalog = ModelCatalogResponseSchema.parse(await result.json());
-    modelCatalogCache.set(userId, {
-      expiresAt: Date.now() + MODEL_CATALOG_CACHE_MS,
-      value: catalog,
-    });
-    return catalog;
-  } catch (error) {
-    logger.error(`Failed getting supported models\n${String(error)}`);
+  const failedAt = modelCatalogFailures.get(userId);
+  if (
+    failedAt !== undefined &&
+    Date.now() - failedAt < MODEL_CATALOG_FAILURE_RETRY_MS
+  ) {
     return null;
+  }
+
+  // Autocomplete can fire several times per second; share one request per user
+  // instead of starting a new one until the first succeeds or fails.
+  const inFlight = modelCatalogRequests.get(userId);
+  if (inFlight !== undefined) {
+    return inFlight;
+  }
+
+  const request = fetchModelCatalog(userId, chatbotUrl, apiKey);
+  modelCatalogRequests.set(userId, request);
+
+  try {
+    return await request;
+  } finally {
+    if (modelCatalogRequests.get(userId) === request) {
+      modelCatalogRequests.delete(userId);
+    }
   }
 };
 
