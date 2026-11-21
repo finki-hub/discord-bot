@@ -3,7 +3,6 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 
-import { getDataStorageUrl } from '@/configuration/environment.js';
 import { getSessions } from '@/modules/session/utils/data.js';
 import { getClosestSession } from '@/modules/session/utils/search.js';
 import {
@@ -44,16 +43,7 @@ export const execute = async (interaction: ChatInputCommandInteraction) => {
     return;
   }
 
-  const baseUrl = getDataStorageUrl();
-
-  if (!baseUrl) {
-    await interaction.editReply(commandErrors.sessionNotFound);
-
-    return;
-  }
-
-  const filename = information[1];
-  const fileUrl = `${baseUrl}/sessions/${filename}`;
+  const fileUrl = information[1];
 
   const content = user
     ? `${commandResponseFunctions.commandFor(user.id)}\n${fileUrl}`
