@@ -47,6 +47,42 @@ const interactionFor = (
     },
   }) as unknown as ModalSubmitInteraction;
 
+const createTicketForExistingTicket = async (
+  threadName: string,
+  title: string,
+) => {
+  const thread = {
+    archived: false,
+    id: 'ticket-thread',
+    isThread: () => true,
+    locked: false,
+    name: threadName,
+    parentId: 'tickets-channel',
+    url: 'https://discord.com/channels/1/2',
+  };
+  const create = vi.fn<(options: unknown) => Promise<unknown>>(async () => {});
+  mocks.getChannel.mockReturnValue({
+    threads: { create },
+    type: ChannelType.GuildText,
+  } as unknown as TextChannel);
+
+  const editReply = vi.fn<(payload: unknown) => Promise<unknown>>(
+    async () => ({}),
+  );
+  const guild = {
+    channels: { cache: new Collection([['ticket-thread', thread]]) },
+    id: 'guild',
+  } as unknown as Guild;
+
+  await createTicket(interactionFor(guild, editReply), TICKET_TYPE, {
+    description: 'Помош',
+    memberIds: [],
+    title,
+  });
+
+  return { create, editReply };
+};
+
 describe('createTicket', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -140,36 +176,10 @@ describe('createTicket', () => {
   });
 
   test('links an existing open ticket instead of creating another', async () => {
-    const thread = {
-      archived: false,
-      id: 'ticket-thread',
-      isThread: () => true,
-      locked: false,
-      name: 'Стар наслов - requester#0001 - Поддршка',
-      parentId: 'tickets-channel',
-      url: 'https://discord.com/channels/1/2',
-    };
-    const create = vi.fn<(options: unknown) => Promise<unknown>>(
-      async () => {},
+    const { create, editReply } = await createTicketForExistingTicket(
+      'Стар наслов - requester#0001 - Поддршка',
+      'Нов наслов',
     );
-    mocks.getChannel.mockReturnValue({
-      threads: { create },
-      type: ChannelType.GuildText,
-    } as unknown as TextChannel);
-
-    const editReply = vi.fn<(payload: unknown) => Promise<unknown>>(
-      async () => ({}),
-    );
-    const guild = {
-      channels: { cache: new Collection([['ticket-thread', thread]]) },
-      id: 'guild',
-    } as unknown as Guild;
-
-    await createTicket(interactionFor(guild, editReply), TICKET_TYPE, {
-      description: 'Помош',
-      memberIds: [],
-      title: 'Нов наслов',
-    });
 
     expect(create).not.toHaveBeenCalled();
     expect(editReply).toHaveBeenCalledWith(
@@ -178,36 +188,10 @@ describe('createTicket', () => {
   });
 
   test('links a legacy ticket named before titles were added', async () => {
-    const thread = {
-      archived: false,
-      id: 'ticket-thread',
-      isThread: () => true,
-      locked: false,
-      name: 'requester#0001 - Поддршка',
-      parentId: 'tickets-channel',
-      url: 'https://discord.com/channels/1/2',
-    };
-    const create = vi.fn<(options: unknown) => Promise<unknown>>(
-      async () => {},
+    const { create, editReply } = await createTicketForExistingTicket(
+      'requester#0001 - Поддршка',
+      'Помош',
     );
-    mocks.getChannel.mockReturnValue({
-      threads: { create },
-      type: ChannelType.GuildText,
-    } as unknown as TextChannel);
-
-    const editReply = vi.fn<(payload: unknown) => Promise<unknown>>(
-      async () => ({}),
-    );
-    const guild = {
-      channels: { cache: new Collection([['ticket-thread', thread]]) },
-      id: 'guild',
-    } as unknown as Guild;
-
-    await createTicket(interactionFor(guild, editReply), TICKET_TYPE, {
-      description: 'Помош',
-      memberIds: [],
-      title: 'Помош',
-    });
 
     expect(create).not.toHaveBeenCalled();
     expect(editReply).toHaveBeenCalledWith(
