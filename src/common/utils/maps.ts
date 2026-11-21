@@ -10,3 +10,12 @@ export const getOrInsert = <K, V>(
   map.set(key, value);
   return value;
 };
+
+// Map iteration follows insertion order, so the first key is the oldest entry.
+export const capMap = <K, V>(map: Map<K, V>, maxSize: number): void => {
+  while (map.size > maxSize) {
+    const oldestKey = map.keys().next().value;
+    if (oldestKey === undefined) return;
+    map.delete(oldestKey);
+  }
+};

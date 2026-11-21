@@ -7,6 +7,7 @@ import {
 } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
+import { capMap } from '@/common/utils/maps.js';
 import {
   commandErrors,
   commandResponseFunctions,
@@ -20,6 +21,7 @@ import {
 import { beginChatOperation } from './privacy.js';
 
 const userThreads = new Map<string, string>();
+const USER_THREADS_LIMIT = 10_000;
 
 const threadKey = (guildId: string, userId: string) => `${guildId}:${userId}`;
 
@@ -89,6 +91,7 @@ const createChatThread = async (interaction: ChatInputCommandInteraction) => {
 
     armThread(thread.id, user.id);
     userThreads.set(key, thread.id);
+    capMap(userThreads, USER_THREADS_LIMIT);
 
     await interaction.editReply(
       commandResponseFunctions.chatThreadCreated(thread.id),

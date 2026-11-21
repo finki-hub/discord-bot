@@ -7,6 +7,7 @@ import { z } from 'zod';
 import type { StreamEvent } from '@/common/types/StreamEvent.js';
 
 import { logger } from '@/common/logger/index.js';
+import { capMap } from '@/common/utils/maps.js';
 import { errorCategory } from '@/common/utils/safeError.js';
 import { withTimeout } from '@/common/utils/timeout.js';
 import { getApiKey, getChatbotUrl } from '@/configuration/environment.js';
@@ -391,10 +392,14 @@ const modelCatalogCache = new Map<
   string,
   { expiresAt: number; value: z.infer<typeof ModelCatalogResponseSchema> }
 >();
+const modelCatalogFailures = new Map<string, number>();
 const MODEL_CATALOG_CACHE_MS = 5 * 60 * 1_000;
+const MODEL_CATALOG_CACHE_LIMIT = 1_000;
+const MODEL_CATALOG_FAILURE_RETRY_MS = 10_000;
 
 export const invalidateModelCatalog = (userId: string): void => {
   modelCatalogCache.delete(userId);
+  modelCatalogFailures.delete(userId);
 };
 
 export const sendPrompt = async (
@@ -603,6 +608,14 @@ export const getSupportedModels = async (userId: string) => {
     return cached.value;
   }
 
+  const failedAt = modelCatalogFailures.get(userId);
+  if (
+    failedAt !== undefined &&
+    Date.now() - failedAt < MODEL_CATALOG_FAILURE_RETRY_MS
+  ) {
+    return null;
+  }
+
   try {
     const url = new URL(`${chatbotUrl}/chat/models`);
     url.searchParams.set('user_id', userId);
@@ -614,17 +627,23 @@ export const getSupportedModels = async (userId: string) => {
     });
 
     if (!result.ok || !result.body || result.status !== 200) {
+      modelCatalogFailures.set(userId, Date.now());
+      capMap(modelCatalogFailures, MODEL_CATALOG_CACHE_LIMIT);
       return null;
     }
 
     const catalog = ModelCatalogResponseSchema.parse(await result.json());
+    modelCatalogFailures.delete(userId);
     modelCatalogCache.set(userId, {
       expiresAt: Date.now() + MODEL_CATALOG_CACHE_MS,
       value: catalog,
     });
+    capMap(modelCatalogCache, MODEL_CATALOG_CACHE_LIMIT);
     return catalog;
   } catch (error) {
     logger.error(`Failed getting supported models\n${String(error)}`);
+    modelCatalogFailures.set(userId, Date.now());
+    capMap(modelCatalogFailures, MODEL_CATALOG_CACHE_LIMIT);
     return null;
   }
 };

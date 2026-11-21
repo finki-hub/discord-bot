@@ -10,6 +10,10 @@ import { getSupportedModels } from '@/modules/chat/utils/requests.js';
 
 export const name = 'chat';
 
+// Discord gives autocomplete about three seconds; resolve the chat account
+// well inside that window so a slow chatbot cannot leave the request pending.
+const AUTOCOMPLETE_USER_TIMEOUT_MS = 2_000;
+
 export type ModelAutocompleteChoice = {
   readonly name: string;
   readonly value: string;
@@ -42,7 +46,10 @@ export const execute = async (interaction: AutocompleteInteraction) => {
     return;
   }
 
-  const chatUser = await resolveChatUser(interaction.user);
+  const chatUser = await resolveChatUser(
+    interaction.user,
+    AbortSignal.timeout(AUTOCOMPLETE_USER_TIMEOUT_MS),
+  );
   const catalog = await getSupportedModels(chatUser.id);
   if (catalog === null) {
     await interaction.respond([]);

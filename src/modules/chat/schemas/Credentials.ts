@@ -37,7 +37,7 @@ export type CredentialPublic = z.infer<typeof CredentialPublicSchema>;
 
 export const CredentialUpsertSchema = z.object({
   api_key: z.string().min(1),
-  base_url: z.url().optional(),
+  base_url: z.url({ protocol: /^https$/u }).optional(),
   provider: CredentialProviderSchema,
 });
 

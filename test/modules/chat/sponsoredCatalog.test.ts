@@ -230,4 +230,10 @@ describe('sponsored model catalog', () => {
     await getSupportedModels(CACHED_USER_ID);
     expect(catalogFetches).toBe(2);
   });
+
+  test('backs off catalog retries after a failed fetch', async () => {
+    await expect(getSupportedModels(USER_ID)).resolves.toBeNull();
+    await expect(getSupportedModels(USER_ID)).resolves.toBeNull();
+    expect(catalogFetches).toBe(1);
+  });
 });
