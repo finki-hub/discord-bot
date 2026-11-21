@@ -60,7 +60,7 @@ describe('consultations', () => {
 
 describe('the staff card consultations', () => {
   const staff = StaffSchema.parse({
-    active: '1',
+    active: true,
     cabinet: '209',
     email: 'vesna.dimitrova@finki.ukim.mk',
     name: 'Весна Димитрова',

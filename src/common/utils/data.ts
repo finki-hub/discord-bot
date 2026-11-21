@@ -1,8 +1,11 @@
 import { Cron } from 'croner';
-import { type ZodType } from 'zod';
+import { z, type ZodType } from 'zod';
 
 import { logger } from '@/common/logger/index.js';
-import { getDataStorageUrl } from '@/configuration/environment.js';
+import {
+  getDataStorageUrl,
+  getDirectusUrl,
+} from '@/configuration/environment.js';
 
 const DATA_FETCH_TIMEOUT_MS = 30_000;
 
@@ -24,6 +27,44 @@ export const parseContent = (
   content: string,
   fallback: unknown = [],
 ): unknown => (content.length === 0 ? fallback : JSON.parse(content));
+
+type LoadJsonFromUrlOptions<T> = {
+  label: string;
+  onLoaded: (data: T) => void;
+  parseFallback?: unknown;
+  schema: ZodType<T>;
+  url: string;
+};
+
+const loadJsonFromUrl = async <T>({
+  label,
+  onLoaded,
+  parseFallback,
+  schema,
+  url,
+}: LoadJsonFromUrlOptions<T>): Promise<boolean> => {
+  let raw: string;
+  try {
+    raw = await fetchJsonFromUrl(url);
+  } catch (error) {
+    logger.error(`Failed fetching ${label}\n${String(error)}`);
+    throw error;
+  }
+
+  const data = parseContent(raw, parseFallback);
+
+  let parsed: T;
+  try {
+    parsed = await schema.parseAsync(data);
+  } catch (error) {
+    logger.error(`Failed parsing ${label} data\n${String(error)}`);
+    throw error;
+  }
+
+  onLoaded(parsed);
+  logger.info(`${label} data reloaded`);
+  return true;
+};
 
 type LoadJsonResourceOptions<T> = {
   label: string;
@@ -49,47 +90,56 @@ export const loadJsonResource = async <T>({
     return false;
   }
 
-  const url = `${baseUrl}/${resource}`;
+  return loadJsonFromUrl({
+    label,
+    onLoaded,
+    parseFallback,
+    schema,
+    url: `${baseUrl}/${resource}`,
+  });
+};
 
-  let raw: string;
-  try {
-    raw = await fetchJsonFromUrl(url);
-  } catch (error) {
-    logger.error(
-      `Failed fetching ${label} from data storage\n${String(error)}`,
-    );
-    throw error;
-  }
+type LoadDirectusItemsOptions<T> = {
+  collection: string;
+  fields: readonly string[];
+  label: string;
+  onLoaded: (data: T) => void;
+  schema: ZodType<T>;
+};
 
-  const data = parseContent(raw, parseFallback);
+// The rows of a public Directus collection, in id order.
+export const loadDirectusItems = async <T>({
+  collection,
+  fields,
+  label,
+  onLoaded,
+  schema,
+}: LoadDirectusItemsOptions<T>): Promise<boolean> => {
+  const query = `fields=${encodeURIComponent(fields.join(','))}&limit=-1&sort=id`;
 
-  let parsed: T;
-  try {
-    parsed = await schema.parseAsync(data);
-  } catch (error) {
-    logger.error(`Failed parsing ${label} data\n${String(error)}`);
-    throw error;
-  }
-
-  onLoaded(parsed);
-  logger.info(`${label} data reloaded from data storage`);
-  return true;
+  return loadJsonFromUrl({
+    label,
+    onLoaded,
+    schema: z.object({ data: schema }).transform(({ data }) => data),
+    url: `${getDirectusUrl()}/items/${collection}?${query}`,
+  });
 };
 
 type SchedulePeriodicReloadOptions = {
   cronExpression?: string;
   label: string;
   reload: () => Promise<unknown>;
+  // Directus has a default URL, so its data reloads without data storage.
+  requiresDataStorage?: boolean;
 };
 
 export const schedulePeriodicReload = ({
   cronExpression = '0 * * * *',
   label,
   reload,
+  requiresDataStorage = true,
 }: SchedulePeriodicReloadOptions): Cron | null => {
-  const baseUrl = getDataStorageUrl();
-
-  if (!baseUrl) {
+  if (requiresDataStorage && !getDataStorageUrl()) {
     logger.debug(
       `DATA_STORAGE_URL not configured, periodic ${label} reload disabled`,
     );
@@ -97,7 +147,7 @@ export const schedulePeriodicReload = ({
   }
 
   const cron = new Cron(cronExpression, async () => {
-    logger.info(`Starting scheduled ${label} reload from data storage...`);
+    logger.info(`Starting scheduled ${label} reload...`);
     try {
       await reload();
     } catch (error) {

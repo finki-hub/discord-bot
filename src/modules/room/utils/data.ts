@@ -1,29 +1,44 @@
 import {
-  loadJsonResource,
+  loadDirectusItems,
   schedulePeriodicReload,
 } from '@/common/utils/data.js';
 import { type Room, RoomSchema } from '@/modules/room/schemas/Room.js';
 
 import { clearTransformedRooms } from './cache.js';
 
+const ROOM_FIELDS = [
+  'capacity',
+  'description',
+  'floor',
+  'location',
+  'mrbs',
+  'name',
+  'type',
+];
+
 const state: { rooms: Room[] } = {
   rooms: [],
 };
 
 export const reloadRooms = async () => {
-  await loadJsonResource({
+  await loadDirectusItems({
+    collection: 'rooms',
+    fields: ROOM_FIELDS,
     label: 'rooms',
     onLoaded: (data: Room[]) => {
       state.rooms = data;
       clearTransformedRooms();
     },
-    resource: 'rooms.json',
     schema: RoomSchema.array(),
   });
 };
 
 export const startPeriodicReload = () => {
-  schedulePeriodicReload({ label: 'rooms', reload: reloadRooms });
+  schedulePeriodicReload({
+    label: 'rooms',
+    reload: reloadRooms,
+    requiresDataStorage: false,
+  });
 };
 
 export const getRooms = (): Room[] => state.rooms;
