@@ -6,12 +6,11 @@ export const installFetchQueue = (responses: Response[]): void => {
   const queue = [...responses];
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => {
+    vi.fn(() => {
       const response = queue.shift();
-      if (response === undefined) {
-        throw new Error('The test exhausted its mocked fetch queue');
-      }
-      return response;
+      return response === undefined
+        ? Promise.reject(new Error('The test exhausted its mocked fetch queue'))
+        : Promise.resolve(response);
     }),
   );
 };

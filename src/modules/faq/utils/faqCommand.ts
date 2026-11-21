@@ -8,6 +8,7 @@ import {
 } from 'discord.js';
 
 import { getMentionComponent } from '@/common/components/mention.js';
+import { MAX_COMPONENT_TEXT_LENGTH } from '@/common/utils/limits.js';
 import { safeReplyToInteraction } from '@/common/utils/messages.js';
 import {
   commandDescriptions,
@@ -15,11 +16,12 @@ import {
   commandResponseFunctions,
 } from '@/translations/commands.js';
 
-import { getQuestionComponent } from '../components/components.js';
-import { getNormalizedUrl } from './links.js';
+import {
+  getQuestionComponent,
+  MAX_LINK_BUTTONS,
+} from '../components/components.js';
+import { getButtonLinks, getNormalizedUrl } from './links.js';
 import { getClosestQuestion } from './search.js';
-
-const MAX_COMPONENT_TEXT_LENGTH = 4_000;
 
 export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
   data: new SlashCommandBuilder()
@@ -58,7 +60,8 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
 
     if (
       title.length + question.content.length + mention.length >
-      MAX_COMPONENT_TEXT_LENGTH
+        MAX_COMPONENT_TEXT_LENGTH ||
+      getButtonLinks(question.links).length > MAX_LINK_BUTTONS
     ) {
       const links = Object.entries(question.links ?? {})
         .filter(([name, url]) => name !== '' && url !== '')

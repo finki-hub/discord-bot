@@ -82,7 +82,11 @@ const assertWire = (
     (body) =>
       (
         JSON.parse(body) as {
-          batch: Array<{ event: string; properties: Record<string, unknown> }>;
+          batch: Array<{
+            event: string;
+            options: Record<string, unknown>;
+            properties: Record<string, unknown>;
+          }>;
         }
       ).batch,
   );
@@ -90,14 +94,15 @@ const assertWire = (
   expect(events[0]).toMatchObject({
     distinct_id: distinctId,
     event: '$exception',
+    options: { process_person_profile: false },
     properties: {
-      $process_person_profile: false,
       app_revision: revision,
       error_type: category,
       phase,
       service: 'discord-bot',
     },
   });
+  expect(events[0]?.properties).not.toHaveProperty('$process_person_profile');
   expect(events[0]?.properties['$exception_list']).toStrictEqual([
     {
       mechanism: {

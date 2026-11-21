@@ -7,12 +7,24 @@ import {
   SeparatorSpacingSize,
 } from 'discord.js';
 
+import {
+  componentTextLength,
+  MAX_COMPONENT_TEXT_LENGTH,
+} from '@/common/utils/limits.js';
 import { labels } from '@/translations/labels.js';
 
 import { ACCREDITATION_YEARS, type AccreditationYear } from '../constants.js';
 import { type Course } from '../schemas/Course.js';
-import { extractParticipants, getRetiredStaff, linkStaff } from './utils.js';
+import {
+  extractParticipants,
+  getRetiredStaff,
+  linkStaff,
+  listRetiredStaff,
+  listStaff,
+} from './utils.js';
 
+// Discord allows 40 components in a message, nested ones included, so the
+// lines of a section share one text display.
 const addCurriculumSection = (
   containerBuilder: ContainerBuilder,
   course: Course,
@@ -32,23 +44,18 @@ const addCurriculumSection = (
     )
     .addSeparatorComponents((separator) => separator.setDivider(false))
     .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.name}:** ${name ?? '-'}`),
-    )
-    .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.code}:** ${code ?? '-'}`),
-    )
-    .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.level}:** ${level ?? '-'}`),
-    )
-    .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.semester}:** ${semester ?? '-'}`),
+      textDisplay.setContent(
+        [
+          `**${labels.name}:** ${name ?? '-'}`,
+          `**${labels.code}:** ${code ?? '-'}`,
+          `**${labels.level}:** ${level ?? '-'}`,
+          `**${labels.semester}:** ${semester ?? '-'}`,
+          ...(prerequisite === undefined
+            ? []
+            : [`**${labels.prerequisite}:** ${prerequisite}`]),
+        ].join('\n'),
+      ),
     );
-
-  if (prerequisite !== undefined) {
-    containerBuilder.addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.prerequisite}:** ${prerequisite}`),
-    );
-  }
 
   if (code !== undefined) {
     containerBuilder
@@ -128,9 +135,21 @@ const unlocksText = (unlocks: string[]) => {
   return rest > 0 ? `${shown} (+${rest})` : shown;
 };
 
-export const getCourseComponent = (
+type StaffText = {
+  active: (names: string[]) => string[];
+  retired: (...nameGroups: string[][]) => string[];
+};
+
+const linkedStaff: StaffText = { active: linkStaff, retired: getRetiredStaff };
+const plainStaff: StaffText = { active: listStaff, retired: listRetiredStaff };
+
+// Room for the line naming the user the card is for.
+const MAX_CARD_TEXT_LENGTH = MAX_COMPONENT_TEXT_LENGTH - 100;
+
+const buildCourseCard = (
   course: Course,
-  extras: CourseExtras = {},
+  extras: CourseExtras,
+  staff: StaffText,
 ) => {
   const containerBuilder = new ContainerBuilder();
 
@@ -182,7 +201,7 @@ export const getCourseComponent = (
     )
     .addSeparatorComponents((separator) => separator.setDivider(false));
 
-  const professorChunks = linkStaff(course.professors);
+  const professorChunks = staff.active(course.professors);
 
   containerBuilder.addTextDisplayComponents((textDisplay) =>
     textDisplay.setContent(`**${labels.professors}**\n${professorChunks[0]}`),
@@ -194,7 +213,7 @@ export const getCourseComponent = (
     );
   }
 
-  const assistantChunks = linkStaff(course.assistants);
+  const assistantChunks = staff.active(course.assistants);
 
   containerBuilder.addTextDisplayComponents((textDisplay) =>
     textDisplay.setContent(`**${labels.assistants}**\n${assistantChunks[0]}`),
@@ -206,7 +225,7 @@ export const getCourseComponent = (
     );
   }
 
-  const retiredChunks = getRetiredStaff(course.professors, course.assistants);
+  const retiredChunks = staff.retired(course.professors, course.assistants);
 
   if (retiredChunks.length > 0) {
     containerBuilder.addTextDisplayComponents((textDisplay) =>
@@ -236,17 +255,34 @@ export const getCourseComponent = (
       )
       .addSeparatorComponents((separator) => separator.setDivider(false));
 
-    for (let i = 0; i < participants.length; i += 3) {
-      const chunk = participants.slice(i, i + 3);
-      const participantText = chunk
-        .map(({ count, year }) => `**${year}:** ${count}`)
-        .join('  •  ');
+    const participantLines: string[] = [];
 
-      containerBuilder.addTextDisplayComponents((textDisplay) =>
-        textDisplay.setContent(participantText),
+    for (let i = 0; i < participants.length; i += 3) {
+      participantLines.push(
+        participants
+          .slice(i, i + 3)
+          .map(({ count, year }) => `**${year}:** ${count}`)
+          .join('  •  '),
       );
     }
+
+    containerBuilder.addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(participantLines.join('\n')),
+    );
   }
 
   return containerBuilder;
+};
+
+// Discord caps a message's text at 4,000 characters. The staff's profile
+// links take most of a long card, so it drops them before anything else.
+export const getCourseComponent = (
+  course: Course,
+  extras: CourseExtras = {},
+) => {
+  const card = buildCourseCard(course, extras, linkedStaff);
+
+  return componentTextLength(card.toJSON()) <= MAX_CARD_TEXT_LENGTH
+    ? card
+    : buildCourseCard(course, extras, plainStaff);
 };

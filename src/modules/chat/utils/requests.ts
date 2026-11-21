@@ -567,7 +567,10 @@ export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {
 
   for (const [key, value] of Object.entries(sanitizedOptions)) {
     if (value !== undefined) {
-      url.searchParams.append(key, String(value));
+      url.searchParams.append(
+        key,
+        typeof value === 'number' ? value.toString() : value,
+      );
     }
   }
 

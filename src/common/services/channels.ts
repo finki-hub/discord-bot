@@ -22,29 +22,38 @@ export const initializeChannels = async (guildId: string) => {
     Record<Channel, GuildTextBasedChannel | undefined>
   > = {};
 
-  for (const [channelName, channelId] of Object.entries(channelIds)) {
-    const channelType = ChannelSchema.safeParse(channelName);
+  // The channels are independent, so they are fetched together.
+  await Promise.all(
+    Object.entries<string | undefined>(channelIds).map(
+      async ([channelName, channelId]) => {
+        const channelType = ChannelSchema.safeParse(channelName);
 
-    if (channelId === undefined || !channelType.success) {
-      continue;
-    }
+        if (channelId === undefined || !channelType.success) {
+          return;
+        }
 
-    try {
-      const channel = await client.channels.fetch(channelId);
-      if (!channel?.isTextBased() || channel.isDMBased()) {
-        logger.warn(`Channel ${channelId} is not a guild text-based channel`, {
-          guildId,
-        });
-        continue;
-      }
+        try {
+          const channel = await client.channels.fetch(channelId);
+          if (!channel?.isTextBased() || channel.isDMBased()) {
+            logger.warn(
+              `Channel ${channelId} is not a guild text-based channel`,
+              { guildId },
+            );
+            return;
+          }
 
-      guildChannels[channelType.data] = channel;
-    } catch (error) {
-      logger.error(`Failed fetching channel ${channelId}\n${String(error)}`, {
-        guildId,
-      });
-    }
-  }
+          guildChannels[channelType.data] = channel;
+        } catch (error) {
+          logger.error(
+            `Failed fetching channel ${channelId}\n${String(error)}`,
+            {
+              guildId,
+            },
+          );
+        }
+      },
+    ),
+  );
 
   channels[guildId] = guildChannels;
   logger.info(`Channels initialized for guild ${guildId}`);

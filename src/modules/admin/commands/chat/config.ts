@@ -10,6 +10,7 @@ import { createChatCommandChoices } from '@/common/commands/chat.js';
 import { executeSubcommand } from '@/common/commands/subcommands.js';
 import { logger } from '@/common/logger/index.js';
 import { Role } from '@/common/schemas/Role.js';
+import { fitsJsonCodeBlock } from '@/common/utils/limits.js';
 import { runSafely } from '@/common/utils/runSafely.js';
 import {
   getConfigKeys,
@@ -121,7 +122,7 @@ const handleConfigGet = async (interaction: ChatInputCommandInteraction) => {
     2,
   );
 
-  if (config.length > 2_000) {
+  if (!fitsJsonCodeBlock(config)) {
     await interaction.editReply({
       files: [
         {
@@ -193,7 +194,7 @@ const handleConfigSet = async (interaction: ChatInputCommandInteraction) => {
     guildId,
   });
 
-  if (newProperty.length > 2_000) {
+  if (!fitsJsonCodeBlock(newProperty)) {
     await interaction.editReply({
       files: [
         {
