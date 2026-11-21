@@ -17,6 +17,9 @@ export const ALLOWED_INACTIVITY_DAYS = 10;
 export const MAX_TICKET_INACTIVITY_MILLISECONDS =
   ALLOWED_INACTIVITY_DAYS * 86_400_000;
 
+export const TICKET_REMINDER_THREE_DAYS_MILLISECONDS = 3 * 86_400_000;
+export const TICKET_REMINDER_ONE_DAY_MILLISECONDS = 86_400_000;
+
 export const TICKETS_PER_PAGE = 8;
 
 // Discord's limit for thread names.
@@ -28,3 +31,7 @@ export const TICKET_START_LOOKBACK_LIMIT = 50;
 // Persisted marker for modal-created tickets. Keep this value stable: existing
 // tickets rely on it to be recognized as started during maintenance.
 export const TICKET_REQUEST_FOOTER = 'Барање за тикет';
+
+// Persisted marker for inactivity warnings. Keep this value stable: the
+// reminder stage and timestamp are read from these messages during maintenance.
+export const TICKET_REMINDER_FOOTER = 'Автоматска напомена';
