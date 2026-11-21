@@ -288,14 +288,17 @@ export const captureException = (
       userId === null ? FALLBACK_DISTINCT_ID : hashUserId(userId);
     const category = errorCategory(error);
     const capturedError = sanitizeExceptionForCapture(category);
-    client.captureException(capturedError, distinctId, {
-      $process_person_profile: false,
-      command: allowedLabel(props.command, EXCEPTION_COMMANDS),
-      error_type: category,
-      phase: allowedLabel(props.phase, EXCEPTION_PHASES),
-      service: SERVICE,
-      surface: allowedLabel(props.surface, EXCEPTION_SURFACES),
-      ...getRevisionProperties(),
+    client.captureException(capturedError, {
+      distinctId,
+      options: { process_person_profile: false },
+      properties: {
+        command: allowedLabel(props.command, EXCEPTION_COMMANDS),
+        error_type: category,
+        phase: allowedLabel(props.phase, EXCEPTION_PHASES),
+        service: SERVICE,
+        surface: allowedLabel(props.surface, EXCEPTION_SURFACES),
+        ...getRevisionProperties(),
+      },
     });
   } catch {
     logger.debug('Failed capturing exception in PostHog');

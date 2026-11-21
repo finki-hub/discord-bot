@@ -14,6 +14,10 @@ import {
   trackMessageAnswered,
 } from '@/common/services/analytics.js';
 
+const discordUserHash = createHash('sha256')
+  .update('test-saltdiscord-user')
+  .digest('hex');
+
 type CaptureExceptionMock = (
   error: Error,
   distinctId: string,
@@ -68,7 +72,7 @@ describe('analytics exception capture', () => {
     });
     expect(postHog.capture).not.toHaveBeenCalled();
     expect(postHog.captureException).toHaveBeenCalledOnce();
-    const [capturedError, distinctId, properties] =
+    const [capturedError, options] =
       postHog.captureException.mock.calls[0] ?? [];
     expect(capturedError).toBeInstanceOf(Error);
     expect(capturedError).toMatchObject({
@@ -76,17 +80,17 @@ describe('analytics exception capture', () => {
       name: 'Error',
     });
     expect(capturedError?.stack).not.toContain('provider-secret');
-    expect(distinctId).toBe(
-      createHash('sha256').update('test-saltdiscord-user').digest('hex'),
-    );
-    expect(properties).toEqual({
-      app_revision: 'a'.repeat(40),
-      $process_person_profile: false,
-      command: 'chat query command',
-      error_type: 'error',
-      phase: null,
-      service: 'discord-bot',
-      surface: 'interaction',
+    expect(options).toEqual({
+      distinctId: discordUserHash,
+      options: { process_person_profile: false },
+      properties: {
+        app_revision: 'a'.repeat(40),
+        command: 'chat query command',
+        error_type: 'error',
+        phase: null,
+        service: 'discord-bot',
+        surface: 'interaction',
+      },
     });
   });
 
@@ -132,9 +136,7 @@ describe('analytics exception capture', () => {
 
     const revisionProps =
       expected === undefined ? {} : { app_revision: expected };
-    const distinctId = createHash('sha256')
-      .update('test-saltdiscord-user')
-      .digest('hex');
+    const distinctId = discordUserHash;
     expect(postHog.capture.mock.calls).toEqual(
       [
         {
@@ -195,15 +197,17 @@ describe('analytics exception capture', () => {
         name: 'Error',
         stack: 'Error: error',
       }),
-      'discord-bot',
       {
-        $process_person_profile: false,
-        command: 'unknown',
-        error_type: 'error',
-        phase: null,
-        service: 'discord-bot',
-        surface: 'unknown',
-        ...revisionProps,
+        distinctId: 'discord-bot',
+        options: { process_person_profile: false },
+        properties: {
+          command: 'unknown',
+          error_type: 'error',
+          phase: null,
+          service: 'discord-bot',
+          surface: 'unknown',
+          ...revisionProps,
+        },
       },
     );
     const captured = JSON.stringify([
