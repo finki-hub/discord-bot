@@ -110,9 +110,8 @@ See [`config/bot.json.example`](./config/bot.json.example) for an example config
 The data for informational commands is loaded from data storage if `DATA_STORAGE_URL` is configured. The bot fetches these files from the data storage base URL on startup and reloads them every hour:
 
 1. `courses.json` - a consolidated array of all courses with their information, participants, prerequisites, and staff
-2. `sessions.json` - an object mapping session names to filenames
 
-Rooms, staff and Anto quotes come from FINKI Hub's Directus (`DIRECTUS_URL`) on startup and every hour.
+Rooms, staff, exam sessions and Anto quotes come from FINKI Hub's Directus (`DIRECTUS_URL`) on startup and every hour.
 
 `/course` also reads FINKI Hub's Directus (`DIRECTUS_URL`) when it answers: the course's Discord channel, shown as a mention when a text channel of that name exists on the server, and the courses whose prerequisites name it. If Directus does not answer, the card is shown without them. `/staff` lists the staff member's consultations of the coming week (day, date, time, room) from FINKI's public APIs when `PUBAPI_API_KEY` is set; otherwise, or if they do not answer, it keeps only the consultations link.
 
@@ -120,7 +119,7 @@ If `DATA_STORAGE_URL` is not configured, these commands run without loaded data.
 
 ### Sessions (Timetables)
 
-All the session schedule files should be placed in the `sessions` folder in your data storage bucket. The names of the files should match the respective names in `sessions.json`. When users request a session via the `/session` command, the bot will provide a direct link to the file in the data storage bucket.
+Exam sessions and their schedule files are managed in Directus. `/session` links the public file of the chosen session.
 
 ## Integration With `finki-hub/chat-bot`
 
