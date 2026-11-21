@@ -117,7 +117,11 @@ describe('getInactivityAction', () => {
   });
 
   test('sends the 3-day reminder at seven idle days', () => {
-    expect(actionFor(7 * DAY)).toEqual({ stage: '3d', type: 'remind' });
+    expect(actionFor(7 * DAY)).toEqual({
+      daysLeft: 3,
+      stage: '3d',
+      type: 'remind',
+    });
   });
 
   test('does not repeat the 3-day reminder', () => {
@@ -125,7 +129,19 @@ describe('getInactivityAction', () => {
   });
 
   test('sends the 1-day reminder after a 3-day reminder', () => {
-    expect(actionFor(9 * DAY, '3d')).toEqual({ stage: '1d', type: 'remind' });
+    expect(actionFor(9 * DAY, '3d')).toEqual({
+      daysLeft: 1,
+      stage: '1d',
+      type: 'remind',
+    });
+  });
+
+  test('reports the actual remaining days for a late 3-day reminder', () => {
+    expect(actionFor(8 * DAY + 21 * 3_600_000)).toEqual({
+      daysLeft: 2,
+      stage: '3d',
+      type: 'remind',
+    });
   });
 
   test('does not repeat the 1-day reminder', () => {
@@ -178,6 +194,7 @@ describe('getInactivityContext', () => {
     await expect(getInactivityContext(thread)).resolves.toEqual({
       lastActivity: BASELINE + DAY,
       lastReminderStage: null,
+      staleReminder: null,
     });
   });
 
@@ -187,6 +204,21 @@ describe('getInactivityContext', () => {
     await expect(getInactivityContext(thread)).resolves.toEqual({
       lastActivity: BASELINE,
       lastReminderStage: '3d',
+      staleReminder: null,
+    });
+  });
+
+  test('uses a newer message posted before the reminder', async () => {
+    const reminder = reminderMessage('3d');
+    const thread = threadFor({
+      lastMessage: reminder,
+      previous: [userMessage(BASELINE + DAY, 'newer-user')],
+    });
+
+    await expect(getInactivityContext(thread)).resolves.toEqual({
+      lastActivity: BASELINE + DAY,
+      lastReminderStage: null,
+      staleReminder: reminder,
     });
   });
 
@@ -198,6 +230,7 @@ describe('getInactivityContext', () => {
     await expect(getInactivityContext(thread)).resolves.toEqual({
       lastActivity: BASELINE + 2 * DAY,
       lastReminderStage: null,
+      staleReminder: null,
     });
   });
 
@@ -207,6 +240,7 @@ describe('getInactivityContext', () => {
     await expect(getInactivityContext(thread)).resolves.toEqual({
       lastActivity: BASELINE,
       lastReminderStage: null,
+      staleReminder: null,
     });
   });
 
@@ -219,6 +253,7 @@ describe('getInactivityContext', () => {
     await expect(getInactivityContext(thread)).resolves.toEqual({
       lastActivity: BASELINE + 3 * DAY,
       lastReminderStage: null,
+      staleReminder: null,
     });
   });
 
@@ -234,7 +269,7 @@ describe('getInactivityContext', () => {
 
 describe('buildTicketReminder', () => {
   test('builds the 3-day warning with a stateless baseline marker', () => {
-    const embed = buildTicketReminder(BASELINE, '3d').toJSON();
+    const embed = buildTicketReminder(BASELINE, '3d', 3).toJSON();
 
     expect(embed.description).toContain('3 дена');
     expect(embed.footer?.text).toBe(
@@ -247,9 +282,15 @@ describe('buildTicketReminder', () => {
   });
 
   test('builds the 1-day warning', () => {
-    const embed = buildTicketReminder(BASELINE, '1d').toJSON();
+    const embed = buildTicketReminder(BASELINE, '1d', 1).toJSON();
 
     expect(embed.description).toContain('1 ден');
+  });
+
+  test('uses the actual remaining days for a late warning', () => {
+    const embed = buildTicketReminder(BASELINE, '3d', 2).toJSON();
+
+    expect(embed.description).toContain('2 дена');
   });
 });
 
@@ -260,6 +301,7 @@ test('sends reminders without notifications', async () => {
   const thread = { id: 'thread', send } as unknown as AnyThreadChannel;
 
   await sendTicketReminder(thread, {
+    daysLeft: 1,
     guildId: 'guild',
     lastActivity: BASELINE,
     stage: '1d',

@@ -19,13 +19,14 @@ import {
 } from './constants.js';
 
 export type TicketInactivityAction =
-  | { stage: TicketReminderStage; type: 'remind' }
+  | { daysLeft: number; stage: TicketReminderStage; type: 'remind' }
   | { type: 'close' }
   | { type: 'none' };
 
 export type TicketInactivityContext = {
   lastActivity: number;
   lastReminderStage: null | TicketReminderStage;
+  staleReminder: Message | null;
 };
 
 export type TicketReminderDetails = {
@@ -89,7 +90,15 @@ export const getInactivityAction = ({
     return { type: 'none' };
   }
 
-  return { stage: dueStage, type: 'remind' };
+  const daysLeft = Math.max(
+    1,
+    Math.ceil(
+      (MAX_TICKET_INACTIVITY_MILLISECONDS - elapsed) /
+        TICKET_REMINDER_ONE_DAY_MILLISECONDS,
+    ),
+  );
+
+  return { daysLeft, stage: dueStage, type: 'remind' };
 };
 
 export const isTicketReminder = (
@@ -142,6 +151,18 @@ export const getReminderDetails = (
   return null;
 };
 
+const fetchPreviousMessages = async (
+  thread: AnyThreadChannel,
+  beforeId: string,
+): Promise<Message[]> => {
+  const messages = await thread.messages.fetch({ before: beforeId, limit: 10 });
+
+  return messages
+    .values()
+    .toArray()
+    .sort((a, b) => b.createdTimestamp - a.createdTimestamp);
+};
+
 export const getInactivityContext = async (
   thread: AnyThreadChannel,
 ): Promise<null | TicketInactivityContext> => {
@@ -155,15 +176,38 @@ export const getInactivityContext = async (
   if (latestMessage === null) {
     return thread.createdTimestamp === null
       ? null
-      : { lastActivity: thread.createdTimestamp, lastReminderStage: null };
+      : {
+          lastActivity: thread.createdTimestamp,
+          lastReminderStage: null,
+          staleReminder: null,
+        };
   }
 
   const details = getReminderDetails(latestMessage);
 
   if (details !== null) {
+    const earlierMessages = await fetchPreviousMessages(
+      thread,
+      latestMessage.id,
+    );
+    const newerActivity = earlierMessages.find(
+      (message) =>
+        !isTicketReminder(message) &&
+        message.createdTimestamp > details.baseline,
+    );
+
+    if (newerActivity !== undefined) {
+      return {
+        lastActivity: newerActivity.createdTimestamp,
+        lastReminderStage: null,
+        staleReminder: latestMessage,
+      };
+    }
+
     return {
       lastActivity: details.baseline,
       lastReminderStage: details.stage,
+      staleReminder: null,
     };
   }
 
@@ -171,25 +215,23 @@ export const getInactivityContext = async (
     return {
       lastActivity: latestMessage.createdTimestamp,
       lastReminderStage: null,
+      staleReminder: null,
     };
   }
 
-  const previousMessages = await thread.messages.fetch({
-    before: latestMessage.id,
-    limit: 10,
-  });
-  const previous = previousMessages
-    .values()
-    .toArray()
-    .sort((a, b) => b.createdTimestamp - a.createdTimestamp);
+  const previousMessages = await fetchPreviousMessages(
+    thread,
+    latestMessage.id,
+  );
 
-  for (const message of previous) {
+  for (const message of previousMessages) {
     const previousDetails = getReminderDetails(message);
 
     if (previousDetails !== null) {
       return {
         lastActivity: previousDetails.baseline,
         lastReminderStage: previousDetails.stage,
+        staleReminder: null,
       };
     }
 
@@ -197,23 +239,27 @@ export const getInactivityContext = async (
       return {
         lastActivity: message.createdTimestamp,
         lastReminderStage: null,
+        staleReminder: null,
       };
     }
   }
 
   return thread.createdTimestamp === null
     ? null
-    : { lastActivity: thread.createdTimestamp, lastReminderStage: null };
+    : {
+        lastActivity: thread.createdTimestamp,
+        lastReminderStage: null,
+        staleReminder: null,
+      };
 };
 
 export const buildTicketReminder = (
   lastActivity: number,
   stage: TicketReminderStage,
+  daysLeft: number,
 ) =>
   new EmbedBuilder()
-    .setDescription(
-      ticketMessageFunctions.ticketInactivityWarning(stage === '1d' ? 1 : 3),
-    )
+    .setDescription(ticketMessageFunctions.ticketInactivityWarning(daysLeft))
     .setFooter({
       text: `${TICKET_REMINDER_FOOTER} · ${stage} · ${ticketMessages.ticketReminderLastActivity}`,
     })
@@ -222,10 +268,12 @@ export const buildTicketReminder = (
 export const sendTicketReminder = async (
   thread: AnyThreadChannel,
   {
+    daysLeft,
     guildId,
     lastActivity,
     stage,
   }: {
+    daysLeft: number;
     guildId: string;
     lastActivity: number;
     stage: TicketReminderStage;
@@ -233,7 +281,7 @@ export const sendTicketReminder = async (
 ): Promise<void> => {
   try {
     await thread.send({
-      embeds: [buildTicketReminder(lastActivity, stage)],
+      embeds: [buildTicketReminder(lastActivity, stage, daysLeft)],
       flags: MessageFlags.SuppressNotifications,
     });
   } catch (error: unknown) {

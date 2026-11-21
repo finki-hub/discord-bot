@@ -472,6 +472,20 @@ const deleteTicketThread = async (
   }
 };
 
+const deleteStaleTicketReminder = async (
+  reminder: Message,
+  guildId: string,
+): Promise<void> => {
+  try {
+    await reminder.delete();
+  } catch (error: unknown) {
+    logger.warn(
+      `Failed deleting stale inactivity reminder ${reminder.id}\n${String(error)}`,
+      { guildId },
+    );
+  }
+};
+
 const maintainTicketThreads = async (
   ticketThreads: Collection<string, AnyThreadChannel>,
   guildId: string,
@@ -495,6 +509,10 @@ const maintainTicketThreads = async (
       continue;
     }
 
+    if (inactivity.staleReminder !== null) {
+      await deleteStaleTicketReminder(inactivity.staleReminder, guildId);
+    }
+
     const action = getInactivityAction({
       lastActivity: inactivity.lastActivity,
       lastReminderStage: inactivity.lastReminderStage,
@@ -505,6 +523,7 @@ const maintainTicketThreads = async (
       await closeTicket(thread.id, guildId);
     } else if (action.type === 'remind') {
       await sendTicketReminder(thread, {
+        daysLeft: action.daysLeft,
         guildId,
         lastActivity: inactivity.lastActivity,
         stage: action.stage,
