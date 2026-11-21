@@ -71,13 +71,17 @@ export const getCommonCommand = (name: keyof typeof commandDescriptions) => ({
       await safeReplyToInteraction(
         interaction,
         [mention, title, question.content, links].filter(Boolean).join('\n\n'),
-        { mentionUsers: user !== null },
+        { mentionUserIds: user ? [user.id] : [] },
       );
 
       return;
     }
 
     await interaction.editReply({
+      allowedMentions: {
+        parse: [],
+        users: user ? [user.id] : [],
+      },
       components: [
         ...(user ? [getMentionComponent(user)] : []),
         getQuestionComponent(question),

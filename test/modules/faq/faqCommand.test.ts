@@ -51,6 +51,7 @@ describe('/faq long answers', () => {
     await getCommonCommand('faq').execute(interaction);
 
     expect(editReply).toHaveBeenCalledWith({
+      allowedMentions: { parse: [], users: [] },
       components: [expect.anything()],
       flags: MessageFlags.IsComponentsV2,
     });

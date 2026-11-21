@@ -3,13 +3,15 @@ import {
   type ChatInputCommandInteraction,
   type MessageContextMenuCommandInteraction,
   MessageFlags,
+  type RepliableInteraction,
 } from 'discord.js';
-import { beforeEach, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { ChatCommand, ContextMenuCommand } from '@/core/lib/Command.js';
 
 import { handleMessageContextMenuCommand } from '@/core/commands/contextMenuHandlers.js';
 import { handleChatInputCommand } from '@/core/commands/handlers.js';
+import { notifyInteractionError } from '@/core/commands/interactionHandlerUtils.js';
 
 const mocks = vi.hoisted(() => ({
   executeChatInput: vi.fn<
@@ -144,4 +146,63 @@ test('keeps a public prompt context command public', async () => {
 
   expect(deferReply).toHaveBeenCalledWith(undefined);
   expect(mocks.executeContextMenu).toHaveBeenCalledWith(interaction);
+});
+
+const fakeButtonInteraction = ({
+  deferred = false,
+  ephemeral = null,
+}: { deferred?: boolean; ephemeral?: boolean | null } = {}) => {
+  const editReply = vi.fn<(payload: unknown) => Promise<void>>(async () => {});
+  const followUp = vi.fn<(payload: unknown) => Promise<void>>(async () => {});
+  const reply = vi.fn<(payload: unknown) => Promise<void>>(async () => {});
+  const interaction = {
+    deferred,
+    editReply,
+    ephemeral,
+    followUp,
+    isButton: () => true,
+    replied: false,
+    reply,
+  } as unknown as RepliableInteraction;
+
+  return { editReply, followUp, interaction, reply };
+};
+
+describe('interaction error notifications', () => {
+  test('follows up ephemerally after deferUpdate instead of replacing the card', async () => {
+    const { editReply, followUp, interaction } = fakeButtonInteraction({
+      deferred: true,
+    });
+
+    await notifyInteractionError(interaction, 'failed');
+
+    expect(followUp).toHaveBeenCalledWith({
+      content: 'failed',
+      flags: MessageFlags.Ephemeral,
+    });
+    expect(editReply).not.toHaveBeenCalled();
+  });
+
+  test('edits an ephemeral deferred reply', async () => {
+    const { editReply, followUp, interaction } = fakeButtonInteraction({
+      deferred: true,
+      ephemeral: true,
+    });
+
+    await notifyInteractionError(interaction, 'failed');
+
+    expect(editReply).toHaveBeenCalledWith({ content: 'failed' });
+    expect(followUp).not.toHaveBeenCalled();
+  });
+
+  test('replies ephemerally when the interaction was not acknowledged', async () => {
+    const { interaction, reply } = fakeButtonInteraction();
+
+    await notifyInteractionError(interaction, 'failed');
+
+    expect(reply).toHaveBeenCalledWith({
+      content: 'failed',
+      flags: MessageFlags.Ephemeral,
+    });
+  });
 });

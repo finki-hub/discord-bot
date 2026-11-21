@@ -2,6 +2,7 @@ import type { Message } from 'discord.js';
 
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
+import { allowedMentions } from '@/common/utils/messages.js';
 import { appendTimingFootnote } from '@/modules/chat/utils/timing.js';
 import { commandResponses } from '@/translations/commands.js';
 
@@ -28,9 +29,9 @@ test.each([0, 1])(
   'notice boundary overflow=%s never truncates the answer',
   async (overflow) => {
     const content = 'a'.repeat(2_000 - footnote.length + overflow);
-    const edit = vi.fn<(value: { content: string }) => Promise<void>>(
-      async () => {},
-    );
+    const edit = vi.fn<
+      (value: { allowedMentions?: unknown; content: string }) => Promise<void>
+    >(async () => {});
     const message = {
       fetch: async () => ({ content, edit }),
     } as unknown as Message;
@@ -38,7 +39,9 @@ test.each([0, 1])(
       overflow === 0,
     );
     expect(edit.mock.calls).toEqual(
-      overflow === 0 ? [[{ content: content + footnote }]] : [],
+      overflow === 0
+        ? [[{ ...allowedMentions(), content: content + footnote }]]
+        : [],
     );
   },
 );
