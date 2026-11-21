@@ -27,6 +27,18 @@ const consultationLine = ({ date, day, from, room, to }: Consultation) => {
     : `${when} ${from}–${to}`;
 };
 
+// The most consultations the card lists before "+N".
+const CONSULTATIONS_SHOWN = 20;
+
+const consultationLines = (consultations: Consultation[]) => {
+  const lines = consultations
+    .slice(0, CONSULTATIONS_SHOWN)
+    .map((consultation) => consultationLine(consultation));
+  const rest = consultations.length - CONSULTATIONS_SHOWN;
+
+  return rest > 0 ? [...lines, `(+${rest})`] : lines;
+};
+
 // `consultations`: the coming ones, an empty list for none scheduled, or
 // null when unknown (the card then keeps only the link).
 export const getStaffComponent = (
@@ -78,7 +90,7 @@ export const getStaffComponent = (
   if (consultations !== null) {
     const lines =
       consultations.length > 0
-        ? consultations.map((consultation) => consultationLine(consultation))
+        ? consultationLines(consultations)
         : [labels.noConsultations];
 
     containerBuilder

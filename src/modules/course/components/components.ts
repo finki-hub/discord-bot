@@ -7,11 +7,21 @@ import {
   SeparatorSpacingSize,
 } from 'discord.js';
 
+import {
+  componentTextLength,
+  MAX_COMPONENT_TEXT_LENGTH,
+} from '@/common/utils/limits.js';
 import { labels } from '@/translations/labels.js';
 
 import { ACCREDITATION_YEARS, type AccreditationYear } from '../constants.js';
 import { type Course } from '../schemas/Course.js';
-import { extractParticipants, getRetiredStaff, linkStaff } from './utils.js';
+import {
+  extractParticipants,
+  getRetiredStaff,
+  linkStaff,
+  listRetiredStaff,
+  listStaff,
+} from './utils.js';
 
 // Discord allows 40 components in a message, nested ones included, so the
 // lines of a section share one text display.
@@ -125,9 +135,21 @@ const unlocksText = (unlocks: string[]) => {
   return rest > 0 ? `${shown} (+${rest})` : shown;
 };
 
-export const getCourseComponent = (
+type StaffText = {
+  active: (names: string[]) => string[];
+  retired: (...nameGroups: string[][]) => string[];
+};
+
+const linkedStaff: StaffText = { active: linkStaff, retired: getRetiredStaff };
+const plainStaff: StaffText = { active: listStaff, retired: listRetiredStaff };
+
+// Room for the line naming the user the card is for.
+const MAX_CARD_TEXT_LENGTH = MAX_COMPONENT_TEXT_LENGTH - 100;
+
+const buildCourseCard = (
   course: Course,
-  extras: CourseExtras = {},
+  extras: CourseExtras,
+  staff: StaffText,
 ) => {
   const containerBuilder = new ContainerBuilder();
 
@@ -179,7 +201,7 @@ export const getCourseComponent = (
     )
     .addSeparatorComponents((separator) => separator.setDivider(false));
 
-  const professorChunks = linkStaff(course.professors);
+  const professorChunks = staff.active(course.professors);
 
   containerBuilder.addTextDisplayComponents((textDisplay) =>
     textDisplay.setContent(`**${labels.professors}**\n${professorChunks[0]}`),
@@ -191,7 +213,7 @@ export const getCourseComponent = (
     );
   }
 
-  const assistantChunks = linkStaff(course.assistants);
+  const assistantChunks = staff.active(course.assistants);
 
   containerBuilder.addTextDisplayComponents((textDisplay) =>
     textDisplay.setContent(`**${labels.assistants}**\n${assistantChunks[0]}`),
@@ -203,7 +225,7 @@ export const getCourseComponent = (
     );
   }
 
-  const retiredChunks = getRetiredStaff(course.professors, course.assistants);
+  const retiredChunks = staff.retired(course.professors, course.assistants);
 
   if (retiredChunks.length > 0) {
     containerBuilder.addTextDisplayComponents((textDisplay) =>
@@ -250,4 +272,17 @@ export const getCourseComponent = (
   }
 
   return containerBuilder;
+};
+
+// Discord caps a message's text at 4,000 characters. The staff's profile
+// links take most of a long card, so it drops them before anything else.
+export const getCourseComponent = (
+  course: Course,
+  extras: CourseExtras = {},
+) => {
+  const card = buildCourseCard(course, extras, linkedStaff);
+
+  return componentTextLength(card.toJSON()) <= MAX_CARD_TEXT_LENGTH
+    ? card
+    : buildCourseCard(course, extras, plainStaff);
 };

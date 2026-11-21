@@ -10,36 +10,41 @@ import {
 
 import type { PaginationComponentData } from '@/common/types/PaginationComponentData.js';
 
+import { MAX_ACTION_ROW_BUTTONS } from '@/common/utils/limits.js';
 import { paginationStringFunctions } from '@/translations/pagination.js';
+
+// The pages a row of buttons offers: all of them when they fit, otherwise
+// the first, the last and the ones around the current page. One row keeps
+// the card within Discord's component limit however long the list is.
+const visiblePages = (currentPage: number, totalPages: number) =>
+  totalPages <= MAX_ACTION_ROW_BUTTONS
+    ? Array.from({ length: totalPages }, (_, page) => page)
+    : [
+        ...new Set([
+          0,
+          currentPage,
+          Math.max(currentPage - 1, 0),
+          Math.min(currentPage + 1, totalPages - 1),
+          totalPages - 1,
+        ]),
+      ].toSorted((left, right) => left - right);
 
 const buildPageButtons = (
   buttonId: string,
   currentPage: number,
   totalPages: number,
-) => {
-  const rows: Array<ActionRowBuilder<ButtonBuilder>> = [];
-
-  for (let i = 0; i < totalPages; i += 5) {
-    const actionRow = new ActionRowBuilder<ButtonBuilder>();
-
-    for (let j = i; j < Math.min(i + 5, totalPages); j++) {
-      const style =
-        j === currentPage ? ButtonStyle.Primary : ButtonStyle.Secondary;
-
-      const button = new ButtonBuilder()
-        .setCustomId(`${buttonId}:page:${j}`)
-        .setLabel(`${j + 1}`)
-        .setStyle(style)
-        .setDisabled(j === currentPage);
-
-      actionRow.addComponents(button);
-    }
-
-    rows.push(actionRow);
-  }
-
-  return rows;
-};
+) =>
+  new ActionRowBuilder<ButtonBuilder>().addComponents(
+    visiblePages(currentPage, totalPages).map((page) =>
+      new ButtonBuilder()
+        .setCustomId(`${buttonId}:page:${page}`)
+        .setLabel(`${page + 1}`)
+        .setStyle(
+          page === currentPage ? ButtonStyle.Primary : ButtonStyle.Secondary,
+        )
+        .setDisabled(page === currentPage),
+    ),
+  );
 
 const addEntries = (
   containerBuilder: ContainerBuilder,
@@ -109,13 +114,11 @@ export const getPaginationComponent = ({
   addEntries(containerBuilder, paginatedEntries, description);
 
   if (totalPages > 1) {
-    for (const row of buildPageButtons(buttonId, currentPage, totalPages)) {
-      containerBuilder.addActionRowComponents(row);
-    }
-
-    containerBuilder.addSeparatorComponents((separator) =>
-      separator.setDivider(false),
-    );
+    containerBuilder
+      .addActionRowComponents(
+        buildPageButtons(buttonId, currentPage, totalPages),
+      )
+      .addSeparatorComponents((separator) => separator.setDivider(false));
   }
 
   containerBuilder.addTextDisplayComponents((textDisplay) =>

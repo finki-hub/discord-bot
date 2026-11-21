@@ -8,9 +8,18 @@ import {
   SeparatorSpacingSize,
 } from 'discord.js';
 
+import {
+  MAX_ACTION_ROW_BUTTONS,
+  truncateButtonLabel,
+} from '@/common/utils/limits.js';
+
 import type { Question } from '../schemas/Question.js';
 
-import { getNormalizedUrl } from '../utils/links.js';
+import { getButtonLinks } from '../utils/links.js';
+
+// The most link buttons a card holds within Discord's component limit; a
+// question with more lists its links as text.
+export const MAX_LINK_BUTTONS = 25;
 
 export const getQuestionComponent = (question: Question) => {
   const containerBuilder = new ContainerBuilder();
@@ -27,24 +36,22 @@ export const getQuestionComponent = (question: Question) => {
     );
 
   if (question.links !== null) {
-    const linkEntries = Object.entries(question.links).filter(
-      ([name, url]) => name !== '' && url !== '',
-    );
+    const linkEntries = getButtonLinks(question.links);
 
     if (linkEntries.length > 0) {
       containerBuilder.addSeparatorComponents((separator) =>
         separator.setSpacing(SeparatorSpacingSize.Large),
       );
 
-      for (let i = 0; i < linkEntries.length; i += 5) {
-        const chunk = linkEntries.slice(i, i + 5);
+      for (let i = 0; i < linkEntries.length; i += MAX_ACTION_ROW_BUTTONS) {
+        const chunk = linkEntries.slice(i, i + MAX_ACTION_ROW_BUTTONS);
         const actionRow = new ActionRowBuilder<ButtonBuilder>();
 
         for (const [name, url] of chunk) {
           actionRow.addComponents(
             new ButtonBuilder()
-              .setLabel(name)
-              .setURL(getNormalizedUrl(url))
+              .setLabel(truncateButtonLabel(name))
+              .setURL(url)
               .setStyle(ButtonStyle.Link),
           );
         }
