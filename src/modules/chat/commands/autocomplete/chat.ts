@@ -1,5 +1,6 @@
 import type { AutocompleteInteraction } from 'discord.js';
 
+import { withTimeout } from '@/common/utils/timeout.js';
 import {
   formatModelLabel,
   isModelSelectable,
@@ -10,9 +11,17 @@ import { getSupportedModels } from '@/modules/chat/utils/requests.js';
 
 export const name = 'chat';
 
-// Discord gives autocomplete about three seconds; resolve the chat account
-// well inside that window so a slow chatbot cannot leave the request pending.
+// Discord closes the autocomplete window at three seconds; leave a little room
+// to actually send the response.
+const AUTOCOMPLETE_DEADLINE_MS = 2_800;
 const AUTOCOMPLETE_USER_TIMEOUT_MS = 2_000;
+
+const remainingBudget = (interaction: AutocompleteInteraction) => {
+  const elapsed = Date.now() - interaction.createdTimestamp;
+  return Number.isFinite(elapsed)
+    ? AUTOCOMPLETE_DEADLINE_MS - elapsed
+    : AUTOCOMPLETE_DEADLINE_MS;
+};
 
 export type ModelAutocompleteChoice = {
   readonly name: string;
@@ -46,11 +55,35 @@ export const execute = async (interaction: AutocompleteInteraction) => {
     return;
   }
 
+  const userBudget = remainingBudget(interaction);
+  if (userBudget <= 0) {
+    await interaction.respond([]);
+    return;
+  }
+
   const chatUser = await resolveChatUser(
     interaction.user,
-    AbortSignal.timeout(AUTOCOMPLETE_USER_TIMEOUT_MS),
+    AbortSignal.timeout(Math.min(AUTOCOMPLETE_USER_TIMEOUT_MS, userBudget)),
   );
-  const catalog = await getSupportedModels(chatUser.id);
+
+  const catalogBudget = remainingBudget(interaction);
+  if (catalogBudget <= 0) {
+    await interaction.respond([]);
+    return;
+  }
+
+  let catalog: ModelCatalogResponse | null = null;
+  try {
+    catalog = await withTimeout(
+      getSupportedModels(chatUser.id),
+      catalogBudget,
+      'Autocomplete catalog timeout',
+    );
+  } catch {
+    // The shared catalog request keeps running and will populate the cache;
+    // this autocomplete window is already closing.
+  }
+
   if (catalog === null) {
     await interaction.respond([]);
     return;

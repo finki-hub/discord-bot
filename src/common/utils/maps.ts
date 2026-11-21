@@ -19,3 +19,10 @@ export const capMap = <K, V>(map: Map<K, V>, maxSize: number): void => {
     map.delete(oldestKey);
   }
 };
+
+// Re-inserting an updated key moves it to the newest position, so active
+// entries are the last ones evicted. Pair with capMap to enforce a limit.
+export const setNewest = <K, V>(map: Map<K, V>, key: K, value: V): void => {
+  map.delete(key);
+  map.set(key, value);
+};

@@ -7,7 +7,7 @@ import {
 } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
-import { capMap } from '@/common/utils/maps.js';
+import { capMap, setNewest } from '@/common/utils/maps.js';
 import {
   commandErrors,
   commandResponseFunctions,
@@ -90,7 +90,7 @@ const createChatThread = async (interaction: ChatInputCommandInteraction) => {
     await thread.send(commandResponses.chatThreadWelcome);
 
     armThread(thread.id, user.id);
-    userThreads.set(key, thread.id);
+    setNewest(userThreads, key, thread.id);
     capMap(userThreads, USER_THREADS_LIMIT);
 
     await interaction.editReply(

@@ -1,7 +1,7 @@
 /* eslint-disable camelcase -- API payload fields use snake_case */
 import type { User } from 'discord.js';
 
-import { capMap } from '@/common/utils/maps.js';
+import { capMap, setNewest } from '@/common/utils/maps.js';
 import { getApiKey, getChatbotUrl } from '@/configuration/environment.js';
 
 import {
@@ -96,7 +96,7 @@ export const resolveChatUser = async (
   }
 
   const user = ChatUserSchema.parse(await result.json());
-  userCache.set(discordUser.id, { profile: body, user });
+  setNewest(userCache, discordUser.id, { profile: body, user });
   capMap(userCache, USER_CACHE_LIMIT);
   return user;
 };
