@@ -6,7 +6,7 @@ import {
 
 import { executeSubcommand } from '@/common/commands/subcommands.js';
 import { getMemberFromGuild } from '@/common/utils/guild.js';
-import { client } from '@/core/client.js';
+import { safeEphemeralReplyToInteraction } from '@/common/utils/messages.js';
 import {
   commandRequiresPermissions,
   getCommandsWithPermission,
@@ -41,8 +41,6 @@ export const data = new SlashCommandBuilder()
 export const handleListCommands = async (
   interaction: ChatInputCommandInteraction,
 ) => {
-  await client.application?.commands.fetch();
-
   let commands: string[];
 
   if (interaction.guild === null) {
@@ -56,10 +54,10 @@ export const handleListCommands = async (
     );
 
     if (member === null) {
-      await interaction.reply({
-        content: commandErrors.commandNoPermission,
-        flags: MessageFlags.Ephemeral,
-      });
+      await safeEphemeralReplyToInteraction(
+        interaction,
+        commandErrors.commandNoPermission,
+      );
 
       return;
     }
@@ -67,27 +65,42 @@ export const handleListCommands = async (
     commands = await getCommandsWithPermission(member);
   }
 
-  await interaction.reply({
-    components: [getListCommandsComponent(commands, 0)],
-    flags: MessageFlags.IsComponentsV2,
-  });
+  const component = getListCommandsComponent(commands, 0);
+
+  await (interaction.deferred || interaction.replied
+    ? interaction.editReply({
+        components: [component],
+        flags: MessageFlags.IsComponentsV2,
+      })
+    : interaction.reply({
+        components: [component],
+        flags: MessageFlags.IsComponentsV2,
+      }));
 };
 
 const handleListLinks = async (interaction: ChatInputCommandInteraction) => {
   const links = await getLinks();
 
   if (links === null) {
-    await interaction.reply({
-      content: commandErrors.linksFetchFailed,
-      flags: MessageFlags.Ephemeral,
-    });
+    await safeEphemeralReplyToInteraction(
+      interaction,
+      commandErrors.linksFetchFailed,
+    );
+
     return;
   }
 
-  await interaction.reply({
-    components: [getListLinksComponent(links, 0)],
-    flags: MessageFlags.IsComponentsV2,
-  });
+  const component = getListLinksComponent(links, 0);
+
+  await (interaction.deferred || interaction.replied
+    ? interaction.editReply({
+        components: [component],
+        flags: MessageFlags.IsComponentsV2,
+      })
+    : interaction.reply({
+        components: [component],
+        flags: MessageFlags.IsComponentsV2,
+      }));
 };
 
 const handleListQuestions = async (
@@ -96,18 +109,25 @@ const handleListQuestions = async (
   const questions = await getQuestions();
 
   if (questions === null) {
-    await interaction.reply({
-      content: commandErrors.questionsFetchFailed,
-      flags: MessageFlags.Ephemeral,
-    });
+    await safeEphemeralReplyToInteraction(
+      interaction,
+      commandErrors.questionsFetchFailed,
+    );
 
     return;
   }
 
-  await interaction.reply({
-    components: [getListQuestionsComponent(questions, 0)],
-    flags: MessageFlags.IsComponentsV2,
-  });
+  const component = getListQuestionsComponent(questions, 0);
+
+  await (interaction.deferred || interaction.replied
+    ? interaction.editReply({
+        components: [component],
+        flags: MessageFlags.IsComponentsV2,
+      })
+    : interaction.reply({
+        components: [component],
+        flags: MessageFlags.IsComponentsV2,
+      }));
 };
 
 const listHandlers = {

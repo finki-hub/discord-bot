@@ -13,11 +13,9 @@ import { name as chatFeedbackButtonId } from '@/modules/chat/commands/button/cha
 import { name as chatCommandId } from '@/modules/chat/commands/chat/chat.js';
 import { name as credentialsCommandId } from '@/modules/chat/commands/chat/credentials.js';
 import { FEEDBACK_REASON_ID as chatFeedbackReasonButtonId } from '@/modules/chat/utils/feedback.js';
-import { name as helpCommandId } from '@/modules/help/commands/chat/help.js';
 import { name as listCommandsButtonId } from '@/modules/list/commands/button/listCommands.js';
 import { name as listLinksButtonId } from '@/modules/list/commands/button/listLinks.js';
 import { name as listQuestionsButtonId } from '@/modules/list/commands/button/listQuestions.js';
-import { name as listCommandId } from '@/modules/list/commands/chat/list.js';
 import { name as ticketCreateButtonId } from '@/modules/ticket/commands/button/ticketCreate.js';
 import { name as ticketListButtonId } from '@/modules/ticket/commands/button/ticketList.js';
 import { name as ticketCommandId } from '@/modules/ticket/commands/chat/ticket.js';
@@ -39,8 +37,6 @@ const nonDeferredCommands = new Set<string>([
   chatFeedbackButtonId,
   // Opens a modal, which cannot follow a deferred reply.
   chatFeedbackReasonButtonId,
-  helpCommandId,
-  listCommandId,
   listCommandsButtonId,
   listLinksButtonId,
   listQuestionsButtonId,

@@ -1,7 +1,10 @@
 import { type ButtonInteraction, MessageFlags } from 'discord.js';
 
 import { getMemberFromGuild } from '@/common/utils/guild.js';
-import { handlePagination } from '@/common/utils/pagination.js';
+import {
+  handlePagination,
+  verifyPaginationInteraction,
+} from '@/common/utils/pagination.js';
 import {
   commandRequiresPermissions,
   getCommandsWithPermission,
@@ -15,6 +18,12 @@ export const execute = async (
   interaction: ButtonInteraction,
   args: string[],
 ) => {
+  if (!(await verifyPaginationInteraction(interaction))) {
+    return;
+  }
+
+  await interaction.deferUpdate();
+
   let commands: string[];
 
   if (interaction.guild === null) {
@@ -28,7 +37,7 @@ export const execute = async (
     );
 
     if (member === null) {
-      await interaction.reply({
+      await interaction.followUp({
         content: commandErrors.commandGuildOnly,
         flags: MessageFlags.Ephemeral,
       });

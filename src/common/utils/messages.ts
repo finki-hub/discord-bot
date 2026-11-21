@@ -27,9 +27,19 @@ const EPHEMERAL_NO_EMBEDS_FLAGS =
   // eslint-disable-next-line no-bitwise -- combining distinct message flag bits
   MessageFlags.SuppressEmbeds | MessageFlags.Ephemeral;
 
+// Answers and knowledge-base content are untrusted text: `@everyone` or a role
+// mention in them must never ping. Only IDs passed in explicitly are allowed.
+const allowedMentions = (mentionUserIds: readonly string[] = []) => ({
+  allowedMentions: {
+    parse: [],
+    repliedUser: false,
+    ...(mentionUserIds.length > 0 && { users: [...mentionUserIds] }),
+  },
+});
+
 type StreamReplyOptions = {
   language?: string;
-  mentionUsers?: boolean;
+  mentionUserIds?: readonly string[];
   useCodeBlock?: boolean;
 };
 
@@ -105,23 +115,17 @@ export const safeReplyToInteraction = async (
   options?: {
     ephemeral?: boolean;
     language?: string;
-    mentionUsers?: boolean;
+    mentionUserIds?: readonly string[];
     useCodeBlock?: boolean;
   },
 ) => {
   const {
     ephemeral = false,
     language = '',
-    mentionUsers = false,
+    mentionUserIds = [],
     useCodeBlock = false,
   } = options ?? {};
-  const mentionOptions = mentionUsers
-    ? {}
-    : {
-        allowedMentions: {
-          users: [],
-        },
-      };
+  const mentionOptions = allowedMentions(mentionUserIds);
   const ephemeralOptions = ephemeral
     ? ({ flags: MessageFlags.Ephemeral } as const)
     : {};
@@ -541,13 +545,13 @@ export const safeStreamReplyToInteraction = async (
 ): Promise<Message[]> => {
   const {
     language = '',
-    mentionUsers = false,
+    mentionUserIds = [],
     useCodeBlock = false,
   } = options ?? {};
 
   const baseOptions = {
     ...NO_EMBEDS,
-    ...(!mentionUsers && { allowedMentions: { users: [] } }),
+    ...allowedMentions(mentionUserIds),
   };
   const ephemeral = interaction.ephemeral === true;
   const replyOptions = ephemeral
@@ -649,16 +653,13 @@ export const safeStreamReplyToMessage = async (
 ): Promise<Message[]> => {
   const {
     language = '',
-    mentionUsers = false,
+    mentionUserIds = [],
     useCodeBlock = false,
   } = options ?? {};
 
   const baseOptions = {
     ...NO_EMBEDS,
-    allowedMentions: {
-      repliedUser: false,
-      ...(!mentionUsers && { users: [] }),
-    },
+    ...allowedMentions(mentionUserIds),
   };
   const formatContent = (text: string) =>
     useCodeBlock ? codeBlock(language, text) : text;
