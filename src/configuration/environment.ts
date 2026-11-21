@@ -40,18 +40,7 @@ export const getApiKey = () => {
   }
 };
 
-export const getDataStorageUrl = () => {
-  try {
-    return z
-      .string()
-      .transform((url) => (url.endsWith('/') ? url.slice(0, -1) : url))
-      .parse(env['DATA_STORAGE_URL']);
-  } catch {
-    return null;
-  }
-};
-
-// FINKI Hub's Directus, read for the details courses.json does not carry.
+// FINKI Hub's Directus, the source of the bot's data.
 export const getDirectusUrl = () => {
   try {
     return z

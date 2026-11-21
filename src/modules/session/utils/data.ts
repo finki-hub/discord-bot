@@ -52,7 +52,6 @@ export const startPeriodicReload = () => {
   schedulePeriodicReload({
     label: 'sessions',
     reload: reloadSessions,
-    requiresDataStorage: false,
   });
 };
 

@@ -32,7 +32,6 @@ export const startPeriodicReload = () => {
   schedulePeriodicReload({
     label: 'anto quotes',
     reload: reloadQuotes,
-    requiresDataStorage: false,
   });
 };
 
