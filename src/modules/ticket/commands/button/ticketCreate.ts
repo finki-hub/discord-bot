@@ -1,13 +1,12 @@
-import { type ButtonInteraction, ChannelType } from 'discord.js';
+import { type ButtonInteraction, ChannelType, MessageFlags } from 'discord.js';
 
 import { Channel } from '@/common/schemas/Channel.js';
 import { getChannel } from '@/common/services/channels.js';
-import { getMembersByRoleIds } from '@/common/services/roles.js';
 import {
   getTicketingProperty,
   getTicketProperty,
 } from '@/configuration/bot/index.js';
-import { createTicket } from '@/modules/ticket/utils/tickets.js';
+import { getTicketCreateModal } from '@/modules/ticket/components/components.js';
 import { commandErrors } from '@/translations/commands.js';
 
 export const name = 'ticketCreate';
@@ -17,7 +16,10 @@ export const execute = async (
   args: string[],
 ) => {
   if (interaction.guild === null) {
-    await interaction.editReply(commandErrors.commandGuildOnly);
+    await interaction.reply({
+      content: commandErrors.commandGuildOnly,
+      flags: MessageFlags.Ephemeral,
+    });
     return;
   }
 
@@ -26,12 +28,18 @@ export const execute = async (
   const enabled = await getTicketingProperty('enabled', interaction.guild.id);
 
   if (!enabled) {
-    await interaction.editReply(commandErrors.ticketingDisabled);
+    await interaction.reply({
+      content: commandErrors.ticketingDisabled,
+      flags: MessageFlags.Ephemeral,
+    });
     return;
   }
 
   if (ticketType === undefined) {
-    await interaction.editReply(commandErrors.invalidTicketType);
+    await interaction.reply({
+      content: commandErrors.invalidTicketType,
+      flags: MessageFlags.Ephemeral,
+    });
 
     return;
   }
@@ -42,7 +50,10 @@ export const execute = async (
   );
 
   if (ticketMetadata === undefined) {
-    await interaction.editReply(commandErrors.invalidTicketType);
+    await interaction.reply({
+      content: commandErrors.invalidTicketType,
+      flags: MessageFlags.Ephemeral,
+    });
 
     return;
   }
@@ -50,27 +61,22 @@ export const execute = async (
   const ticketsChannel = getChannel(Channel.Tickets, interaction.guild.id);
 
   if (ticketsChannel?.type !== ChannelType.GuildText) {
-    await interaction.editReply(commandErrors.invalidChannel);
+    await interaction.reply({
+      content: commandErrors.invalidChannel,
+      flags: MessageFlags.Ephemeral,
+    });
 
     return;
   }
 
   if (ticketMetadata.roles.length === 0) {
-    await interaction.editReply(commandErrors.noTicketMembers);
+    await interaction.reply({
+      content: commandErrors.noTicketMembers,
+      flags: MessageFlags.Ephemeral,
+    });
 
     return;
   }
 
-  const ticketRoleMembers = await getMembersByRoleIds(
-    interaction.guild,
-    ticketMetadata.roles,
-  );
-
-  if (ticketRoleMembers.length === 0) {
-    await interaction.editReply(commandErrors.noTicketMembers);
-
-    return;
-  }
-
-  await createTicket(interaction, ticketMetadata);
+  await interaction.showModal(getTicketCreateModal(ticketType));
 };

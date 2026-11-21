@@ -11,6 +11,12 @@ export const componentMessageFunctions = {
     `Ова се сите достапни прашања. Користете ${command} за да ги добиете одговорите.`,
 };
 
+export const ticketCreateComponents = {
+  descriptionLabel: 'Опис на прашањето или проблемот',
+  placeholder: 'Напишете што повеќе детали за да можат надлежните да помогнат.',
+  title: 'Нов тикет',
+} as const;
+
 export const feedbackReasonComponents = {
   button: 'Наведи причина',
   commentLabel: 'Коментар (по избор)',
