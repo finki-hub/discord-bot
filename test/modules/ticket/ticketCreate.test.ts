@@ -83,11 +83,12 @@ describe('createTicket', () => {
     await createTicket(interactionFor(guild, editReply), TICKET_TYPE, {
       description: 'Не можам да го отворам предметот.',
       memberIds: ['staff-member'],
+      title: 'Проблем со предметот',
     });
 
     expect(create).toHaveBeenCalledWith(
       expect.objectContaining({
-        name: 'requester#0001 - Поддршка',
+        name: 'Проблем со предметот - requester#0001 - Поддршка',
         type: ChannelType.PrivateThread,
       }),
     );
@@ -106,7 +107,77 @@ describe('createTicket', () => {
     );
   });
 
+  test("rejects thread names whose metadata cannot fit Discord's limit", async () => {
+    const create = vi.fn<(options: unknown) => Promise<unknown>>(
+      async () => ({}),
+    );
+    mocks.getChannel.mockReturnValue({
+      threads: { create },
+      type: ChannelType.GuildText,
+    } as unknown as TextChannel);
+
+    const editReply = vi.fn<(payload: unknown) => Promise<unknown>>(
+      async () => ({}),
+    );
+    const guild = {
+      channels: { cache: new Collection() },
+      id: 'guild',
+    } as unknown as Guild;
+    const longType: Ticket = {
+      ...TICKET_TYPE,
+      name: 'Т'.repeat(100),
+    };
+
+    await expect(
+      createTicket(interactionFor(guild, editReply), longType, {
+        description: 'Опис',
+        memberIds: [],
+        title: 'Наслов',
+      }),
+    ).rejects.toThrow('Ticket thread metadata exceeds');
+
+    expect(create).not.toHaveBeenCalled();
+  });
+
   test('links an existing open ticket instead of creating another', async () => {
+    const thread = {
+      archived: false,
+      id: 'ticket-thread',
+      isThread: () => true,
+      locked: false,
+      name: 'Стар наслов - requester#0001 - Поддршка',
+      parentId: 'tickets-channel',
+      url: 'https://discord.com/channels/1/2',
+    };
+    const create = vi.fn<(options: unknown) => Promise<unknown>>(
+      async () => {},
+    );
+    mocks.getChannel.mockReturnValue({
+      threads: { create },
+      type: ChannelType.GuildText,
+    } as unknown as TextChannel);
+
+    const editReply = vi.fn<(payload: unknown) => Promise<unknown>>(
+      async () => ({}),
+    );
+    const guild = {
+      channels: { cache: new Collection([['ticket-thread', thread]]) },
+      id: 'guild',
+    } as unknown as Guild;
+
+    await createTicket(interactionFor(guild, editReply), TICKET_TYPE, {
+      description: 'Помош',
+      memberIds: [],
+      title: 'Нов наслов',
+    });
+
+    expect(create).not.toHaveBeenCalled();
+    expect(editReply).toHaveBeenCalledWith(
+      'Веќе имате активен тикет од овој тип: https://discord.com/channels/1/2',
+    );
+  });
+
+  test('links a legacy ticket named before titles were added', async () => {
     const thread = {
       archived: false,
       id: 'ticket-thread',
@@ -135,6 +206,7 @@ describe('createTicket', () => {
     await createTicket(interactionFor(guild, editReply), TICKET_TYPE, {
       description: 'Помош',
       memberIds: [],
+      title: 'Помош',
     });
 
     expect(create).not.toHaveBeenCalled();

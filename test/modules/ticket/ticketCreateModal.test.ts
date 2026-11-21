@@ -6,13 +6,15 @@ import {
   getTicketCreateModal,
   TICKET_CREATE_MODAL_ID,
   TICKET_DESCRIPTION_FIELD,
+  TICKET_TITLE_FIELD,
 } from '@/modules/ticket/components/components.js';
 
-test('builds the ticket modal with a stable custom id and description field', () => {
+test('builds the ticket modal with a stable custom id and both fields', () => {
   expect(modalName).toBe(TICKET_CREATE_MODAL_ID);
 
   const modal = getTicketCreateModal('support').toJSON();
   expect(modal.custom_id).toBe(`${TICKET_CREATE_MODAL_ID}:support`);
+  expect(JSON.stringify(modal)).toContain(TICKET_TITLE_FIELD);
   expect(JSON.stringify(modal)).toContain(TICKET_DESCRIPTION_FIELD);
 });
 

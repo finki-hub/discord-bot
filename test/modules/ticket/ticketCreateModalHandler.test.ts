@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Ticket } from '@/modules/ticket/schemas/Ticket.js';
 
+import { TICKET_TITLE_FIELD } from '@/modules/ticket/components/components.js';
 import { commandErrors } from '@/translations/commands.js';
 import { ticketMessageFunctions } from '@/translations/tickets.js';
 
@@ -48,14 +49,16 @@ const TICKET: Ticket = {
   roles: ['staff-role'],
 };
 
-const interactionFor = (description: string) => {
+const interactionFor = (title: string, description: string) => {
   const deferReply = vi.fn<() => Promise<void>>(async () => {});
   const editReply = vi.fn<(payload: unknown) => Promise<void>>(async () => {});
   const interaction = {
     deferReply,
     editReply,
     fields: {
-      getTextInputValue: vi.fn<(field: string) => string>(() => description),
+      getTextInputValue: vi.fn<(field: string) => string>((field) =>
+        field === TICKET_TITLE_FIELD ? title : description,
+      ),
     },
     guild: { id: 'guild' },
     user: { id: 'requester', tag: 'requester#0001' },
@@ -77,8 +80,11 @@ beforeEach(() => {
 });
 
 describe('ticket create modal', () => {
-  test('creates the ticket with the trimmed description and staff members', async () => {
-    const { deferReply, editReply, interaction } = interactionFor('  Help  ');
+  test('creates the ticket with the trimmed title, description, and staff members', async () => {
+    const { deferReply, editReply, interaction } = interactionFor(
+      '  Help  ',
+      '  Help me  ',
+    );
 
     await execute(interaction, ['support']);
 
@@ -91,14 +97,15 @@ describe('ticket create modal', () => {
       TICKET.roles,
     );
     expect(mocks.createTicket).toHaveBeenCalledWith(interaction, TICKET, {
-      description: 'Help',
+      description: 'Help me',
       memberIds: ['staff-member'],
+      title: 'Help',
     });
     expect(editReply).not.toHaveBeenCalled();
   });
 
   test('links an existing ticket without fetching members', async () => {
-    const { editReply, interaction } = interactionFor('Help');
+    const { editReply, interaction } = interactionFor('Help', 'Help');
     mocks.findActiveTicket.mockResolvedValue({
       url: 'https://discord.com/channels/1/2',
     });
@@ -112,8 +119,18 @@ describe('ticket create modal', () => {
     );
   });
 
+  test('rejects a whitespace title before fetching members', async () => {
+    const { editReply, interaction } = interactionFor(' '.repeat(3), 'Help me');
+
+    await execute(interaction, ['support']);
+
+    expect(mocks.getMembersByRoleIds).not.toHaveBeenCalled();
+    expect(mocks.createTicket).not.toHaveBeenCalled();
+    expect(editReply).toHaveBeenCalledWith(commandErrors.ticketTitleRequired);
+  });
+
   test('rejects a whitespace description before fetching members', async () => {
-    const { editReply, interaction } = interactionFor(' '.repeat(3));
+    const { editReply, interaction } = interactionFor('Help', ' '.repeat(3));
 
     await execute(interaction, ['support']);
 
@@ -125,7 +142,7 @@ describe('ticket create modal', () => {
   });
 
   test('rejects a ticket type without staff roles', async () => {
-    const { editReply, interaction } = interactionFor('Help');
+    const { editReply, interaction } = interactionFor('Help', 'Help');
     mocks.getTicketProperty.mockResolvedValue({ ...TICKET, roles: [] });
 
     await execute(interaction, ['support']);
@@ -135,7 +152,7 @@ describe('ticket create modal', () => {
   });
 
   test('rejects a ticket type without role members', async () => {
-    const { editReply, interaction } = interactionFor('Help');
+    const { editReply, interaction } = interactionFor('Help', 'Help');
     mocks.getMembersByRoleIds.mockResolvedValue([]);
 
     await execute(interaction, ['support']);
@@ -145,7 +162,7 @@ describe('ticket create modal', () => {
   });
 
   test('reports disabled ticketing', async () => {
-    const { editReply, interaction } = interactionFor('Help');
+    const { editReply, interaction } = interactionFor('Help', 'Help');
     mocks.getTicketingProperty.mockResolvedValue(false);
 
     await execute(interaction, ['support']);

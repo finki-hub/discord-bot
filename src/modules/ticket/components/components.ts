@@ -10,7 +10,10 @@ import {
 } from 'discord.js';
 
 import { getPaginationComponent } from '@/common/components/pagination.js';
-import { TICKETS_PER_PAGE } from '@/modules/ticket/utils/constants.js';
+import {
+  MAX_THREAD_NAME_LENGTH,
+  TICKETS_PER_PAGE,
+} from '@/modules/ticket/utils/constants.js';
 import {
   componentMessages,
   ticketCreateComponents,
@@ -22,6 +25,7 @@ import { type Ticket } from '../schemas/Ticket.js';
 
 const TICKET_LIST_BUTTON_ID = 'ticketList';
 export const TICKET_CREATE_MODAL_ID = 'ticketCreateModal';
+export const TICKET_TITLE_FIELD = 'title';
 export const TICKET_DESCRIPTION_FIELD = 'description';
 
 const dateFormatter = new Intl.DateTimeFormat('mk-MK', {
@@ -73,6 +77,16 @@ export const getTicketCreateModal = (ticketTypeId: string) =>
     .setCustomId(`${TICKET_CREATE_MODAL_ID}:${ticketTypeId}`)
     .setTitle(ticketCreateComponents.title)
     .addLabelComponents(
+      new LabelBuilder()
+        .setLabel(ticketCreateComponents.titleLabel)
+        .setTextInputComponent(
+          new TextInputBuilder()
+            .setCustomId(TICKET_TITLE_FIELD)
+            .setPlaceholder(ticketCreateComponents.titlePlaceholder)
+            .setStyle(TextInputStyle.Short)
+            .setRequired(true)
+            .setMaxLength(MAX_THREAD_NAME_LENGTH),
+        ),
       new LabelBuilder()
         .setLabel(ticketCreateComponents.descriptionLabel)
         .setTextInputComponent(

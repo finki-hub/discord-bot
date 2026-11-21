@@ -30,6 +30,7 @@ import {
 import { getTicketCloseComponents } from '../components/components.js';
 import { type Ticket } from '../schemas/Ticket.js';
 import {
+  MAX_THREAD_NAME_LENGTH,
   MAX_TICKET_INACTIVITY_MILLISECONDS,
   TICKET_ABANDON_TIMEOUT_MILLISECONDS,
   TICKET_REQUEST_FOOTER,
@@ -45,11 +46,42 @@ const MAX_THREAD_MEMBERS = 1_000;
 type TicketInteraction =
   ButtonInteraction | ChatInputCommandInteraction | ModalSubmitInteraction;
 
-const getTicketThreadName = (
+const getTicketThreadSuffix = (
   interaction: TicketInteraction,
   ticketMetadata: Ticket,
 ): string =>
   `${interaction.user.tag}${TICKET_NAME_SEPARATOR}${ticketMetadata.name}`;
+
+const getTicketThreadName = (
+  interaction: TicketInteraction,
+  ticketMetadata: Ticket,
+  title?: string,
+): string => {
+  // The title leads the thread name; the user/type suffix keeps existing-ticket
+  // detection and type resolution working from the name alone.
+  const suffix = getTicketThreadSuffix(interaction, ticketMetadata);
+
+  if (title === undefined || title.length === 0) {
+    if (suffix.length > MAX_THREAD_NAME_LENGTH) {
+      throw new Error(
+        `Ticket thread metadata exceeds Discord's ${MAX_THREAD_NAME_LENGTH}-character limit.`,
+      );
+    }
+
+    return suffix;
+  }
+
+  const maxTitleLength =
+    MAX_THREAD_NAME_LENGTH - suffix.length - TICKET_NAME_SEPARATOR.length;
+
+  if (maxTitleLength < 1) {
+    throw new Error(
+      `Ticket thread metadata exceeds Discord's ${MAX_THREAD_NAME_LENGTH}-character limit.`,
+    );
+  }
+
+  return `${title.slice(0, maxTitleLength)}${TICKET_NAME_SEPARATOR}${suffix}`;
+};
 
 const addTicketMember = async (
   ticketChannel: AnyThreadChannel,
@@ -149,10 +181,12 @@ export const findActiveTicket = async (
   // Thread names are the only stable association available for tickets created
   // before the modal flow; a renamed thread or changed username can still miss.
   const activeTickets = await getActiveTickets(interaction.guild);
+  const suffix = getTicketThreadSuffix(interaction, ticketMetadata);
 
   return activeTickets?.find(
     (thread) =>
-      thread.name === getTicketThreadName(interaction, ticketMetadata),
+      thread.name === suffix ||
+      thread.name.endsWith(`${TICKET_NAME_SEPARATOR}${suffix}`),
   );
 };
 
@@ -183,7 +217,7 @@ export const getActiveTicketsSorted = async (
 export const createTicket = async (
   interaction: TicketInteraction,
   ticketMetadata: Ticket,
-  options: { description?: string; memberIds?: string[] } = {},
+  options: { description?: string; memberIds?: string[]; title?: string } = {},
 ): Promise<void> => {
   if (interaction.guild === null) {
     return;
@@ -208,7 +242,7 @@ export const createTicket = async (
   const ticketChannel = await ticketsChannel.threads.create({
     autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
     invitable: false,
-    name: getTicketThreadName(interaction, ticketMetadata),
+    name: getTicketThreadName(interaction, ticketMetadata, options.title),
     type: ChannelType.PrivateThread,
   });
 
@@ -252,6 +286,10 @@ export const createTicket = async (
       .setFooter({ text: TICKET_REQUEST_FOOTER })
       .setTimestamp();
 
+    if (options.title !== undefined) {
+      request.setTitle(options.title);
+    }
+
     await ticketChannel.send({ embeds: [request] });
     await ticketChannel.send(
       ticketMessageFunctions.ticketStarted(
@@ -271,22 +309,41 @@ export const createTicket = async (
   );
 };
 
+export const findTicketTypeByThreadName = (
+  threadName: string,
+  tickets: Ticket[],
+): Ticket | undefined => {
+  const legacySeparatorIndex = threadName.indexOf(TICKET_NAME_SEPARATOR);
+
+  if (legacySeparatorIndex !== -1) {
+    const legacyName = threadName.slice(
+      legacySeparatorIndex + TICKET_NAME_SEPARATOR.length,
+    );
+    const legacyTicket = tickets.find((ticket) => ticket.name === legacyName);
+
+    if (legacyTicket !== undefined) {
+      return legacyTicket;
+    }
+  }
+
+  // New names are "<title> - <tag> - <type>"; use the longest configured name
+  // that the thread name ends with so type names may contain separators.
+  return tickets
+    .filter((ticket) =>
+      threadName.endsWith(`${TICKET_NAME_SEPARATOR}${ticket.name}`),
+    )
+    .sort((a, b) => b.name.length - a.name.length)[0];
+};
+
 const getTicketType = async (
   thread: AnyThreadChannel,
   guildId: string,
 ): Promise<Ticket | undefined> => {
-  const separatorIndex = thread.name.indexOf(TICKET_NAME_SEPARATOR);
-
-  if (separatorIndex === -1) {
-    return undefined;
-  }
-
-  const ticketTypeName = thread.name.slice(
-    separatorIndex + TICKET_NAME_SEPARATOR.length,
-  );
   const tickets = await getTicketingProperty('tickets', guildId);
 
-  return tickets?.find((ticket) => ticket.name === ticketTypeName);
+  return tickets === undefined
+    ? undefined
+    : findTicketTypeByThreadName(thread.name, tickets);
 };
 
 const startTicket = async (

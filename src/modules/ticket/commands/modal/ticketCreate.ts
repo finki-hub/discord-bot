@@ -11,7 +11,10 @@ import {
   getTicketingProperty,
   getTicketProperty,
 } from '@/configuration/bot/index.js';
-import { TICKET_DESCRIPTION_FIELD } from '@/modules/ticket/components/components.js';
+import {
+  TICKET_DESCRIPTION_FIELD,
+  TICKET_TITLE_FIELD,
+} from '@/modules/ticket/components/components.js';
 import {
   createTicket,
   findActiveTicket,
@@ -76,9 +79,15 @@ export const execute = async (
     return;
   }
 
+  const title = interaction.fields.getTextInputValue(TICKET_TITLE_FIELD).trim();
   const description = interaction.fields
     .getTextInputValue(TICKET_DESCRIPTION_FIELD)
     .trim();
+
+  if (title.length === 0) {
+    await interaction.editReply(commandErrors.ticketTitleRequired);
+    return;
+  }
 
   if (description.length === 0) {
     await interaction.editReply(commandErrors.ticketDescriptionRequired);
@@ -98,5 +107,6 @@ export const execute = async (
   await createTicket(interaction, ticketMetadata, {
     description,
     memberIds: ticketRoleMembers,
+    title,
   });
 };
