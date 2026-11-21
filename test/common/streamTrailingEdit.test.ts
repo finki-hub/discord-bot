@@ -78,23 +78,23 @@ test('a tool step skipped by the edit throttle still appears while the search ru
   expect(contents.at(-1)).toBe('Прво ќе проверам.');
 });
 
-test('streamed messages never show link previews', async () => {
-  const payloads: Array<{ flags?: unknown }> = [];
+test('streamed messages never show link previews or allow mentions', async () => {
+  const payloads: Array<{ allowedMentions?: unknown; flags?: unknown }> = [];
   const sent = {
-    edit: async (payload: { flags?: unknown }) => {
+    edit: async (payload: { allowedMentions?: unknown; flags?: unknown }) => {
       payloads.push(payload);
       return sent;
     },
   };
   const message = {
-    reply: async (payload: { flags?: unknown }) => {
+    reply: async (payload: { allowedMentions?: unknown; flags?: unknown }) => {
       payloads.push(payload);
       return sent;
     },
   } as unknown as Message;
 
   const reply = safeStreamReplyToMessage(message, async (emit) => {
-    await emit({ text: 'Види https://finki.ukim.mk', type: 'token' });
+    await emit({ text: 'Види https://finki.ukim.mk @everyone', type: 'token' });
     // Past the edit throttle, so the next token edits the sent message.
     await delay(2_000);
     await emit({ text: ' за повеќе.', type: 'token' });
@@ -106,5 +106,9 @@ test('streamed messages never show link previews', async () => {
   expect(payloads.length).toBeGreaterThan(1);
   for (const payload of payloads) {
     expect(payload.flags).toBe(MessageFlags.SuppressEmbeds);
+    expect(payload.allowedMentions).toEqual({
+      parse: [],
+      repliedUser: false,
+    });
   }
 });

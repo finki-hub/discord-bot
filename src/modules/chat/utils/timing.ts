@@ -1,6 +1,7 @@
 import { type Message } from 'discord.js';
 
 import { logger } from '@/common/logger/index.js';
+import { allowedMentions } from '@/common/utils/messages.js';
 
 const MAX_MESSAGE_LENGTH = 2_000;
 
@@ -40,7 +41,12 @@ export const appendTimingFootnote = async (
     }
 
     if (edit === undefined) {
-      await current.edit({ content: current.content + footnote });
+      // The edit re-parses the answer's mentions; keep the streamed policy so
+      // untrusted answer text cannot ping roles or everyone.
+      await current.edit({
+        ...allowedMentions(),
+        content: current.content + footnote,
+      });
     } else {
       await edit(current, current.content + footnote);
     }

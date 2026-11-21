@@ -72,6 +72,20 @@ export const notifyInteractionError = async (
   errorMessage: string,
 ) => {
   try {
+    // A deferUpdate keeps the original component message. Editing it would
+    // replace the list card with the error, so notify through a follow-up.
+    if (
+      interaction.isButton() &&
+      interaction.deferred &&
+      interaction.ephemeral !== true
+    ) {
+      await interaction.followUp({
+        content: errorMessage,
+        flags: MessageFlags.Ephemeral,
+      });
+      return;
+    }
+
     await (interaction.deferred || interaction.replied
       ? interaction.editReply({ content: errorMessage })
       : interaction.reply({

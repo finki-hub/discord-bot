@@ -29,7 +29,8 @@ const EPHEMERAL_NO_EMBEDS_FLAGS =
 
 // Answers and knowledge-base content are untrusted text: `@everyone` or a role
 // mention in them must never ping. Only IDs passed in explicitly are allowed.
-const allowedMentions = (mentionUserIds: readonly string[] = []) => ({
+// Exported so every later edit of streamed content can carry the same policy.
+export const allowedMentions = (mentionUserIds: readonly string[] = []) => ({
   allowedMentions: {
     parse: [],
     repliedUser: false,
@@ -620,7 +621,12 @@ export const safeStreamReplyToInteraction = async (
         });
         rememberFollowUp(index, edited);
       } else {
-        await existing.edit({ ...NO_EMBEDS, content: formatContent(content) });
+        // A plain edit re-parses mentions with default allowances unless the
+        // policy travels with it.
+        await existing.edit({
+          ...baseOptions,
+          content: formatContent(content),
+        });
       }
 
       return;
@@ -677,7 +683,9 @@ export const safeStreamReplyToMessage = async (
 
     const existing = sentMessages[index];
     if (existing !== undefined) {
-      await existing.edit({ ...NO_EMBEDS, content: formatContent(content) });
+      // A plain edit re-parses mentions with default allowances unless the
+      // policy travels with it.
+      await existing.edit({ ...baseOptions, content: formatContent(content) });
 
       return;
     }
