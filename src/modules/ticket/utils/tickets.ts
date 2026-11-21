@@ -33,9 +33,56 @@ import {
   MAX_TICKET_INACTIVITY_MILLISECONDS,
   TICKET_ABANDON_TIMEOUT_MILLISECONDS,
   TICKET_REQUEST_FOOTER,
+  TICKET_START_LOOKBACK_LIMIT,
 } from './constants.js';
 
 const TICKET_NAME_SEPARATOR = ' - ';
+const THREAD_MEMBER_ADD_CONCURRENCY = 5;
+// Discord allows up to 1,000 members in a thread; the bot and requester take
+// two of those slots.
+const MAX_THREAD_MEMBERS = 1_000;
+
+type TicketInteraction =
+  ButtonInteraction | ChatInputCommandInteraction | ModalSubmitInteraction;
+
+const getTicketThreadName = (
+  interaction: TicketInteraction,
+  ticketMetadata: Ticket,
+): string =>
+  `${interaction.user.tag}${TICKET_NAME_SEPARATOR}${ticketMetadata.name}`;
+
+const addTicketMember = async (
+  ticketChannel: AnyThreadChannel,
+  memberId: string,
+  guildId: string,
+): Promise<void> => {
+  try {
+    await ticketChannel.members.add(memberId);
+  } catch (error: unknown) {
+    logger.warn(
+      `Failed adding member ${memberId} to ticket ${ticketChannel.id}\n${String(error)}`,
+      { guildId },
+    );
+  }
+};
+
+const addTicketMembers = async (
+  ticketChannel: AnyThreadChannel,
+  memberIds: string[],
+  guildId: string,
+): Promise<void> => {
+  for (
+    let index = 0;
+    index < memberIds.length;
+    index += THREAD_MEMBER_ADD_CONCURRENCY
+  ) {
+    await Promise.all(
+      memberIds
+        .slice(index, index + THREAD_MEMBER_ADD_CONCURRENCY)
+        .map((memberId) => addTicketMember(ticketChannel, memberId, guildId)),
+    );
+  }
+};
 
 const isHumanMessage = (message: Message): boolean =>
   !message.author.bot && !message.system;
@@ -50,7 +97,7 @@ const isTicketRequest = (message: Message): boolean =>
 const hasTicketStarted = async (thread: AnyThreadChannel): Promise<boolean> => {
   const earliestMessages = await thread.messages.fetch({
     after: thread.id,
-    limit: 10,
+    limit: TICKET_START_LOOKBACK_LIMIT,
   });
 
   return earliestMessages.some(
@@ -91,6 +138,24 @@ export const getActiveTickets = async (
       );
 };
 
+export const findActiveTicket = async (
+  interaction: TicketInteraction,
+  ticketMetadata: Ticket,
+): Promise<AnyThreadChannel | undefined> => {
+  if (interaction.guild === null) {
+    return undefined;
+  }
+
+  // Thread names are the only stable association available for tickets created
+  // before the modal flow; a renamed thread or changed username can still miss.
+  const activeTickets = await getActiveTickets(interaction.guild);
+
+  return activeTickets?.find(
+    (thread) =>
+      thread.name === getTicketThreadName(interaction, ticketMetadata),
+  );
+};
+
 export const getActiveTicketsSorted = async (
   guild: Guild,
 ): Promise<AnyThreadChannel[]> => {
@@ -116,8 +181,7 @@ export const getActiveTicketsSorted = async (
 };
 
 export const createTicket = async (
-  interaction:
-    ButtonInteraction | ChatInputCommandInteraction | ModalSubmitInteraction,
+  interaction: TicketInteraction,
   ticketMetadata: Ticket,
   options: { description?: string; memberIds?: string[] } = {},
 ): Promise<void> => {
@@ -131,12 +195,7 @@ export const createTicket = async (
     return;
   }
 
-  const activeTickets = await getActiveTickets(interaction.guild);
-  const existingTicket = activeTickets?.find(
-    (thread) =>
-      thread.name ===
-      `${interaction.user.tag}${TICKET_NAME_SEPARATOR}${ticketMetadata.name}`,
-  );
+  const existingTicket = await findActiveTicket(interaction, ticketMetadata);
 
   if (existingTicket !== undefined) {
     await interaction.editReply(
@@ -149,26 +208,35 @@ export const createTicket = async (
   const ticketChannel = await ticketsChannel.threads.create({
     autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
     invitable: false,
-    name: `${interaction.user.tag}${TICKET_NAME_SEPARATOR}${ticketMetadata.name}`,
+    name: getTicketThreadName(interaction, ticketMetadata),
     type: ChannelType.PrivateThread,
   });
 
   // Role mentions invite small roles, but explicit membership also covers
   // large roles and makes the requester's access deterministic.
-  const memberIds = new Set([
+  await addTicketMember(
+    ticketChannel,
     interaction.user.id,
-    ...(options.memberIds ?? []),
-  ]);
-  for (const memberId of memberIds) {
-    try {
-      await ticketChannel.members.add(memberId);
-    } catch (error: unknown) {
-      logger.warn(
-        `Failed adding member ${memberId} to ticket ${ticketChannel.id}\n${String(error)}`,
-        { guildId: interaction.guild.id },
-      );
-    }
+    interaction.guild.id,
+  );
+
+  const staffMemberIds = [
+    ...new Set(
+      (options.memberIds ?? []).filter(
+        (memberId) => memberId !== interaction.user.id,
+      ),
+    ),
+  ];
+  const maxStaffMemberCount = MAX_THREAD_MEMBERS - 2;
+  if (staffMemberIds.length > maxStaffMemberCount) {
+    logger.warn(
+      `Ticket ${ticketChannel.id} has more staff members than Discord's thread limit; adding the first ${maxStaffMemberCount}.`,
+      { guildId: interaction.guild.id },
+    );
+    staffMemberIds.length = maxStaffMemberCount;
   }
+
+  await addTicketMembers(ticketChannel, staffMemberIds, interaction.guild.id);
 
   await ticketChannel.send(
     ticketMessageFunctions.ticketCreated(interaction.user.id),
@@ -268,7 +336,7 @@ export const handleTicketMessage = async (message: Message): Promise<void> => {
 
     const previousMessages = await channel.messages.fetch({
       before: message.id,
-      limit: 50,
+      limit: TICKET_START_LOOKBACK_LIMIT,
     });
 
     if (

@@ -12,8 +12,12 @@ import {
   getTicketProperty,
 } from '@/configuration/bot/index.js';
 import { TICKET_DESCRIPTION_FIELD } from '@/modules/ticket/components/components.js';
-import { createTicket } from '@/modules/ticket/utils/tickets.js';
+import {
+  createTicket,
+  findActiveTicket,
+} from '@/modules/ticket/utils/tickets.js';
 import { commandErrors } from '@/translations/commands.js';
+import { ticketMessageFunctions } from '@/translations/tickets.js';
 
 export const name = 'ticketCreateModal';
 
@@ -63,13 +67,12 @@ export const execute = async (
     return;
   }
 
-  const ticketRoleMembers = await getMembersByRoleIds(
-    interaction.guild,
-    ticketMetadata.roles,
-  );
+  const existingTicket = await findActiveTicket(interaction, ticketMetadata);
 
-  if (ticketRoleMembers.length === 0) {
-    await interaction.editReply(commandErrors.noTicketMembers);
+  if (existingTicket !== undefined) {
+    await interaction.editReply(
+      ticketMessageFunctions.ticketExisting(existingTicket.url),
+    );
     return;
   }
 
@@ -79,6 +82,16 @@ export const execute = async (
 
   if (description.length === 0) {
     await interaction.editReply(commandErrors.ticketDescriptionRequired);
+    return;
+  }
+
+  const ticketRoleMembers = await getMembersByRoleIds(
+    interaction.guild,
+    ticketMetadata.roles,
+  );
+
+  if (ticketRoleMembers.length === 0) {
+    await interaction.editReply(commandErrors.noTicketMembers);
     return;
   }
 
