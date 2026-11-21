@@ -66,6 +66,7 @@ test('attaches listeners for every discovered event', async () => {
   expect(emitter.listenerCount(Events.InteractionCreate)).toBe(1);
   expect(emitter.listenerCount(Events.MessageCreate)).toBe(1);
   expect(emitter.listenerCount(Events.ShardReady)).toBe(1);
+  expect(emitter.listenerCount(Events.GuildAvailable)).toBe(1);
 
   emitter.removeAllListeners();
 });

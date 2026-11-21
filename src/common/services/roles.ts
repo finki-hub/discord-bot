@@ -5,7 +5,8 @@ import { type Role as DiscordRole, type Guild } from 'discord.js';
 // calls reuse the completed fetch, while a failed fetch is dropped so it can
 // be retried. The GuildMembers intent keeps the cache current afterwards, but
 // Discord omits members from GUILD_CREATE for large guilds, so a fresh
-// identify resets the cache rather than trusting data from the last session.
+// identify forgets the fetch and the next lookup reconciles the cache with
+// the guild.
 const memberFetches = new WeakMap<Guild, Promise<void>>();
 
 const ensureGuildMembersFetched = async (guild: Guild): Promise<void> => {
@@ -17,7 +18,17 @@ const ensureGuildMembersFetched = async (guild: Guild): Promise<void> => {
   }
 
   const memberFetch = (async () => {
-    await guild.members.fetch();
+    // `fetch()` only adds or updates members. Keep the ids cached before the
+    // request so members who left while the bot was offline can be removed
+    // without dropping anyone who joined while the request was in flight.
+    const previouslyCachedMemberIds = new Set(guild.members.cache.keys());
+    const members = await guild.members.fetch();
+
+    for (const memberId of previouslyCachedMemberIds) {
+      if (!members.has(memberId)) {
+        guild.members.cache.delete(memberId);
+      }
+    }
   })();
 
   memberFetches.set(guild, memberFetch);
@@ -25,7 +36,9 @@ const ensureGuildMembersFetched = async (guild: Guild): Promise<void> => {
   try {
     await memberFetch;
   } catch (error) {
-    memberFetches.delete(guild);
+    if (memberFetches.get(guild) === memberFetch) {
+      memberFetches.delete(guild);
+    }
     throw error;
   }
 };
@@ -50,15 +63,23 @@ export const getMembersByRoleIds = async (
     return [];
   }
 
-  await Promise.all([guild.roles.fetch(), ensureGuildMembersFetched(guild)]);
+  await guild.roles.fetch();
 
   const rolesList = roleIdsWithMembers
     .map((roleId) => guild.roles.cache.get(roleId))
     .filter((role) => role !== undefined);
 
+  if (rolesList.length === 0) {
+    return [];
+  }
+
+  await ensureGuildMembersFetched(guild);
+
   return getMembersByRoles(rolesList);
 };
 
+// Forget the memo for these guilds so the next lookup refetches their members
+// and drops anyone who left while the bot was offline.
 export const resetGuildMembersCache = (guilds: Iterable<Guild>): void => {
   for (const guild of guilds) {
     memberFetches.delete(guild);

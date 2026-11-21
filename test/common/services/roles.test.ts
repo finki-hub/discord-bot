@@ -36,13 +36,18 @@ const createFakeGuild = ({
     rolesCache.set(roleId, makeRole(roleId));
   }
 
-  const fetchMembers = vi.fn<() => Promise<typeof membersCache>>(async () => {
-    for (const member of remoteMembers) {
-      membersCache.set(member.id, member);
-    }
+  const fetchMembers = vi.fn<() => Promise<Collection<string, FakeMember>>>(
+    async () => {
+      const fetchedMembers = new Collection<string, FakeMember>();
 
-    return membersCache;
-  });
+      for (const member of remoteMembers) {
+        membersCache.set(member.id, member);
+        fetchedMembers.set(member.id, member);
+      }
+
+      return fetchedMembers;
+    },
+  );
 
   const fetchRoles = vi.fn<() => Promise<typeof rolesCache>>(async () => {
     for (const roleId of remoteRoles) {
@@ -110,6 +115,33 @@ describe('getMembersByRoleIds', () => {
 
     await expect(getMembersByRoleIds(guild, ['fss'])).resolves.toEqual(['u1']);
     expect(fetchMembers).toHaveBeenCalledTimes(2);
+  });
+
+  test('removes cached members who are absent from the fresh guild fetch', async () => {
+    const { guild } = createFakeGuild({
+      initialMembers: [
+        { id: 'stale', roles: ['fss'] },
+        { id: 'current', roles: ['fss'] },
+      ],
+      remoteMembers: [{ id: 'current', roles: ['fss'] }],
+      remoteRoles: ['fss'],
+    });
+
+    await expect(getMembersByRoleIds(guild, ['fss'])).resolves.toEqual([
+      'current',
+    ]);
+    expect(guild.members.cache.has('stale')).toBe(false);
+    expect(guild.members.cache.has('current')).toBe(true);
+  });
+
+  test('does not fetch guild members when none of the role IDs exist', async () => {
+    const { fetchMembers, fetchRoles, guild } = createFakeGuild({
+      remoteRoles: ['other'],
+    });
+
+    await expect(getMembersByRoleIds(guild, ['missing'])).resolves.toEqual([]);
+    expect(fetchRoles).toHaveBeenCalledOnce();
+    expect(fetchMembers).not.toHaveBeenCalled();
   });
 
   test('deduplicates concurrent guild member fetches for the same guild', async () => {

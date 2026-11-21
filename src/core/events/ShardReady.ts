@@ -13,5 +13,10 @@ export const execute = (...[shardId]: ClientEvents[typeof name]) => {
 
   // A fresh identify does not resend members for large guilds, so cached guild
   // member fetches may be from before the session.
-  resetGuildMembersCache(bot.guilds.cache.values());
+  resetGuildMembersCache(
+    bot.guilds.cache
+      .filter((guild) => guild.shardId === shardId)
+      .values()
+      .toArray(),
+  );
 };
