@@ -8,6 +8,7 @@ import {
 import { getDirectusUrl } from '@/configuration/environment.js';
 
 import { clearTransformedSessions } from './cache.js';
+import { compareSessionsNewestFirst } from './order.js';
 
 const state: { sessions: Record<string, string> } = {
   sessions: {},
@@ -23,10 +24,14 @@ const SessionsSchema = z
   )
   .transform((rows) =>
     Object.fromEntries(
-      rows.map(({ file, name }) => [
-        name,
-        `${getDirectusUrl()}/assets/${file.id}/${encodeURIComponent(file.filename_download)}`,
-      ]),
+      rows
+        .toSorted((left, right) =>
+          compareSessionsNewestFirst(left.name, right.name),
+        )
+        .map(({ file, name }) => [
+          name,
+          `${getDirectusUrl()}/assets/${file.id}/${encodeURIComponent(file.filename_download)}`,
+        ]),
     ),
   );
 
