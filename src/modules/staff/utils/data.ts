@@ -39,7 +39,6 @@ export const startPeriodicReload = () => {
   schedulePeriodicReload({
     label: 'staff',
     reload: reloadStaff,
-    requiresDataStorage: false,
   });
 };
 

@@ -37,7 +37,6 @@ export const startPeriodicReload = () => {
   schedulePeriodicReload({
     label: 'rooms',
     reload: reloadRooms,
-    requiresDataStorage: false,
   });
 };
 

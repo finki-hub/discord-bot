@@ -69,7 +69,6 @@ Use `.env.sample` as a starting point for local development. The runtime also re
 | `APPLICATION_ID`   | Yes      | Discord application ID                                                                                                        |
 | `CHATBOT_URL`      | No       | URL of the [`finki-hub/chat-bot`](https://github.com/finki-hub/chat-bot) instance                                             |
 | `API_KEY`          | No       | Chat-bot API authentication for `/chat` and credential management requests; never a sponsored provider credential             |
-| `DATA_STORAGE_URL` | No       | Base URL for data storage, without a trailing slash                                                                           |
 | `DIRECTUS_URL`     | No       | FINKI Hub Directus base URL for the course card's channel and "prerequisite for" lists (default `https://data.finki-hub.com`) |
 | `PUBAPI_URL`       | No       | FINKI public APIs MCP (SSE) URL for staff consultations (default `https://pubapi.finki.ukim.mk/sse`)                          |
 | `PUBAPI_API_KEY`   | No       | API key for FINKI public APIs; without it `/staff` shows only the consultations link                                          |
@@ -78,7 +77,7 @@ Use `.env.sample` as a starting point for local development. The runtime also re
 | `POSTHOG_SALT`     | No       | Salt used to hash Discord user IDs. Required together with `POSTHOG_KEY` to enable analytics                                  |
 | `TZ`               | No       | Timezone, for example `Europe/Berlin`                                                                                         |
 
-If `DATA_STORAGE_URL` is not set, data-backed features start with empty data and periodic data reloads are disabled. If `CHATBOT_URL` is not set, FAQ, link, and chat-bot features are disabled or return unavailable responses.
+If `CHATBOT_URL` is not set, FAQ, link, and chat-bot features are disabled or return unavailable responses.
 
 ### Bot Configuration
 
@@ -107,15 +106,11 @@ See [`config/bot.json.example`](./config/bot.json.example) for an example config
 
 ### Data Files
 
-The data for informational commands is loaded from data storage if `DATA_STORAGE_URL` is configured. The bot fetches these files from the data storage base URL on startup and reloads them every hour:
-
-1. `courses.json` - a consolidated array of all courses with their information, participants, prerequisites, and staff
-
-Rooms, staff, exam sessions and Anto quotes come from FINKI Hub's Directus (`DIRECTUS_URL`) on startup and every hour.
+Courses, rooms, staff, exam sessions and Anto quotes come from FINKI Hub's Directus (`DIRECTUS_URL`) on startup and every hour. Courses are read from `/catalog/courses.json`, the rest from public collections.
 
 `/course` also reads FINKI Hub's Directus (`DIRECTUS_URL`) when it answers: the course's Discord channel, shown as a mention when a text channel of that name exists on the server, and the courses whose prerequisites name it. If Directus does not answer, the card is shown without them. `/staff` lists the staff member's consultations of the coming week (day, date, time, room) from FINKI's public APIs when `PUBAPI_API_KEY` is set; otherwise, or if they do not answer, it keeps only the consultations link.
 
-If `DATA_STORAGE_URL` is not configured, these commands run without loaded data. You can manually trigger a data reload using the `/config data` command.
+You can manually trigger a data reload using the `/config data` command.
 
 ### Sessions (Timetables)
 

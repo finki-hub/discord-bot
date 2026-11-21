@@ -2,10 +2,7 @@ import { Cron } from 'croner';
 import { z, type ZodType } from 'zod';
 
 import { logger } from '@/common/logger/index.js';
-import {
-  getDataStorageUrl,
-  getDirectusUrl,
-} from '@/configuration/environment.js';
+import { getDirectusUrl } from '@/configuration/environment.js';
 
 const DATA_FETCH_TIMEOUT_MS = 30_000;
 
@@ -31,7 +28,6 @@ export const parseContent = (
 type LoadJsonFromUrlOptions<T> = {
   label: string;
   onLoaded: (data: T) => void;
-  parseFallback?: unknown;
   schema: ZodType<T>;
   url: string;
 };
@@ -39,7 +35,6 @@ type LoadJsonFromUrlOptions<T> = {
 const loadJsonFromUrl = async <T>({
   label,
   onLoaded,
-  parseFallback,
   schema,
   url,
 }: LoadJsonFromUrlOptions<T>): Promise<boolean> => {
@@ -51,7 +46,7 @@ const loadJsonFromUrl = async <T>({
     throw error;
   }
 
-  const data = parseContent(raw, parseFallback);
+  const data = parseContent(raw);
 
   let parsed: T;
   try {
@@ -66,38 +61,26 @@ const loadJsonFromUrl = async <T>({
   return true;
 };
 
-type LoadJsonResourceOptions<T> = {
+type LoadCatalogFileOptions<T> = {
+  file: string;
   label: string;
   onLoaded: (data: T) => void;
-  parseFallback?: unknown;
-  resource: string;
   schema: ZodType<T>;
 };
 
-export const loadJsonResource = async <T>({
+// A file Directus builds from several collections, under /catalog.
+export const loadCatalogFile = async <T>({
+  file,
   label,
   onLoaded,
-  parseFallback,
-  resource,
   schema,
-}: LoadJsonResourceOptions<T>): Promise<boolean> => {
-  const baseUrl = getDataStorageUrl();
-
-  if (!baseUrl) {
-    logger.warn(
-      `DATA_STORAGE_URL not configured, ${label} data loading disabled`,
-    );
-    return false;
-  }
-
-  return loadJsonFromUrl({
+}: LoadCatalogFileOptions<T>): Promise<boolean> =>
+  loadJsonFromUrl({
     label,
     onLoaded,
-    parseFallback,
     schema,
-    url: `${baseUrl}/${resource}`,
+    url: `${getDirectusUrl()}/catalog/${file}`,
   });
-};
 
 type LoadDirectusItemsOptions<T> = {
   collection: string;
@@ -129,23 +112,13 @@ type SchedulePeriodicReloadOptions = {
   cronExpression?: string;
   label: string;
   reload: () => Promise<unknown>;
-  // Directus has a default URL, so its data reloads without data storage.
-  requiresDataStorage?: boolean;
 };
 
 export const schedulePeriodicReload = ({
   cronExpression = '0 * * * *',
   label,
   reload,
-  requiresDataStorage = true,
-}: SchedulePeriodicReloadOptions): Cron | null => {
-  if (requiresDataStorage && !getDataStorageUrl()) {
-    logger.debug(
-      `DATA_STORAGE_URL not configured, periodic ${label} reload disabled`,
-    );
-    return null;
-  }
-
+}: SchedulePeriodicReloadOptions): Cron => {
   const cron = new Cron(cronExpression, async () => {
     logger.info(`Starting scheduled ${label} reload...`);
     try {

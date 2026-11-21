@@ -1,5 +1,5 @@
 import {
-  loadJsonResource,
+  loadCatalogFile,
   schedulePeriodicReload,
 } from '@/common/utils/data.js';
 
@@ -12,13 +12,13 @@ const state: { courses: Course[] } = {
 };
 
 export const reloadCourses = async () => {
-  await loadJsonResource({
+  await loadCatalogFile({
+    file: 'courses.json',
     label: 'courses',
     onLoaded: (data: Course[]) => {
       state.courses = data;
       clearTransformedCourses();
     },
-    resource: 'courses.json',
     schema: CourseSchema.array(),
   });
 };
