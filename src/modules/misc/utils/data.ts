@@ -2,7 +2,7 @@ import { randomInt } from 'node:crypto';
 import { z } from 'zod';
 
 import {
-  loadJsonResource,
+  loadDirectusItems,
   schedulePeriodicReload,
 } from '@/common/utils/data.js';
 
@@ -10,21 +10,30 @@ const state: { quotes: string[] } = {
   quotes: [],
 };
 
-const QuotesSchema = z.array(z.string());
+const QuotesSchema = z
+  .array(z.object({ quote: z.string() }))
+  .transform((rows) =>
+    rows.map(({ quote }) => quote.trim()).filter((quote) => quote !== ''),
+  );
 
 export const reloadQuotes = async () => {
-  await loadJsonResource({
+  await loadDirectusItems({
+    collection: 'anto_quotes',
+    fields: ['quote'],
     label: 'anto quotes',
     onLoaded: (data: string[]) => {
       state.quotes = data;
     },
-    resource: 'anto.json',
     schema: QuotesSchema,
   });
 };
 
 export const startPeriodicReload = () => {
-  schedulePeriodicReload({ label: 'anto quotes', reload: reloadQuotes });
+  schedulePeriodicReload({
+    label: 'anto quotes',
+    reload: reloadQuotes,
+    requiresDataStorage: false,
+  });
 };
 
 export const getQuotes = (): string[] => state.quotes;

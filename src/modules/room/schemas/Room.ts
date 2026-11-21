@@ -1,11 +1,17 @@
 import { z } from 'zod';
 
+import {
+  optionalNumberText,
+  optionalText,
+  optionalUrl,
+} from '@/common/schemas/directus.js';
+
 export const RoomSchema = z.object({
-  capacity: z.string().optional(),
-  description: z.string().optional(),
-  floor: z.string().optional(),
+  capacity: optionalNumberText,
+  description: optionalText,
+  floor: optionalNumberText,
   location: z.string(),
-  mrbs: z.url().optional(),
+  mrbs: optionalUrl,
   name: z.string(),
   type: z.string(),
 });
