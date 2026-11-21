@@ -13,6 +13,8 @@ import { ACCREDITATION_YEARS, type AccreditationYear } from '../constants.js';
 import { type Course } from '../schemas/Course.js';
 import { extractParticipants, getRetiredStaff, linkStaff } from './utils.js';
 
+// Discord allows 40 components in a message, nested ones included, so the
+// lines of a section share one text display.
 const addCurriculumSection = (
   containerBuilder: ContainerBuilder,
   course: Course,
@@ -32,23 +34,18 @@ const addCurriculumSection = (
     )
     .addSeparatorComponents((separator) => separator.setDivider(false))
     .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.name}:** ${name ?? '-'}`),
-    )
-    .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.code}:** ${code ?? '-'}`),
-    )
-    .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.level}:** ${level ?? '-'}`),
-    )
-    .addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.semester}:** ${semester ?? '-'}`),
+      textDisplay.setContent(
+        [
+          `**${labels.name}:** ${name ?? '-'}`,
+          `**${labels.code}:** ${code ?? '-'}`,
+          `**${labels.level}:** ${level ?? '-'}`,
+          `**${labels.semester}:** ${semester ?? '-'}`,
+          ...(prerequisite === undefined
+            ? []
+            : [`**${labels.prerequisite}:** ${prerequisite}`]),
+        ].join('\n'),
+      ),
     );
-
-  if (prerequisite !== undefined) {
-    containerBuilder.addTextDisplayComponents((textDisplay) =>
-      textDisplay.setContent(`**${labels.prerequisite}:** ${prerequisite}`),
-    );
-  }
 
   if (code !== undefined) {
     containerBuilder
@@ -236,16 +233,20 @@ export const getCourseComponent = (
       )
       .addSeparatorComponents((separator) => separator.setDivider(false));
 
-    for (let i = 0; i < participants.length; i += 3) {
-      const chunk = participants.slice(i, i + 3);
-      const participantText = chunk
-        .map(({ count, year }) => `**${year}:** ${count}`)
-        .join('  •  ');
+    const participantLines: string[] = [];
 
-      containerBuilder.addTextDisplayComponents((textDisplay) =>
-        textDisplay.setContent(participantText),
+    for (let i = 0; i < participants.length; i += 3) {
+      participantLines.push(
+        participants
+          .slice(i, i + 3)
+          .map(({ count, year }) => `**${year}:** ${count}`)
+          .join('  •  '),
       );
     }
+
+    containerBuilder.addTextDisplayComponents((textDisplay) =>
+      textDisplay.setContent(participantLines.join('\n')),
+    );
   }
 
   return containerBuilder;

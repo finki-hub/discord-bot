@@ -49,3 +49,41 @@ describe('the course card', () => {
     );
   });
 });
+
+describe('the size of the course card', () => {
+  test('stays within the 40 components Discord allows', () => {
+    const accredited = Object.fromEntries(
+      ['2018', '2023'].flatMap((year) => [
+        [`${year}-available`, 'TRUE'],
+        [`${year}-name`, 'Бази на податоци'],
+        [`${year}-code`, `F${year}L3W055`],
+        [`${year}-level`, '3'],
+        [`${year}-semester`, '5'],
+        [`${year}-prerequisite`, 'Алгоритми и податочни структури'],
+      ]),
+    );
+    const participants = Object.fromEntries(
+      Array.from({ length: 12 }, (_, index) => [
+        `${2_014 + index}/${2_015 + index}`,
+        '100',
+      ]),
+    );
+    const card = getCourseComponent(
+      CourseSchema.parse({
+        name: 'Бази на податоци',
+        professors: 'Димитар Трајанов',
+        ...accredited,
+        ...participants,
+      }),
+      { channels: ['<#1>'], unlocks: ['Напредни бази на податоци'] },
+    ).toJSON();
+    const count = (component: unknown): number => {
+      const { components = [] } = component as { components?: unknown[] };
+
+      return 1 + components.reduce<number>((sum, c) => sum + count(c), 0);
+    };
+
+    // One more for the line naming the user the card is for.
+    expect(count(card) + 1).toBeLessThanOrEqual(40);
+  });
+});
