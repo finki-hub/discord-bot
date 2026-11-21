@@ -1,3 +1,5 @@
+import type { CaptureExceptionOptions } from 'posthog-node';
+
 import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
@@ -20,8 +22,7 @@ const discordUserHash = createHash('sha256')
 
 type CaptureExceptionMock = (
   error: Error,
-  distinctId: string,
-  properties: Record<string, unknown>,
+  options: CaptureExceptionOptions,
 ) => void;
 
 const postHog = vi.hoisted(() => ({
