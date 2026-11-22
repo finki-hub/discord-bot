@@ -82,11 +82,6 @@ export const data = new SlashCommandBuilder()
       .setName('reload')
       .setDescription(commandDescriptions['config reload']),
   )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName('data')
-      .setDescription(commandDescriptions['config data']),
-  )
   .setContexts(InteractionContextType.Guild)
   .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild);
 
@@ -226,21 +221,7 @@ const handleConfigSet = async (interaction: ChatInputCommandInteraction) => {
   await interaction.editReply(codeBlock('json', newProperty));
 };
 
-const handleConfigReload = async (interaction: ChatInputCommandInteraction) => {
-  await interaction.editReply(commandResponses.configurationReloading);
-
-  if (await reloadConfig()) {
-    await interaction.editReply(commandResponses.configurationReloaded);
-
-    return;
-  }
-
-  await interaction.editReply(commandErrors.configurationReloadFailed);
-};
-
-const handleConfigData = async (interaction: ChatInputCommandInteraction) => {
-  await interaction.editReply(commandResponses.dataReloading);
-
+const reloadData = async (guildId: string | undefined): Promise<boolean> => {
   try {
     await Promise.all([
       reloadCourses(),
@@ -250,17 +231,35 @@ const handleConfigData = async (interaction: ChatInputCommandInteraction) => {
       reloadStaff(),
     ]);
 
-    await interaction.editReply(commandResponses.dataReloaded);
+    return true;
   } catch (error) {
-    logger.error(`Failed reloading data\n${String(error)}`, {
-      guildId: interaction.guild?.id,
-    });
-    await interaction.editReply(commandErrors.dataReloadFailed);
+    logger.error(`Failed reloading data\n${String(error)}`, { guildId });
+
+    return false;
   }
 };
 
+const handleConfigReload = async (interaction: ChatInputCommandInteraction) => {
+  await interaction.editReply(commandResponses.configurationReloading);
+
+  // Independent, so a failure in one still refreshes the other.
+  const [configReloaded, dataReloaded] = await Promise.all([
+    reloadConfig(),
+    reloadData(interaction.guild?.id),
+  ]);
+  const failures = [
+    ...(configReloaded ? [] : [commandErrors.configurationReloadFailed]),
+    ...(dataReloaded ? [] : [commandErrors.dataReloadFailed]),
+  ];
+
+  await interaction.editReply(
+    failures.length === 0
+      ? commandResponses.configurationReloaded
+      : failures.join('\n'),
+  );
+};
+
 const configHandlers = {
-  data: handleConfigData,
   get: handleConfigGet,
   reload: handleConfigReload,
   set: handleConfigSet,

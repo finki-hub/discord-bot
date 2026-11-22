@@ -4,9 +4,8 @@ export const commandDescriptions = {
   about: 'За Discord ботот',
   anto: 'Преземи случајна Анто цитата',
   ask: 'Испрати промпт до LLM агентот',
-  'config data': 'Освежи ги податоците од складиштето',
   'config get': 'Преземи конфигурација',
-  'config reload': 'Освежи ги конфигурациите',
+  'config reload': 'Освежи ги конфигурацијата и податоците',
   'config set': 'Измени конфигурација',
   course: 'Преземи информации за предмет',
   faq: 'Преземи најчесто поставувано прашање',
@@ -29,10 +28,8 @@ const chatStorageNotice =
 
 export const commandResponses = {
   chatStorageNotice,
-  configurationReloaded: 'Конфигурацијата е освежена.',
-  configurationReloading: 'Се освежува конфигурацијата...',
-  dataReloaded: 'Податоците се освежени.',
-  dataReloading: 'Се освежуваат податоците...',
+  configurationReloaded: 'Конфигурацијата и податоците се освежени.',
+  configurationReloading: 'Се освежуваат конфигурацијата и податоците...',
   feedbackReasonSaved: 'Причината е зачувана. Ви благодариме!',
   feedbackRecorded: 'Ви благодариме на повратната информација!',
   feedbackRecordedAskReason:
