@@ -36,7 +36,7 @@ const expectEphemeral = (calls: ReturnType<typeof callsOf>): void => {
 describe('interaction replies', () => {
   test('defers public chat commands but not private model listings', () => {
     expect(shouldDeferCommand('chat models')).toBe(false);
-    expect(shouldDeferCommand('chat closest')).toBe(true);
+    expect(shouldDeferCommand('chat query')).toBe(true);
   });
 
   test('defers help and list responses that wait on external data', () => {
@@ -51,7 +51,7 @@ describe('interaction replies', () => {
   });
 
   test('blocks role and everyone mentions in replies by default', async () => {
-    const driver = fakeInteraction('chat', 'closest', USER_ID);
+    const driver = fakeInteraction('chat', 'query', USER_ID);
 
     await safeReplyToInteraction(
       driver.interaction,
@@ -67,7 +67,7 @@ describe('interaction replies', () => {
   });
 
   test('allows only explicitly named users', async () => {
-    const driver = fakeInteraction('chat', 'closest', USER_ID);
+    const driver = fakeInteraction('chat', 'query', USER_ID);
 
     await safeReplyToInteraction(driver.interaction, `<@${MENTIONED_ID}>`, {
       mentionUserIds: [MENTIONED_ID],
@@ -92,7 +92,7 @@ describe('interaction replies', () => {
   });
 
   test('keeps split public replies public', async () => {
-    const driver = fakeInteraction('chat', 'closest', USER_ID);
+    const driver = fakeInteraction('chat', 'query', USER_ID);
 
     await safeReplyToInteraction(driver.interaction, 'public '.repeat(1_000));
 

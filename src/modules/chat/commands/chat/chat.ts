@@ -16,10 +16,8 @@ import {
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
 import {
-  ClosestQuestionsOptionsSchema,
   FillEmbeddingsOptionsSchema,
   FillProgressSchema,
-  UnembeddedQuestionsOptionsSchema,
 } from '@/modules/chat/schemas/Chat.js';
 import { ChatApiError } from '@/modules/chat/schemas/Credentials.js';
 import {
@@ -45,9 +43,7 @@ import {
 import {
   deleteChatHistory,
   fillEmbeddings,
-  getClosestQuestions,
   getSupportedModels,
-  getUnembeddedQuestions,
 } from '@/modules/chat/utils/requests.js';
 import { handleChatThread } from '@/modules/chat/utils/thread.js';
 import { generateModelChoices } from '@/modules/chat/utils/utils.js';
@@ -78,40 +74,6 @@ export const permissions = {
 export const data = new SlashCommandBuilder()
   .setName(name)
   .setDescription('chat')
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName('closest')
-      .setDescription(commandDescriptions['chat closest'])
-      .addStringOption((option) =>
-        option
-          .setName('query')
-          .setDescription('Прашање за најблиски прашања')
-          .setRequired(true),
-      )
-      .addStringOption((option) =>
-        option
-          .setName(EMBEDDINGS_MODEL_OPTION_NAME)
-          .setDescription('Моделот за ембедирање')
-          .setRequired(false)
-          .setChoices(generateModelChoices(EMBEDDING_MODELS)),
-      )
-      .addNumberOption((option) =>
-        option
-          .setName('threshold')
-          .setDescription('Праг за сличност на прашањата')
-          .setRequired(false)
-          .setMinValue(0)
-          .setMaxValue(1),
-      )
-      .addNumberOption((option) =>
-        option
-          .setName('limit')
-          .setDescription('Максимален број на прашања за враќање')
-          .setRequired(false)
-          .setMinValue(1)
-          .setMaxValue(100),
-      ),
-  )
   .addSubcommand((subcommand) =>
     subcommand
       .setName('models')
@@ -149,18 +111,6 @@ export const data = new SlashCommandBuilder()
             'Дали да се ембедираат сите модели или само избраниот',
           )
           .setRequired(false),
-      ),
-  )
-  .addSubcommand((subcommand) =>
-    subcommand
-      .setName('unembedded')
-      .setDescription(commandDescriptions['chat unembedded'])
-      .addStringOption((option) =>
-        option
-          .setName(EMBEDDINGS_MODEL_OPTION_NAME)
-          .setDescription('Моделот за ембедирање')
-          .setRequired(false)
-          .setChoices(generateModelChoices(EMBEDDING_MODELS)),
       ),
   )
   .addSubcommand((subcommand) =>
@@ -231,56 +181,6 @@ export const data = new SlashCommandBuilder()
       .setName('forget')
       .setDescription(commandDescriptions['chat forget']),
   );
-
-const handleChatClosest = async (interaction: ChatInputCommandInteraction) => {
-  const prompt = interaction.options.getString('query', true);
-  const embeddingsModel =
-    interaction.options.getString(EMBEDDINGS_MODEL_OPTION_NAME, false) ??
-    undefined;
-  const threshold =
-    interaction.options.getNumber('threshold', false) ?? undefined;
-  const limit = interaction.options.getNumber('limit', false) ?? undefined;
-
-  const models =
-    interaction.guild === null
-      ? DEFAULT_CONFIGURATION.models
-      : await getConfigProperty('models', interaction.guild.id);
-
-  const options = ClosestQuestionsOptionsSchema.parse({
-    embeddingsModel: embeddingsModel ?? models.embeddings ?? undefined,
-    limit,
-    prompt,
-    threshold,
-  });
-
-  const closestQuestions = await getClosestQuestions(options);
-
-  if (closestQuestions === null) {
-    await interaction.editReply(commandErrors.dataFetchFailed);
-
-    return;
-  }
-
-  if (closestQuestions.length === 0) {
-    await interaction.editReply(labels.none);
-
-    return;
-  }
-
-  const content = closestQuestions
-    .toSorted((a, b) => {
-      if (a.distance === undefined && b.distance === undefined) return 0;
-      if (a.distance === undefined) return 1;
-      return b.distance === undefined ? -1 : a.distance - b.distance;
-    })
-    .map(
-      ({ distance, name }, index) =>
-        `${index + 1}. ${inlineCode(name)} (${distance === undefined ? labels.none : distance.toFixed(3)})`,
-    )
-    .join('\n');
-
-  await safeReplyToInteraction(interaction, content);
-};
 
 const handleChatModels = async (interaction: ChatInputCommandInteraction) => {
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -415,53 +315,12 @@ const handleChatEmbed = async (interaction: ChatInputCommandInteraction) => {
   }
 };
 
-const handleChatUnembedded = async (
-  interaction: ChatInputCommandInteraction,
-) => {
-  const embeddingsModel =
-    interaction.options.getString('embeddings-model', false) ?? undefined;
-
-  const models =
-    interaction.guild === null
-      ? DEFAULT_CONFIGURATION.models
-      : await getConfigProperty('models', interaction.guild.id);
-
-  const options = UnembeddedQuestionsOptionsSchema.parse({
-    embeddingsModel: embeddingsModel ?? models.embeddings ?? undefined,
-  });
-
-  const unembeddedQuestions = await getUnembeddedQuestions(options);
-
-  if (unembeddedQuestions === null) {
-    logger.error(
-      `Failed getting unembedded questions for embeddings model: ${options.model ?? 'default'}`,
-      {
-        guildId: interaction.guild?.id,
-      },
-    );
-    await interaction.editReply(commandErrors.dataFetchFailed);
-
-    return;
-  }
-
-  if (unembeddedQuestions.length === 0) {
-    await interaction.editReply(labels.none);
-
-    return;
-  }
-
-  const content = unembeddedQuestions.map(({ name }) => `- ${name}`).join('\n');
-  await safeReplyToInteraction(interaction, content);
-};
-
 const chatHandlers = {
-  closest: handleChatClosest,
   embed: handleChatEmbed,
   forget: handleChatForget,
   models: handleChatModels,
   query: handleChatQuery,
   thread: handleChatThread,
-  unembedded: handleChatUnembedded,
 };
 
 export const execute = async (interaction: ChatInputCommandInteraction) => {
