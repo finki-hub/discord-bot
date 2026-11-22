@@ -14,7 +14,7 @@ import {
 } from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
-import { isModelSelectable } from '../schemas/Model.js';
+import { isFreeModelSelectable } from '../schemas/Model.js';
 import { interactionDiscordContext } from './discordContext.js';
 import { resolveInteractionChatUser } from './interaction.js';
 import { getSupportedModels, getValidatedInferenceModel } from './requests.js';
@@ -105,7 +105,10 @@ export const getCommonCommand = (
         const selectedModel = catalog.models.find(
           ({ id }) => id === inferenceModel,
         );
-        if (selectedModel === undefined || !isModelSelectable(selectedModel)) {
+        if (
+          selectedModel === undefined ||
+          !isFreeModelSelectable(selectedModel)
+        ) {
           await safeEphemeralReplyToInteraction(
             interaction,
             commandErrors.invalidInferenceModel,

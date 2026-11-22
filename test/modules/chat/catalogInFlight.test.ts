@@ -6,6 +6,8 @@ import {
   invalidateModelCatalog,
 } from '@/modules/chat/utils/requests.js';
 
+import { requestUrl } from './interactionFixture.js';
+
 const USER_ID = '00000000-0000-4000-8000-000000000012';
 
 const catalog = {
@@ -40,6 +42,12 @@ describe('model catalog requests', () => {
     const second = getSupportedModels(USER_ID);
 
     expect(fetchMock).toHaveBeenCalledOnce();
+    const call = fetchMock.mock.calls[0];
+    if (call === undefined) {
+      throw new Error('Expected a catalog request');
+    }
+    const [input] = call;
+    expect(requestUrl(input).searchParams.get('interface')).toBe('discord');
 
     resolve(Response.json(catalog));
 

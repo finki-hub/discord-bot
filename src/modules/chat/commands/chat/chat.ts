@@ -25,6 +25,7 @@ import { ChatApiError } from '@/modules/chat/schemas/Credentials.js';
 import {
   EMBEDDING_MODELS,
   formatModelLabel,
+  isFreeModelSelectable,
 } from '@/modules/chat/schemas/Model.js';
 import { getCommonCommand } from '@/modules/chat/utils/chatCommand.js';
 import {
@@ -295,12 +296,14 @@ const handleChatModels = async (interaction: ChatInputCommandInteraction) => {
     return;
   }
 
-  if (models.models.length === 0) {
+  const freeModels = models.models.filter(isFreeModelSelectable);
+
+  if (freeModels.length === 0) {
     await interaction.editReply(labels.none);
     return;
   }
 
-  const content = models.models
+  const content = freeModels
     .map((model) => `- ${formatModelLabel(model)}: ${inlineCode(model.id)}`)
     .join('\n');
   await safeReplyToInteraction(interaction, content, { ephemeral: true });

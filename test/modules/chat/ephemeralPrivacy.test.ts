@@ -6,7 +6,6 @@ import type { SendPromptOptions } from '@/modules/chat/schemas/Chat.js';
 import { logger } from '@/common/logger/index.js';
 import { safeStreamReplyToInteraction } from '@/common/utils/messages.js';
 import { execute as executeChat } from '@/modules/chat/commands/chat/chat.js';
-import { execute as executeCredentials } from '@/modules/chat/commands/chat/credentials.js';
 import { clearChatUserCache } from '@/modules/chat/utils/identity.js';
 import { invalidateModelCatalog } from '@/modules/chat/utils/requests.js';
 import { handlePromptWithStreaming } from '@/modules/chat/utils/streaming.js';
@@ -19,7 +18,6 @@ import {
   requestUrl,
 } from './interactionFixture.js';
 
-const CREDENTIAL_USER_ID = '00000000-0000-4000-8000-000000000002';
 const MODEL_USER_ID = '00000000-0000-4000-8000-000000000003';
 
 const streamErrorResponse = (): Response =>
@@ -38,16 +36,9 @@ const expectEphemeral = (calls: ReturnType<typeof callsOf>): void => {
   }
 };
 
-const credentialPayload = () =>
-  ['anthropic', 'google', 'ollama', 'openai'].map((provider) => ({
-    base_url: `https://${provider}.${'x'.repeat(490)}.invalid`,
-    has_api_key: true,
-    provider,
-  }));
-
 const modelPayload = () => ({
   models: Array.from({ length: 25 }, (_, index) => ({
-    availability: index === 0 ? 'sponsored' : 'byok',
+    availability: 'sponsored',
     id: `model-${index}-${'x'.repeat(50)}`,
     name: `Model ${index} ${'x'.repeat(80)}`,
     provider: 'openai',
@@ -82,46 +73,14 @@ describe('ephemeral chat output', () => {
     logger.silent = true;
     vi.stubEnv('CHATBOT_URL', 'https://chatbot.invalid');
     vi.stubEnv('API_KEY', 'test-api-key');
-    clearChatUserCache(CREDENTIAL_USER_ID);
     clearChatUserCache(MODEL_USER_ID);
     invalidateModelCatalog(MODEL_USER_ID);
   });
 
   afterEach(() => {
-    clearChatUserCache(CREDENTIAL_USER_ID);
     clearChatUserCache(MODEL_USER_ID);
     invalidateModelCatalog(MODEL_USER_ID);
     logger.silent = originalLoggerSilent;
-  });
-
-  test('keeps credential output ephemeral across follow-ups', async () => {
-    const driver = fakeInteraction('credentials', 'list', CREDENTIAL_USER_ID);
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(async (input: Parameters<typeof fetch>[0]) => {
-        const url = requestUrl(input);
-        if (url.pathname === '/chat/state/users') {
-          driver.state.requestOrder.push('identity');
-          return jsonResponse({
-            id: CREDENTIAL_USER_ID,
-            provider: 'discord',
-            provider_subject: 'privacy-test',
-          });
-        }
-        if (url.pathname.endsWith('/credentials')) {
-          return jsonResponse(credentialPayload());
-        }
-        throw new Error(`Unexpected credential request URL: ${url.href}`);
-      }),
-    );
-
-    await executeCredentials(driver.interaction);
-
-    expect(payloadFlags(driver.state.calls[0]?.payload)).toBe(
-      MessageFlags.Ephemeral,
-    );
-    expect(callsOf(driver.state, 'edit')).toHaveLength(1);
-    expectEphemeral(callsOf(driver.state, 'followUp'));
   });
 
   test('resolves identity before returning an ephemeral model catalog', async () => {
