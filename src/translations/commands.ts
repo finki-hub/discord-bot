@@ -1,10 +1,4 @@
-import {
-  channelMention,
-  codeBlock,
-  type GuildPremiumTier,
-  italic,
-  userMention,
-} from 'discord.js';
+import { channelMention, codeBlock, italic, userMention } from 'discord.js';
 
 export const commandDescriptions = {
   about: 'За Discord ботот',
@@ -67,35 +61,6 @@ export const commandResponseFunctions = {
     `Веќе имаш активна нишка за разговор: ${channelMention(threadId)}`,
 
   commandFor: (userId: string) => italic(`за ${userMention(userId)}`),
-
-  serverAnimatedEmojiStat: (emojiCount: number, maxCount: number) =>
-    `Анимирани емоџиња: ${emojiCount} / ${maxCount}`,
-
-  serverBoostLevelStat: (boostLevel: GuildPremiumTier) => `Ниво: ${boostLevel}`,
-
-  serverBoostStat: (boostCount: number) => `Бустови: ${boostCount}`,
-
-  serverChannelsStat: (channelCount: number) => `Канали: ${channelCount} / 500`,
-
-  serverEmojiStat: (emojiCount: number, maxCount: number) =>
-    `Емоџиња: ${emojiCount} / ${maxCount}`,
-
-  serverInvitesStat: (inviteCount: number | string) => `Покани: ${inviteCount}`,
-
-  serverMembersStat: (memberCount: number, maxMembers: null | number) =>
-    maxMembers === null
-      ? `Членови: ${memberCount}`
-      : `Членови: ${memberCount} / ${maxMembers}`,
-
-  serverRolesStat: (roleCount: number) => `Улоги: ${roleCount} / 250`,
-
-  serverSoundboardSoundsStat: (
-    soundCount: number | string,
-    maxCount: number | string,
-  ) => `Звуци: ${soundCount} / ${maxCount}`,
-
-  serverStickersStat: (stickerCount: number, maxCount: number) =>
-    `Стикери: ${stickerCount} / ${maxCount}`,
 };
 
 export const commandErrors = {
@@ -116,7 +81,6 @@ export const commandErrors = {
     'Настана грешка при извршување на командата. Обидете се повторно, или пријавете ја грешката.',
   commandGuildOnly: 'Оваа команда може да се користи само на сервер.',
   commandNoPermission: 'Немате дозвола да ја извршите командата.',
-  commandNotFound: 'Командата не постои.',
   configurationReloadFailed:
     'Неуспешно освежување на конфигурацијата. Проверете ги логовите за повеќе детали.',
   configurationSavingFailed: 'Зачувувањето на конфигурацијата беше неуспешно.',

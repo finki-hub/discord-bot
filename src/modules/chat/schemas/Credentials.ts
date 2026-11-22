@@ -29,8 +29,6 @@ export const SafeErrorDetailSchema = z.object({
   detail: z.string().optional(),
 });
 
-export type SafeErrorDetail = z.infer<typeof SafeErrorDetailSchema>;
-
 export class ChatApiError extends Error {
   readonly detail: string;
   override readonly name = 'ChatApiError';
