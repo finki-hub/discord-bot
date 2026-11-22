@@ -10,6 +10,7 @@ import {
 import { executeSubcommand } from '@/common/commands/subcommands.js';
 import { Channel } from '@/common/schemas/Channel.js';
 import { Role } from '@/common/schemas/Role.js';
+import { truncateComponentText } from '@/common/utils/limits.js';
 import {
   getChannelsProperty,
   getTicketingProperty,
@@ -140,12 +141,13 @@ const handleTicketSend = async (interaction: ChatInputCommandInteraction) => {
     })
     .join('\n');
 
-  // A text display keeps the embed's higher character limit for long lists.
   await targetChannel.send({
     allowedMentions: { parse: [] },
     components: [
       new TextDisplayBuilder().setContent(
-        ticketMessageFunctions.ticketSendMessage(ticketList),
+        truncateComponentText(
+          ticketMessageFunctions.ticketSendMessage(ticketList),
+        ),
       ),
       ...getTicketCreateComponents(tickets),
     ],

@@ -2,6 +2,7 @@ import {
   ChannelType,
   Collection,
   type Guild,
+  type Message,
   type ModalSubmitInteraction,
   type TextChannel,
 } from 'discord.js';
@@ -9,6 +10,7 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Ticket } from '@/modules/ticket/schemas/Ticket.js';
 
+import { logger } from '@/common/logger/index.js';
 import { commandErrors } from '@/translations/commands.js';
 import { ticketMessageFunctions } from '@/translations/tickets.js';
 
@@ -28,7 +30,8 @@ vi.mock('@/configuration/bot/index.js', () => ({
   getTicketingProperty: mocks.getTicketingProperty,
 }));
 
-const { createTicket } = await import('@/modules/ticket/utils/tickets.js');
+const { createTicket, handleTicketMessage } =
+  await import('@/modules/ticket/utils/tickets.js');
 
 const TICKET_TYPE: Ticket = {
   id: 'support',
@@ -42,7 +45,7 @@ const interactionFor = (
 ) =>
   ({
     editReply,
-    guild,
+    guild: { members: { me: null }, ...(guild as object) },
     user: {
       displayAvatarURL: () => 'https://example.invalid/avatar.png',
       id: 'requester',
@@ -152,6 +155,82 @@ describe('createTicket', () => {
     expect(editReply).toHaveBeenCalledWith(
       'Креиран е Вашиот тикет: https://discord.com/channels/1/2',
     );
+  });
+});
+
+describe('ticket safeguards', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getChannelsProperty.mockReturnValue('tickets-channel');
+  });
+
+  test('recognizes a text header without resolved role mentions', async () => {
+    const header = {
+      author: { bot: true },
+      content: ticketMessageFunctions.ticketRequestHeader(
+        'Наслов',
+        'requester',
+        '<@&staff-role>',
+      ),
+      embeds: [],
+      mentions: { roles: new Collection() },
+      system: false,
+    };
+    const send = vi.fn<(payload: unknown) => Promise<unknown>>(
+      async () => ({}),
+    );
+    const message = {
+      author: { bot: false },
+      channel: {
+        id: 'ticket-thread',
+        isThread: () => true,
+        messages: { fetch: async () => new Collection([['header', header]]) },
+        parentId: 'tickets-channel',
+        send,
+      },
+      guild: { id: 'guild' },
+      id: 'reply',
+      system: false,
+    } as unknown as Message;
+
+    await handleTicketMessage(message);
+
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  test('warns when a ticket role cannot be mentioned', async () => {
+    const warn = vi.spyOn(logger, 'warn');
+    const thread = {
+      id: 'ticket-thread',
+      send: vi.fn<() => Promise<unknown>>(async () => ({})),
+      url: 'https://discord.com/channels/1/2',
+    };
+    mocks.getChannel.mockReturnValue({
+      threads: { create: async () => thread },
+      type: ChannelType.GuildText,
+    } as unknown as TextChannel);
+    const guild = {
+      channels: { cache: new Collection() },
+      id: 'guild',
+      members: {
+        me: { permissionsIn: () => ({ has: () => false }) },
+      },
+      roles: {
+        cache: new Collection([['staff-role', { mentionable: false }]]),
+      },
+    } as unknown as Guild;
+
+    await createTicket(
+      interactionFor(guild, async () => ({})),
+      TICKET_TYPE,
+      { description: 'Опис', title: 'Наслов' },
+    );
+
+    expect(warn).toHaveBeenCalledExactlyOnceWith(
+      expect.stringContaining('staff-role'),
+      { guildId: 'guild' },
+    );
+    warn.mockRestore();
   });
 
   test('deletes the thread when its messages cannot be sent', async () => {

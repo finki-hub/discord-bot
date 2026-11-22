@@ -10,6 +10,7 @@ import {
   type Message,
   MessageFlags,
   type ModalSubmitInteraction,
+  PermissionFlagsBits,
   roleMention,
   type TextChannel,
   ThreadAutoArchiveDuration,
@@ -38,6 +39,7 @@ import {
   MAX_THREAD_NAME_LENGTH,
   TICKET_ABANDON_TIMEOUT_MILLISECONDS,
   TICKET_REQUEST_FOOTER,
+  TICKET_REQUEST_MARKER,
   TICKET_START_LOOKBACK_LIMIT,
 } from './constants.js';
 import {
@@ -103,11 +105,12 @@ const getTicketThreadName = (
 const isHumanMessage = (message: Message): boolean =>
   !message.author.bot && !message.system;
 
-// Older modal tickets carry the footer embed; newer ones ping the staff roles
-// in their plain-text header. Both mean staff were already notified.
+// Older modal tickets carry the footer embed; newer ones carry a text marker.
+// Role mentions are not a reliable signal: Discord and the role cache can both
+// drop them, and an unrecognized ticket is deleted as abandoned.
 const isTicketRequest = (message: Message): boolean =>
   message.author.bot &&
-  (message.mentions.roles.size > 0 ||
+  (message.content.includes(TICKET_REQUEST_MARKER) ||
     message.embeds.some(
       (embed) => embed.footer?.text === TICKET_REQUEST_FOOTER,
     ));
@@ -251,11 +254,42 @@ const sendTicketMessages = async (
   });
 };
 
+// Staff join the thread only through the role mention, so a role the bot cannot
+// mention leaves them without access or a notification.
+const warnUnmentionableRoles = (
+  guild: Guild,
+  ticketsChannel: TextChannel,
+  roleIds: string[],
+): void => {
+  const botMember = guild.members.me;
+
+  if (
+    botMember === null ||
+    botMember
+      .permissionsIn(ticketsChannel)
+      .has(PermissionFlagsBits.MentionEveryone)
+  ) {
+    return;
+  }
+
+  const unmentionableRoleIds = roleIds.filter(
+    (roleId) => guild.roles.cache.get(roleId)?.mentionable !== true,
+  );
+
+  if (unmentionableRoleIds.length > 0) {
+    logger.warn(
+      `Ticket roles cannot be mentioned, so their members will not be added: ${unmentionableRoleIds.join(', ')}`,
+      { guildId: guild.id },
+    );
+  }
+};
+
 const createTicketThread = async (
   request: TicketRequest,
-  guildId: string,
+  guild: Guild,
 ): Promise<void> => {
   const { interaction, options, ticketMetadata } = request;
+  const guildId = guild.id;
   const ticketsChannel = getChannel(Channel.Tickets, guildId);
 
   if (ticketsChannel?.type !== ChannelType.GuildText) {
@@ -271,6 +305,8 @@ const createTicketThread = async (
 
     return;
   }
+
+  warnUnmentionableRoles(guild, ticketsChannel, ticketMetadata.roles);
 
   const ticketChannel = await ticketsChannel.threads.create({
     autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
@@ -314,7 +350,10 @@ export const createTicket = async (
   ticketCreationsInProgress.add(creationKey);
 
   try {
-    await createTicketThread({ interaction, options, ticketMetadata }, guildId);
+    await createTicketThread(
+      { interaction, options, ticketMetadata },
+      interaction.guild,
+    );
   } finally {
     ticketCreationsInProgress.delete(creationKey);
   }

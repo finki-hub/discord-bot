@@ -34,6 +34,10 @@ export const TICKET_START_LOOKBACK_LIMIT = 50;
 // tickets rely on it to be recognized as started during maintenance.
 export const TICKET_REQUEST_FOOTER = 'Барање за тикет';
 
+// Persisted marker in the plain-text ticket header. Keep this value stable:
+// maintenance deletes tickets it cannot recognize as started.
+export const TICKET_REQUEST_MARKER = '-# Приватен тикет од';
+
 // Persisted marker for inactivity warnings. Keep this value stable: the
 // reminder stage and timestamp are read from these messages during maintenance.
 export const TICKET_REMINDER_FOOTER = 'Автоматска напомена';

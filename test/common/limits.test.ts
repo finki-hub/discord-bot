@@ -13,6 +13,7 @@ import {
   MAX_COMPONENT_TEXT_LENGTH,
   MAX_MESSAGE_LENGTH,
   truncateButtonLabel,
+  truncateComponentText,
 } from '@/common/utils/limits.js';
 import { getCourseComponent } from '@/modules/course/components/components.js';
 import { CourseSchema } from '@/modules/course/schemas/Course.js';
@@ -36,6 +37,17 @@ const flatten = (component: Json): Json[] => [
 ];
 
 const jsonOf = (card: ContainerBuilder) => card.toJSON() as unknown as Json;
+
+describe('truncateComponentText', () => {
+  test('keeps text at the limit and shortens longer text', () => {
+    const atLimit = 'a'.repeat(MAX_COMPONENT_TEXT_LENGTH);
+    const truncated = truncateComponentText(`${atLimit}a`);
+
+    expect(truncateComponentText(atLimit)).toBe(atLimit);
+    expect(truncated).toHaveLength(MAX_COMPONENT_TEXT_LENGTH);
+    expect(truncated.endsWith('…')).toBe(true);
+  });
+});
 
 const pageCard = (pages: number, page: number) =>
   getPaginationComponent({
