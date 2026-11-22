@@ -12,15 +12,12 @@ import { capMap, setNewest } from '@/common/utils/maps.js';
 import { errorCategory } from '@/common/utils/safeError.js';
 import { withTimeout } from '@/common/utils/timeout.js';
 import { getApiKey, getChatbotUrl } from '@/configuration/environment.js';
-import { QuestionsSchema } from '@/modules/faq/schemas/Question.js';
 import { labels } from '@/translations/labels.js';
 
 import type {
-  ClosestQuestionsOptions,
   FeedbackOptions,
   FillEmbeddingsOptions,
   SendPromptOptions,
-  UnembeddedQuestionsOptions,
 } from '../schemas/Chat.js';
 
 import {
@@ -482,42 +479,6 @@ export const sendFeedback = async (
   }
 };
 
-export const getClosestQuestions = async (options: ClosestQuestionsOptions) => {
-  const chatbotUrl = getChatbotUrl();
-
-  if (chatbotUrl === null) {
-    return null;
-  }
-
-  const url = new URL(`${chatbotUrl}/questions/closest`);
-
-  const sanitizedOptions = sanitizeOptions(options);
-
-  for (const [key, value] of Object.entries(sanitizedOptions)) {
-    if (value !== undefined) {
-      url.searchParams.append(
-        key,
-        typeof value === 'number' ? value.toString() : value,
-      );
-    }
-  }
-
-  try {
-    const result = await fetchWithTimeout(url, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    return result.ok && result.body && result.status === 200
-      ? QuestionsSchema.parse(await result.json())
-      : null;
-  } catch (error) {
-    logger.error(`Failed getting closest questions\n${String(error)}`);
-    return null;
-  }
-};
-
 const fetchModelCatalog = async (
   userId: string,
   chatbotUrl: string,
@@ -683,47 +644,4 @@ export const fillEmbeddings = async (
   logger.info(
     `Embeddings filled for model ${options.embeddings_model ?? 'ALL'}`,
   );
-};
-
-export const getUnembeddedQuestions = async (
-  options: UnembeddedQuestionsOptions,
-) => {
-  const chatbotUrl = getChatbotUrl();
-
-  if (chatbotUrl === null) {
-    logger.error(
-      'Failed getting unembedded questions: chatbot URL not configured',
-    );
-    return null;
-  }
-
-  const url = new URL(`${chatbotUrl}/questions/unfilled`);
-
-  const sanitizedOptions = sanitizeOptions(options);
-
-  for (const [key, value] of Object.entries(sanitizedOptions)) {
-    if (value !== undefined) {
-      url.searchParams.append(key, value);
-    }
-  }
-
-  try {
-    const result = await fetchWithTimeout(url, {
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!result.ok || !result.body || result.status !== 200) {
-      logger.error(
-        `Failed getting unembedded questions: HTTP ${result.status} ${result.statusText}`,
-      );
-      return null;
-    }
-
-    return QuestionsSchema.parse(await result.json());
-  } catch (error) {
-    logger.error(`Failed getting unembedded questions\n${String(error)}`);
-    return null;
-  }
 };

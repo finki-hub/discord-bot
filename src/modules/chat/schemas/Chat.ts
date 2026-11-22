@@ -90,24 +90,6 @@ export const FeedbackOptionsSchema = z
 
 export type FeedbackOptions = z.infer<typeof FeedbackOptionsSchema>;
 
-export const ClosestQuestionsOptionsSchema = z
-  .object({
-    embeddingsModel: z.string().optional(),
-    limit: z.number().min(1).max(100).optional(),
-    prompt: z.string().min(1, 'Query must not be empty'),
-    threshold: z.number().min(0).max(1).optional(),
-  })
-  .transform((data) => ({
-    embeddings_model: data.embeddingsModel,
-    limit: data.limit,
-    prompt: data.prompt,
-    threshold: data.threshold,
-  }));
-
-export type ClosestQuestionsOptions = z.infer<
-  typeof ClosestQuestionsOptionsSchema
->;
-
 export const FillProgressSchema = z.object({
   error: z.string(),
   id: z.string(),
@@ -139,15 +121,3 @@ export const FillEmbeddingsOptionsSchema = z
   }));
 
 export type FillEmbeddingsOptions = z.infer<typeof FillEmbeddingsOptionsSchema>;
-
-export const UnembeddedQuestionsOptionsSchema = z
-  .object({
-    embeddingsModel: z.string().optional(),
-  })
-  .transform((data) => ({
-    model: data.embeddingsModel,
-  }));
-
-export type UnembeddedQuestionsOptions = z.infer<
-  typeof UnembeddedQuestionsOptionsSchema
->;
