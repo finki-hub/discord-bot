@@ -35,8 +35,6 @@ export const startPeriodicReload = () => {
   });
 };
 
-export const getQuotes = (): string[] => state.quotes;
-
 export const getRandomQuote = (): string | undefined => {
   if (state.quotes.length === 0) {
     return undefined;

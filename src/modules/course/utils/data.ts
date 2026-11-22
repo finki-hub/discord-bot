@@ -27,9 +27,6 @@ export const startPeriodicReload = () => {
   schedulePeriodicReload({ label: 'courses', reload: reloadCourses });
 };
 
-export const getCourses = (): string[] =>
-  state.courses.map((course) => course.name);
-
 export const getCourseNameVariants = (): Array<[string, string]> =>
   state.courses.flatMap((course) => {
     const variants: Array<[string, string]> = [[course.name, course.name]];

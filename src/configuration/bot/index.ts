@@ -134,27 +134,6 @@ export const getGuildConfigFull = async (
   return currentConfig[guildId] ?? null;
 };
 
-export const setGuildConfigFull = async (
-  guildId: string,
-  config: BotConfig,
-): Promise<BotConfig | null> => {
-  if (configState.persistenceBlocked) {
-    logger.warn(
-      'Configuration write skipped because configuration persistence is blocked',
-    );
-    return null;
-  }
-
-  const validated = BotConfigSchema.parse(config);
-  const currentConfig = await getLoadedConfigState();
-  currentConfig[guildId] = validated;
-  setMultiGuildConfig(currentConfig);
-
-  const newValue = await setConfigFile(currentConfig);
-
-  return newValue?.[guildId] ?? null;
-};
-
 export const getConfigKeys = (): readonly string[] =>
   Object.keys(DEFAULT_CONFIGURATION);
 

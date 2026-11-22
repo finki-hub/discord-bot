@@ -8,7 +8,6 @@ export const QuestionSchema = z
   .object({
     content: z.string(),
     created_at: z.string(),
-    distance: z.number().nullish(),
     id: z.string(),
     links: z.record(z.string(), z.string()).nullable(),
     name: z.string(),
@@ -18,7 +17,6 @@ export const QuestionSchema = z
   .transform((data) => ({
     content: data.content,
     createdAt: parseInstant(data.created_at),
-    distance: data.distance ?? undefined,
     id: data.id,
     links: data.links,
     name: data.name,

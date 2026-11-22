@@ -62,8 +62,6 @@ export const FEEDBACK_REASONS = [
   'other',
 ] as const;
 
-export type FeedbackReason = (typeof FEEDBACK_REASONS)[number];
-
 export const FeedbackOptionsSchema = z
   .object({
     channelId: z.string().optional(),
