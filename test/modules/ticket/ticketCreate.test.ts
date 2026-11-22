@@ -1,6 +1,7 @@
 import {
   ChannelType,
   Collection,
+  ComponentType,
   type Guild,
   type Message,
   type ModalSubmitInteraction,
@@ -8,9 +9,12 @@ import {
 } from 'discord.js';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 
-import type { Ticket } from '@/modules/ticket/schemas/Ticket.js';
-
 import { logger } from '@/common/logger/index.js';
+import {
+  getTicketNamesSchema,
+  type Ticket,
+  TicketSchema,
+} from '@/modules/ticket/schemas/Ticket.js';
 import { commandErrors } from '@/translations/commands.js';
 import { ticketMessageFunctions } from '@/translations/tickets.js';
 
@@ -30,7 +34,7 @@ vi.mock('@/configuration/bot/index.js', () => ({
   getTicketingProperty: mocks.getTicketingProperty,
 }));
 
-const { createTicket, handleTicketMessage } =
+const { closeTicket, createTicket, handleTicketMessage } =
   await import('@/modules/ticket/utils/tickets.js');
 
 const TICKET_TYPE: Ticket = {
@@ -134,7 +138,7 @@ describe('createTicket', () => {
     );
     expect(add).not.toHaveBeenCalled();
     expect(send).toHaveBeenCalledTimes(2);
-    expect(send.mock.calls[0]?.[0]).toEqual({
+    expect(send.mock.calls[0]?.[0]).toMatchObject({
       allowedMentions: {
         parse: [],
         roles: ['staff-role'],
@@ -146,12 +150,11 @@ describe('createTicket', () => {
         '<@&staff-role>',
       ),
     });
-    expect(send.mock.calls[1]?.[0]).toMatchObject({
+    expect(send.mock.calls[0]?.[0]).toHaveProperty('components');
+    expect(send.mock.calls[1]?.[0]).toEqual({
       allowedMentions: { parse: [] },
       content: 'Не можам да го отворам предметот.',
     });
-    expect(send.mock.calls[1]?.[0]).toHaveProperty('components');
-    expect(send.mock.calls[1]?.[0]).not.toHaveProperty('embeds');
     expect(editReply).toHaveBeenCalledWith(
       'Креиран е Вашиот тикет: https://discord.com/channels/1/2',
     );
@@ -301,6 +304,60 @@ describe('ticket safeguards', () => {
       commandErrors.ticketCreationInProgress,
     );
   });
+});
+
+describe('closing a ticket', () => {
+  test.each([
+    ['the header', 0],
+    ['the description', 1],
+  ])('disables a close button on %s', async (_position, buttonIndex) => {
+    const edits = [
+      vi.fn<(payload: unknown) => Promise<void>>(async () => {}),
+      vi.fn<(payload: unknown) => Promise<void>>(async () => {}),
+    ];
+    const messages = edits.map((edit, index) => ({
+      author: { bot: true },
+      components:
+        index === buttonIndex
+          ? [
+              {
+                components: [{ customId: 'ticketClose:ticket-thread' }],
+                type: ComponentType.ActionRow,
+              },
+            ]
+          : [],
+      edit,
+    }));
+    const thread = {
+      id: 'ticket-thread',
+      locked: false,
+      messages: {
+        fetch: async () =>
+          new Collection(messages.map((message, index) => [index, message])),
+      },
+      send: async () => ({}),
+      setArchived: async () => ({}),
+      setLocked: async () => ({}),
+    };
+    mocks.getChannel.mockReturnValue({
+      threads: { cache: new Collection([[thread.id, thread]]) },
+      type: ChannelType.GuildText,
+    } as unknown as TextChannel);
+
+    await closeTicket(thread.id, 'guild', 'closer');
+
+    expect(edits[buttonIndex]).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ allowedMentions: { parse: [] } }),
+    );
+    expect(edits[1 - buttonIndex]).not.toHaveBeenCalled();
+  });
+});
+
+describe('ticket thread names', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getChannelsProperty.mockReturnValue('tickets-channel');
+  });
 
   test("rejects thread names whose metadata cannot fit Discord's limit", async () => {
     const create = vi.fn<(options: unknown) => Promise<unknown>>(
@@ -323,14 +380,66 @@ describe('ticket safeguards', () => {
       name: 'Т'.repeat(100),
     };
 
-    await expect(
-      createTicket(interactionFor(guild, editReply), longType, {
-        description: 'Опис',
-        title: 'Наслов',
-      }),
-    ).rejects.toThrow('Ticket thread metadata exceeds');
+    await createTicket(interactionFor(guild, editReply), longType, {
+      description: 'Опис',
+      title: 'Наслов',
+    });
 
     expect(create).not.toHaveBeenCalled();
+    expect(editReply).toHaveBeenCalledExactlyOnceWith(
+      commandErrors.ticketNameTooLong,
+    );
+  });
+
+  test('shortens a long title without breaking an emoji', async () => {
+    const send = vi.fn<(payload: unknown) => Promise<unknown>>(
+      async () => ({}),
+    );
+    const create = vi.fn<(options: { name: string }) => Promise<unknown>>(
+      async () => ({
+        id: 'ticket-thread',
+        send,
+        url: 'https://discord.com/channels/1/2',
+      }),
+    );
+    mocks.getChannel.mockReturnValue({
+      threads: { create },
+      type: ChannelType.GuildText,
+    } as unknown as TextChannel);
+    const guild = {
+      channels: { cache: new Collection() },
+      id: 'guild',
+    } as unknown as Guild;
+    const suffix = ' - requester#0001 - Поддршка';
+    const titleRoom = 100 - suffix.length;
+
+    await createTicket(
+      interactionFor(guild, async () => ({})),
+      TICKET_TYPE,
+      {
+        description: 'Опис',
+        title: `${'а'.repeat(titleRoom - 2)}😀${'б'.repeat(10)}`,
+      },
+    );
+
+    const name = create.mock.calls[0]?.[0].name;
+
+    expect(name).toBe(`${'а'.repeat(titleRoom - 2)}…${suffix}`);
+    expect(name?.length).toBeLessThanOrEqual(100);
+  });
+
+  test('limits new ticket type names without affecting saved ones', () => {
+    const ticket = { ...TICKET_TYPE, name: 'т'.repeat(51) };
+
+    const value = { tickets: [ticket] };
+
+    expect(TicketSchema.safeParse(ticket).success).toBe(true);
+    expect(getTicketNamesSchema(new Set()).safeParse(value).success).toBe(
+      false,
+    );
+    expect(
+      getTicketNamesSchema(new Set([ticket.name])).safeParse(value).success,
+    ).toBe(true);
   });
 
   test('links an existing open ticket instead of creating another', async () => {
