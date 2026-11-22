@@ -103,21 +103,21 @@ const actionFor = (
 
 describe('getDueReminderStage', () => {
   test('uses the 3-day and 1-day thresholds', () => {
-    expect(getDueReminderStage(7 * DAY - 1)).toBeNull();
-    expect(getDueReminderStage(7 * DAY)).toBe('3d');
-    expect(getDueReminderStage(8 * DAY)).toBe('3d');
-    expect(getDueReminderStage(9 * DAY - 1)).toBe('3d');
-    expect(getDueReminderStage(9 * DAY)).toBe('1d');
+    expect(getDueReminderStage(4 * DAY - 1)).toBeNull();
+    expect(getDueReminderStage(4 * DAY)).toBe('3d');
+    expect(getDueReminderStage(5 * DAY)).toBe('3d');
+    expect(getDueReminderStage(6 * DAY - 1)).toBe('3d');
+    expect(getDueReminderStage(6 * DAY)).toBe('1d');
   });
 });
 
 describe('getInactivityAction', () => {
-  test('does nothing before seven idle days', () => {
-    expect(actionFor(6 * DAY)).toEqual({ type: 'none' });
+  test('does nothing before four idle days', () => {
+    expect(actionFor(3 * DAY)).toEqual({ type: 'none' });
   });
 
-  test('sends the 3-day reminder at seven idle days', () => {
-    expect(actionFor(7 * DAY)).toEqual({
+  test('sends the 3-day reminder at four idle days', () => {
+    expect(actionFor(4 * DAY)).toEqual({
       daysLeft: 3,
       stage: '3d',
       type: 'remind',
@@ -125,11 +125,11 @@ describe('getInactivityAction', () => {
   });
 
   test('does not repeat the 3-day reminder', () => {
-    expect(actionFor(8 * DAY, '3d')).toEqual({ type: 'none' });
+    expect(actionFor(5 * DAY, '3d')).toEqual({ type: 'none' });
   });
 
   test('sends the 1-day reminder after a 3-day reminder', () => {
-    expect(actionFor(9 * DAY, '3d')).toEqual({
+    expect(actionFor(6 * DAY, '3d')).toEqual({
       daysLeft: 1,
       stage: '1d',
       type: 'remind',
@@ -137,7 +137,7 @@ describe('getInactivityAction', () => {
   });
 
   test('reports the actual remaining days for a late 3-day reminder', () => {
-    expect(actionFor(8 * DAY + 21 * 3_600_000)).toEqual({
+    expect(actionFor(5 * DAY + 21 * 3_600_000)).toEqual({
       daysLeft: 2,
       stage: '3d',
       type: 'remind',
@@ -145,10 +145,10 @@ describe('getInactivityAction', () => {
   });
 
   test('does not repeat the 1-day reminder', () => {
-    expect(actionFor(9 * DAY, '1d')).toEqual({ type: 'none' });
+    expect(actionFor(6 * DAY, '1d')).toEqual({ type: 'none' });
   });
 
-  test('closes after ten idle days even when a reminder was sent', () => {
+  test('closes after seven idle days even when a reminder was sent', () => {
     expect(actionFor(MAX_TICKET_INACTIVITY_MILLISECONDS, '1d')).toEqual({
       type: 'close',
     });

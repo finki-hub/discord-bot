@@ -15,6 +15,7 @@ import { FEEDBACK_REASON_ID as chatFeedbackReasonButtonId } from '@/modules/chat
 import { name as listCommandsButtonId } from '@/modules/list/commands/button/listCommands.js';
 import { name as listLinksButtonId } from '@/modules/list/commands/button/listLinks.js';
 import { name as listQuestionsButtonId } from '@/modules/list/commands/button/listQuestions.js';
+import { name as ticketCloseButtonId } from '@/modules/ticket/commands/button/ticketClose.js';
 import { name as ticketCreateButtonId } from '@/modules/ticket/commands/button/ticketCreate.js';
 import { name as ticketListButtonId } from '@/modules/ticket/commands/button/ticketList.js';
 import { name as ticketCommandId } from '@/modules/ticket/commands/chat/ticket.js';
@@ -36,6 +37,8 @@ const nonDeferredCommands = new Set<string>([
   listCommandsButtonId,
   listLinksButtonId,
   listQuestionsButtonId,
+  // Replies with a prompt, then updates that prompt when confirmed.
+  ticketCloseButtonId,
   ticketCreateButtonId,
   ticketListButtonId,
 ]);

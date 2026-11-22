@@ -1,15 +1,16 @@
 import { InteractionContextType } from 'discord-api-types/v10';
 import {
   type ChatInputCommandInteraction,
-  EmbedBuilder,
   MessageFlags,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  TextDisplayBuilder,
 } from 'discord.js';
 
 import { executeSubcommand } from '@/common/commands/subcommands.js';
 import { Channel } from '@/common/schemas/Channel.js';
 import { Role } from '@/common/schemas/Role.js';
+import { truncateComponentText } from '@/common/utils/limits.js';
 import {
   getChannelsProperty,
   getTicketingProperty,
@@ -140,16 +141,17 @@ const handleTicketSend = async (interaction: ChatInputCommandInteraction) => {
     })
     .join('\n');
 
-  const embed = new EmbedBuilder()
-    .setTitle('Тикети')
-    .setDescription(ticketMessageFunctions.ticketSendMessage(ticketList))
-    .setTimestamp();
-
-  const components = getTicketCreateComponents(tickets);
-
   await targetChannel.send({
-    components,
-    embeds: [embed],
+    allowedMentions: { parse: [] },
+    components: [
+      new TextDisplayBuilder().setContent(
+        truncateComponentText(
+          ticketMessageFunctions.ticketSendMessage(ticketList),
+        ),
+      ),
+      ...getTicketCreateComponents(tickets),
+    ],
+    flags: MessageFlags.IsComponentsV2,
   });
 
   await interaction.editReply(commandResponses.ticketMessageSent);

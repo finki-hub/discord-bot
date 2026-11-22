@@ -106,7 +106,6 @@ export const execute = async (
 
   await createTicket(interaction, ticketMetadata, {
     description,
-    memberIds: ticketRoleMembers,
     title,
   });
 };

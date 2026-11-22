@@ -4,11 +4,13 @@ import {
   ChannelType,
   type ChatInputCommandInteraction,
   type Collection,
-  EmbedBuilder,
+  ComponentType,
+  escapeMarkdown,
   type Guild,
   type Message,
   MessageFlags,
   type ModalSubmitInteraction,
+  PermissionFlagsBits,
   roleMention,
   type TextChannel,
   ThreadAutoArchiveDuration,
@@ -22,17 +24,22 @@ import {
   getTicketingProperty,
 } from '@/configuration/bot/index.js';
 import { client } from '@/core/client.js';
+import { commandErrors } from '@/translations/commands.js';
 import {
   ticketMessageFunctions,
   ticketMessages,
 } from '@/translations/tickets.js';
 
-import { getTicketCloseComponents } from '../components/components.js';
+import {
+  getTicketCloseButtonId,
+  getTicketCloseComponents,
+} from '../components/components.js';
 import { type Ticket } from '../schemas/Ticket.js';
 import {
   MAX_THREAD_NAME_LENGTH,
   TICKET_ABANDON_TIMEOUT_MILLISECONDS,
   TICKET_REQUEST_FOOTER,
+  TICKET_REQUEST_MARKER,
   TICKET_START_LOOKBACK_LIMIT,
 } from './constants.js';
 import {
@@ -42,13 +49,21 @@ import {
 } from './inactivity.js';
 
 const TICKET_NAME_SEPARATOR = ' - ';
-const THREAD_MEMBER_ADD_CONCURRENCY = 5;
-// Discord allows up to 1,000 members in a thread; the bot and requester take
-// two of those slots.
-const MAX_THREAD_MEMBERS = 1_000;
+
+// The active-ticket check and thread creation are separate requests, so this
+// stops a double submission from passing the check twice.
+const ticketCreationsInProgress = new Set<string>();
 
 type TicketInteraction =
   ButtonInteraction | ChatInputCommandInteraction | ModalSubmitInteraction;
+
+type TicketOptions = { description?: string; title?: string };
+
+type TicketRequest = {
+  interaction: TicketInteraction;
+  options: TicketOptions;
+  ticketMetadata: Ticket;
+};
 
 const getTicketThreadSuffix = (
   interaction: TicketInteraction,
@@ -87,49 +102,22 @@ const getTicketThreadName = (
   return `${title.slice(0, maxTitleLength)}${TICKET_NAME_SEPARATOR}${suffix}`;
 };
 
-const addTicketMember = async (
-  ticketChannel: AnyThreadChannel,
-  memberId: string,
-  guildId: string,
-): Promise<void> => {
-  try {
-    await ticketChannel.members.add(memberId);
-  } catch (error: unknown) {
-    logger.warn(
-      `Failed adding member ${memberId} to ticket ${ticketChannel.id}\n${String(error)}`,
-      { guildId },
-    );
-  }
-};
-
-const addTicketMembers = async (
-  ticketChannel: AnyThreadChannel,
-  memberIds: string[],
-  guildId: string,
-): Promise<void> => {
-  for (
-    let index = 0;
-    index < memberIds.length;
-    index += THREAD_MEMBER_ADD_CONCURRENCY
-  ) {
-    await Promise.all(
-      memberIds
-        .slice(index, index + THREAD_MEMBER_ADD_CONCURRENCY)
-        .map((memberId) => addTicketMember(ticketChannel, memberId, guildId)),
-    );
-  }
-};
-
 const isHumanMessage = (message: Message): boolean =>
   !message.author.bot && !message.system;
 
+// Older modal tickets carry the footer embed; newer ones carry a text marker.
+// Role mentions are not a reliable signal: Discord and the role cache can both
+// drop them, and an unrecognized ticket is deleted as abandoned.
 const isTicketRequest = (message: Message): boolean =>
   message.author.bot &&
-  message.embeds.some((embed) => embed.footer?.text === TICKET_REQUEST_FOOTER);
+  (message.content.includes(TICKET_REQUEST_MARKER) ||
+    message.embeds.some(
+      (embed) => embed.footer?.text === TICKET_REQUEST_FOOTER,
+    ));
 
 // Recent messages may all be the bot on a long ticket; the first user message
-// is near the start. A modal-created ticket is already started by its request
-// embed, before the first human reply.
+// is near the start. A modal-created ticket is already started by its request,
+// before the first human reply.
 const hasTicketStarted = async (thread: AnyThreadChannel): Promise<boolean> => {
   const earliestMessages = await thread.messages.fetch({
     after: thread.id,
@@ -218,16 +206,91 @@ export const getActiveTicketsSorted = async (
   return ticketThreads;
 };
 
-export const createTicket = async (
-  interaction: TicketInteraction,
-  ticketMetadata: Ticket,
-  options: { description?: string; memberIds?: string[]; title?: string } = {},
+const deleteTicketThread = async (
+  thread: AnyThreadChannel,
+  guildId: string,
 ): Promise<void> => {
-  if (interaction.guild === null) {
+  try {
+    await thread.delete();
+  } catch (error: unknown) {
+    logger.error(
+      `Failed deleting ticket channel ${thread.id}\n${String(error)}`,
+      { guildId },
+    );
+  }
+};
+
+const sendTicketMessages = async (
+  ticketChannel: AnyThreadChannel,
+  { interaction, options, ticketMetadata }: TicketRequest,
+): Promise<void> => {
+  const components = getTicketCloseComponents(ticketChannel.id);
+
+  if (options.description === undefined) {
+    await ticketChannel.send({
+      components,
+      content: ticketMessageFunctions.ticketCreated(interaction.user.id),
+    });
+
     return;
   }
 
-  const ticketsChannel = getChannel(Channel.Tickets, interaction.guild.id);
+  await ticketChannel.send({
+    allowedMentions: {
+      parse: [],
+      roles: ticketMetadata.roles,
+      users: [interaction.user.id],
+    },
+    content: ticketMessageFunctions.ticketRequestHeader(
+      escapeMarkdown(options.title ?? ticketMetadata.name),
+      interaction.user.id,
+      ticketMetadata.roles.map((role) => roleMention(role)).join(' '),
+    ),
+  });
+  await ticketChannel.send({
+    allowedMentions: { parse: [] },
+    components,
+    content: options.description,
+  });
+};
+
+// Staff join the thread only through the role mention, so a role the bot cannot
+// mention leaves them without access or a notification.
+const warnUnmentionableRoles = (
+  guild: Guild,
+  ticketsChannel: TextChannel,
+  roleIds: string[],
+): void => {
+  const botMember = guild.members.me;
+
+  if (
+    botMember === null ||
+    botMember
+      .permissionsIn(ticketsChannel)
+      .has(PermissionFlagsBits.MentionEveryone)
+  ) {
+    return;
+  }
+
+  const unmentionableRoleIds = roleIds.filter(
+    (roleId) => guild.roles.cache.get(roleId)?.mentionable !== true,
+  );
+
+  if (unmentionableRoleIds.length > 0) {
+    logger.warn(
+      `Ticket roles cannot be mentioned, so their members will not be added: ${unmentionableRoleIds.join(', ')}`,
+      { guildId: guild.id },
+    );
+  }
+};
+
+const createTicketThread = async (
+  request: TicketRequest,
+  guild: Guild,
+): Promise<void> => {
+  const { interaction, options, ticketMetadata } = request;
+  const guildId = guild.id;
+  const ticketsChannel = getChannel(Channel.Tickets, guildId);
 
   if (ticketsChannel?.type !== ChannelType.GuildText) {
     return;
@@ -243,6 +306,8 @@ export const createTicket = async (
     return;
   }
 
+  warnUnmentionableRoles(guild, ticketsChannel, ticketMetadata.roles);
+
   const ticketChannel = await ticketsChannel.threads.create({
     autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
     invitable: false,
@@ -250,67 +315,48 @@ export const createTicket = async (
     type: ChannelType.PrivateThread,
   });
 
-  // Role mentions invite small roles, but explicit membership also covers
-  // large roles and makes the requester's access deterministic.
-  await addTicketMember(
-    ticketChannel,
-    interaction.user.id,
-    interaction.guild.id,
-  );
-
-  const staffMemberIds = [
-    ...new Set(
-      (options.memberIds ?? []).filter(
-        (memberId) => memberId !== interaction.user.id,
-      ),
-    ),
-  ];
-  const maxStaffMemberCount = MAX_THREAD_MEMBERS - 2;
-  if (staffMemberIds.length > maxStaffMemberCount) {
-    logger.warn(
-      `Ticket ${ticketChannel.id} has more staff members than Discord's thread limit; adding the first ${maxStaffMemberCount}.`,
-      { guildId: interaction.guild.id },
-    );
-    staffMemberIds.length = maxStaffMemberCount;
+  try {
+    await sendTicketMessages(ticketChannel, request);
+  } catch (error: unknown) {
+    // Members join through the mentions, so a partial ticket may be
+    // inaccessible and would block a retry through the active-ticket check.
+    await deleteTicketThread(ticketChannel, guildId);
+    throw error;
   }
-
-  await addTicketMembers(ticketChannel, staffMemberIds, interaction.guild.id);
-
-  await ticketChannel.send(
-    ticketMessageFunctions.ticketCreated(interaction.user.id),
-  );
-
-  if (options.description !== undefined) {
-    const request = new EmbedBuilder()
-      .setAuthor({
-        iconURL: interaction.user.displayAvatarURL(),
-        name: interaction.user.tag,
-      })
-      .setDescription(options.description)
-      .setFooter({ text: TICKET_REQUEST_FOOTER })
-      .setTimestamp();
-
-    if (options.title !== undefined) {
-      request.setTitle(options.title);
-    }
-
-    await ticketChannel.send({ embeds: [request] });
-    await ticketChannel.send(
-      ticketMessageFunctions.ticketStarted(
-        ticketMetadata.roles.map((role) => roleMention(role)).join(' '),
-      ),
-    );
-  }
-
-  const components = getTicketCloseComponents(ticketChannel.id);
-  await ticketChannel.send({
-    components,
-    content: ticketMessages.sendMessage,
-  });
 
   await interaction.editReply(
     ticketMessageFunctions.ticketLink(ticketChannel.url),
   );
+};
+
+export const createTicket = async (
+  interaction: TicketInteraction,
+  ticketMetadata: Ticket,
+  options: TicketOptions = {},
+): Promise<void> => {
+  if (interaction.guild === null) {
+    return;
+  }
+
+  const guildId = interaction.guild.id;
+  const creationKey = `${guildId}:${interaction.user.id}:${ticketMetadata.id}`;
+
+  if (ticketCreationsInProgress.has(creationKey)) {
+    await interaction.editReply(commandErrors.ticketCreationInProgress);
+
+    return;
+  }
+
+  ticketCreationsInProgress.add(creationKey);
+
+  try {
+    await createTicketThread(
+      { interaction, options, ticketMetadata },
+      interaction.guild,
+    );
+  } finally {
+    ticketCreationsInProgress.delete(creationKey);
+  }
 };
 
 export const findTicketTypeByThreadName = (
@@ -417,6 +463,41 @@ export const handleTicketMessage = async (message: Message): Promise<void> => {
   }
 };
 
+const hasTicketCloseButton = (message: Message, customId: string): boolean =>
+  message.author.bot &&
+  message.components.some(
+    (component) =>
+      component.type === ComponentType.ActionRow &&
+      component.components.some((child) => child.customId === customId),
+  );
+
+const disableTicketCloseButton = async (
+  thread: AnyThreadChannel,
+  guildId: string,
+): Promise<void> => {
+  try {
+    const customId = getTicketCloseButtonId(thread.id);
+    const messages = await thread.messages.fetch({
+      after: thread.id,
+      limit: TICKET_START_LOOKBACK_LIMIT,
+    });
+    const closeMessage = messages.find((message) =>
+      hasTicketCloseButton(message, customId),
+    );
+
+    // The button sits on the user's text, whose mentions must stay inert.
+    await closeMessage?.edit({
+      allowedMentions: { parse: [] },
+      components: getTicketCloseComponents(thread.id, true),
+    });
+  } catch (error: unknown) {
+    logger.warn(
+      `Failed disabling close button for ticket ${thread.id}\n${String(error)}`,
+      { guildId },
+    );
+  }
+};
+
 export const closeTicket = async (
   ticketId: string,
   guildId: string,
@@ -430,7 +511,7 @@ export const closeTicket = async (
 
   const ticketChannel = await resolveTicketThread(ticketsChannel, ticketId);
 
-  if (ticketChannel === null) {
+  if (ticketChannel === null || ticketChannel.locked === true) {
     return;
   }
 
@@ -452,24 +533,11 @@ export const closeTicket = async (
     );
   }
 
+  await disableTicketCloseButton(ticketChannel, guildId);
   await ticketChannel.setLocked(true);
   await ticketChannel.setArchived(true);
 
   logger.info(`Closed ticket ${ticketId}`);
-};
-
-const deleteTicketThread = async (
-  thread: AnyThreadChannel,
-  guildId: string,
-): Promise<void> => {
-  try {
-    await thread.delete();
-  } catch (error: unknown) {
-    logger.error(
-      `Failed deleting ticket channel ${thread.id}\n${String(error)}`,
-      { guildId },
-    );
-  }
 };
 
 const deleteStaleTicketReminder = async (

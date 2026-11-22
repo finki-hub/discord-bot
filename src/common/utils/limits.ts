@@ -16,6 +16,11 @@ export const truncateButtonLabel = (label: string) =>
     ? `${label.slice(0, MAX_BUTTON_LABEL_LENGTH - 1).trimEnd()}…`
     : label;
 
+export const truncateComponentText = (text: string) =>
+  text.length > MAX_COMPONENT_TEXT_LENGTH
+    ? `${text.slice(0, MAX_COMPONENT_TEXT_LENGTH - 1).trimEnd()}…`
+    : text;
+
 export const isButtonUrl = (url: string) =>
   url.length <= MAX_BUTTON_URL_LENGTH &&
   WEB_URL_REGEX.test(url) &&

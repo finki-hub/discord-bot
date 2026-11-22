@@ -98,7 +98,6 @@ describe('ticket create modal', () => {
     );
     expect(mocks.createTicket).toHaveBeenCalledWith(interaction, TICKET, {
       description: 'Help me',
-      memberIds: ['staff-member'],
       title: 'Help',
     });
     expect(editReply).not.toHaveBeenCalled();
