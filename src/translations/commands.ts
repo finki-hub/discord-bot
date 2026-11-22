@@ -164,6 +164,8 @@ export const commandErrors = {
   ticketDescriptionRequired:
     'Описот на тикетот не може да биде празен. Обидете се повторно.',
   ticketingDisabled: 'Тикетите не се овозможени.',
+  ticketNameTooLong:
+    'Името на овој тип тикет е предолго. Известете администратор.',
   ticketTitleRequired:
     'Насловот на тикетот не може да биде празен. Обидете се повторно.',
   unknownChatError:

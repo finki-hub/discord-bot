@@ -27,6 +27,9 @@ export const TICKETS_PER_PAGE = 8;
 // Discord's limit for thread names.
 export const MAX_THREAD_NAME_LENGTH = 100;
 
+// Leaves room in the thread name for the longest user tag and part of a title.
+export const MAX_TICKET_NAME_LENGTH = 50;
+
 // How far into a thread to look for the first human message or modal request.
 export const TICKET_START_LOOKBACK_LIMIT = 50;
 

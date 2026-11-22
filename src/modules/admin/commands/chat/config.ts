@@ -29,6 +29,7 @@ import { reloadQuotes } from '@/modules/misc/utils/data.js';
 import { reloadRooms } from '@/modules/room/utils/data.js';
 import { reloadSessions } from '@/modules/session/utils/data.js';
 import { reloadStaff } from '@/modules/staff/utils/data.js';
+import { TicketNamesSchema } from '@/modules/ticket/schemas/Ticket.js';
 import {
   commandDescriptions,
   commandErrorFunctions,
@@ -163,6 +164,17 @@ const handleConfigSet = async (interaction: ChatInputCommandInteraction) => {
   if (!parsedValue.success) {
     await interaction.editReply(
       commandErrorFunctions.invalidConfiguration(parsedValue.error),
+    );
+
+    return;
+  }
+
+  const ticketNames =
+    key === 'ticketing' ? TicketNamesSchema.safeParse(parsedValue.data) : null;
+
+  if (ticketNames?.success === false) {
+    await interaction.editReply(
+      commandErrorFunctions.invalidConfiguration(ticketNames.error),
     );
 
     return;

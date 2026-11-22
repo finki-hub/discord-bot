@@ -71,35 +71,46 @@ const getTicketThreadSuffix = (
 ): string =>
   `${interaction.user.tag}${TICKET_NAME_SEPARATOR}${ticketMetadata.name}`;
 
+// Cuts between whole characters so an emoji is never left broken.
+const truncateThreadTitle = (title: string, maxLength: number): string => {
+  if (title.length <= maxLength) {
+    return title;
+  }
+
+  const segments = new Intl.Segmenter().segment(title);
+  let truncated = '';
+
+  for (const { segment } of segments) {
+    if (truncated.length + segment.length > maxLength - 1) {
+      break;
+    }
+
+    truncated += segment;
+  }
+
+  return `${truncated.trimEnd()}…`;
+};
+
+// Returns null when the user and type leave no room within Discord's limit.
 const getTicketThreadName = (
   interaction: TicketInteraction,
   ticketMetadata: Ticket,
   title?: string,
-): string => {
+): null | string => {
   // The title leads the thread name; the user/type suffix keeps existing-ticket
   // detection and type resolution working from the name alone.
   const suffix = getTicketThreadSuffix(interaction, ticketMetadata);
 
   if (title === undefined || title.length === 0) {
-    if (suffix.length > MAX_THREAD_NAME_LENGTH) {
-      throw new Error(
-        `Ticket thread metadata exceeds Discord's ${MAX_THREAD_NAME_LENGTH}-character limit.`,
-      );
-    }
-
-    return suffix;
+    return suffix.length > MAX_THREAD_NAME_LENGTH ? null : suffix;
   }
 
   const maxTitleLength =
     MAX_THREAD_NAME_LENGTH - suffix.length - TICKET_NAME_SEPARATOR.length;
 
-  if (maxTitleLength < 1) {
-    throw new Error(
-      `Ticket thread metadata exceeds Discord's ${MAX_THREAD_NAME_LENGTH}-character limit.`,
-    );
-  }
-
-  return `${title.slice(0, maxTitleLength)}${TICKET_NAME_SEPARATOR}${suffix}`;
+  return maxTitleLength < 1
+    ? null
+    : `${truncateThreadTitle(title, maxTitleLength)}${TICKET_NAME_SEPARATOR}${suffix}`;
 };
 
 const isHumanMessage = (message: Message): boolean =>
@@ -241,6 +252,7 @@ const sendTicketMessages = async (
       roles: ticketMetadata.roles,
       users: [interaction.user.id],
     },
+    components,
     content: ticketMessageFunctions.ticketRequestHeader(
       escapeMarkdown(options.title ?? ticketMetadata.name),
       interaction.user.id,
@@ -249,7 +261,6 @@ const sendTicketMessages = async (
   });
   await ticketChannel.send({
     allowedMentions: { parse: [] },
-    components,
     content: options.description,
   });
 };
@@ -306,12 +317,27 @@ const createTicketThread = async (
     return;
   }
 
+  const threadName = getTicketThreadName(
+    interaction,
+    ticketMetadata,
+    options.title,
+  );
+
+  if (threadName === null) {
+    logger.error(`Ticket type ${ticketMetadata.id} has too long a name`, {
+      guildId,
+    });
+    await interaction.editReply(commandErrors.ticketNameTooLong);
+
+    return;
+  }
+
   warnUnmentionableRoles(guild, ticketsChannel, ticketMetadata.roles);
 
   const ticketChannel = await ticketsChannel.threads.create({
     autoArchiveDuration: ThreadAutoArchiveDuration.OneWeek,
     invitable: false,
-    name: getTicketThreadName(interaction, ticketMetadata, options.title),
+    name: threadName,
     type: ChannelType.PrivateThread,
   });
 
@@ -485,7 +511,8 @@ const disableTicketCloseButton = async (
       hasTicketCloseButton(message, customId),
     );
 
-    // The button sits on the user's text, whose mentions must stay inert.
+    // Older tickets have the button on the user's text, and newer ones on the
+    // header. Neither should mention anyone again when edited.
     await closeMessage?.edit({
       allowedMentions: { parse: [] },
       components: getTicketCloseComponents(thread.id, true),
