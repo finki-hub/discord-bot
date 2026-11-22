@@ -1,10 +1,10 @@
 import { InteractionContextType } from 'discord-api-types/v10';
 import {
   type ChatInputCommandInteraction,
-  EmbedBuilder,
   MessageFlags,
   PermissionFlagsBits,
   SlashCommandBuilder,
+  TextDisplayBuilder,
 } from 'discord.js';
 
 import { executeSubcommand } from '@/common/commands/subcommands.js';
@@ -140,16 +140,16 @@ const handleTicketSend = async (interaction: ChatInputCommandInteraction) => {
     })
     .join('\n');
 
-  const embed = new EmbedBuilder()
-    .setTitle('Тикети')
-    .setDescription(ticketMessageFunctions.ticketSendMessage(ticketList))
-    .setTimestamp();
-
-  const components = getTicketCreateComponents(tickets);
-
+  // A text display keeps the embed's higher character limit for long lists.
   await targetChannel.send({
-    components,
-    embeds: [embed],
+    allowedMentions: { parse: [] },
+    components: [
+      new TextDisplayBuilder().setContent(
+        ticketMessageFunctions.ticketSendMessage(ticketList),
+      ),
+      ...getTicketCreateComponents(tickets),
+    ],
+    flags: MessageFlags.IsComponentsV2,
   });
 
   await interaction.editReply(commandResponses.ticketMessageSent);

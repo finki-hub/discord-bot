@@ -13,7 +13,9 @@ export const TICKETS_CHECK_INTERVAL = 900_000; // 15 minutes
 
 export const TICKET_ABANDON_TIMEOUT_MILLISECONDS = 1_800_000; // 30 minutes
 
-export const ALLOWED_INACTIVITY_DAYS = 10;
+// Must not exceed the thread's one-week auto-archive: maintenance skips archived
+// threads. The reminders are messages, so they keep the thread open until close.
+export const ALLOWED_INACTIVITY_DAYS = 7;
 export const MAX_TICKET_INACTIVITY_MILLISECONDS =
   ALLOWED_INACTIVITY_DAYS * 86_400_000;
 

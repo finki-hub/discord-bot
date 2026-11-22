@@ -28,6 +28,7 @@ const TICKET_LIST_BUTTON_ID = 'ticketList';
 export const TICKET_CREATE_MODAL_ID = 'ticketCreateModal';
 export const TICKET_TITLE_FIELD = 'title';
 export const TICKET_DESCRIPTION_FIELD = 'description';
+export const TICKET_CLOSE_CONFIRM_ACTION = 'confirm';
 
 // A message holds five rows of five buttons.
 const MAX_TICKET_BUTTONS = 25;
@@ -105,10 +106,32 @@ export const getTicketCreateModal = (ticketTypeId: string) =>
         ),
     );
 
-export const getTicketCloseComponents = (ticketId: string) => {
+export const getTicketCloseButtonId = (ticketId: string) =>
+  `ticketClose:${ticketId}`;
+
+export const getTicketCloseComponents = (
+  ticketId: string,
+  disabled = false,
+) => {
   const row = new ActionRowBuilder<ButtonBuilder>();
   const button = new ButtonBuilder()
-    .setCustomId(`ticketClose:${ticketId}`)
+    .setCustomId(getTicketCloseButtonId(ticketId))
+    .setDisabled(disabled)
+    .setLabel(labels.close)
+    .setStyle(ButtonStyle.Danger)
+    .setEmoji('🔒');
+
+  row.addComponents(button);
+
+  return [row];
+};
+
+export const getTicketCloseConfirmComponents = (ticketId: string) => {
+  const row = new ActionRowBuilder<ButtonBuilder>();
+  const button = new ButtonBuilder()
+    .setCustomId(
+      `${getTicketCloseButtonId(ticketId)}:${TICKET_CLOSE_CONFIRM_ACTION}`,
+    )
     .setLabel(labels.close)
     .setStyle(ButtonStyle.Danger)
     .setEmoji('🔒');

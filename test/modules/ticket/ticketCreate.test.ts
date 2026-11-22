@@ -9,6 +9,9 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { Ticket } from '@/modules/ticket/schemas/Ticket.js';
 
+import { commandErrors } from '@/translations/commands.js';
+import { ticketMessageFunctions } from '@/translations/tickets.js';
+
 const mocks = vi.hoisted(() => ({
   getChannel: vi.fn<(channel: string, guildId: string) => TextChannel>(),
   getChannelsProperty: vi.fn<(channel: string, guildId: string) => string>(),
@@ -76,7 +79,6 @@ const createTicketForExistingTicket = async (
 
   await createTicket(interactionFor(guild, editReply), TICKET_TYPE, {
     description: 'Помош',
-    memberIds: [],
     title,
   });
 
@@ -89,7 +91,7 @@ describe('createTicket', () => {
     mocks.getChannelsProperty.mockReturnValue('tickets-channel');
   });
 
-  test('adds the requester and staff and posts the modal request', async () => {
+  test('posts the request as text and lets mentions add members', async () => {
     const add = vi.fn<(memberId: string) => Promise<void>>(async () => {});
     const send = vi.fn<(payload: unknown) => Promise<unknown>>(
       async () => ({}),
@@ -118,7 +120,6 @@ describe('createTicket', () => {
 
     await createTicket(interactionFor(guild, editReply), TICKET_TYPE, {
       description: 'Не можам да го отворам предметот.',
-      memberIds: ['staff-member'],
       title: 'Проблем со предметот',
     });
 
@@ -128,18 +129,97 @@ describe('createTicket', () => {
         type: ChannelType.PrivateThread,
       }),
     );
-    expect(add.mock.calls).toEqual([['requester'], ['staff-member']]);
-    expect(send).toHaveBeenCalledTimes(4);
-    expect(send.mock.calls[1]?.[0]).toEqual(
-      expect.objectContaining({
-        embeds: [expect.anything()],
-      }),
-    );
-    expect(send.mock.calls[2]?.[0]).toBe(
-      '<@&staff-role> Креиран е тикет до Вас.',
-    );
+    expect(add).not.toHaveBeenCalled();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[0]?.[0]).toEqual({
+      allowedMentions: {
+        parse: [],
+        roles: ['staff-role'],
+        users: ['requester'],
+      },
+      content: ticketMessageFunctions.ticketRequestHeader(
+        'Проблем со предметот',
+        'requester',
+        '<@&staff-role>',
+      ),
+    });
+    expect(send.mock.calls[1]?.[0]).toMatchObject({
+      allowedMentions: { parse: [] },
+      content: 'Не можам да го отворам предметот.',
+    });
+    expect(send.mock.calls[1]?.[0]).toHaveProperty('components');
+    expect(send.mock.calls[1]?.[0]).not.toHaveProperty('embeds');
     expect(editReply).toHaveBeenCalledWith(
       'Креиран е Вашиот тикет: https://discord.com/channels/1/2',
+    );
+  });
+
+  test('deletes the thread when its messages cannot be sent', async () => {
+    const deleteThread = vi.fn<() => Promise<void>>(async () => {});
+    const failure = new Error('send failed');
+    const thread = {
+      delete: deleteThread,
+      id: 'ticket-thread',
+      send: vi.fn<() => Promise<never>>(async () => {
+        throw failure;
+      }),
+      url: 'https://discord.com/channels/1/2',
+    };
+    mocks.getChannel.mockReturnValue({
+      threads: { create: async () => thread },
+      type: ChannelType.GuildText,
+    } as unknown as TextChannel);
+    const editReply = vi.fn<(payload: unknown) => Promise<unknown>>(
+      async () => ({}),
+    );
+    const guild = {
+      channels: { cache: new Collection() },
+      id: 'guild',
+    } as unknown as Guild;
+
+    await expect(
+      createTicket(interactionFor(guild, editReply), TICKET_TYPE, {
+        description: 'Опис',
+        title: 'Наслов',
+      }),
+    ).rejects.toBe(failure);
+
+    expect(deleteThread).toHaveBeenCalledOnce();
+    expect(editReply).not.toHaveBeenCalled();
+  });
+
+  test('creates one ticket for concurrent submissions', async () => {
+    const send = vi.fn<(payload: unknown) => Promise<unknown>>(
+      async () => ({}),
+    );
+    const thread = {
+      id: 'ticket-thread',
+      send,
+      url: 'https://discord.com/channels/1/2',
+    };
+    const create = vi.fn<() => Promise<typeof thread>>(async () => thread);
+    mocks.getChannel.mockReturnValue({
+      threads: { create },
+      type: ChannelType.GuildText,
+    } as unknown as TextChannel);
+    const editReply = vi.fn<(payload: unknown) => Promise<unknown>>(
+      async () => ({}),
+    );
+    const guild = {
+      channels: { cache: new Collection() },
+      id: 'guild',
+    } as unknown as Guild;
+    const interaction = interactionFor(guild, editReply);
+    const options = { description: 'Опис', title: 'Наслов' };
+
+    await Promise.all([
+      createTicket(interaction, TICKET_TYPE, options),
+      createTicket(interaction, TICKET_TYPE, options),
+    ]);
+
+    expect(create).toHaveBeenCalledOnce();
+    expect(editReply).toHaveBeenCalledWith(
+      commandErrors.ticketCreationInProgress,
     );
   });
 
@@ -167,7 +247,6 @@ describe('createTicket', () => {
     await expect(
       createTicket(interactionFor(guild, editReply), longType, {
         description: 'Опис',
-        memberIds: [],
         title: 'Наслов',
       }),
     ).rejects.toThrow('Ticket thread metadata exceeds');

@@ -160,6 +160,7 @@ export const commandErrors = {
   sponsoredRequestInProgress:
     'Веќе имате активно бесплатно барање. Почекајте да заврши и обидете се повторно.',
   staffNotFound: 'Професорот не постои.',
+  ticketCreationInProgress: 'Вашиот тикет се креира. Почекајте момент.',
   ticketDescriptionRequired:
     'Описот на тикетот не може да биде празен. Обидете се повторно.',
   ticketingDisabled: 'Тикетите не се овозможени.',
