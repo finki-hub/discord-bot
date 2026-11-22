@@ -20,10 +20,7 @@ export const getAboutComponent = () => {
     )
     .addTextDisplayComponents((textDisplay) =>
       textDisplay.setContent(
-        aboutMessage(
-          getCommandMention('help'),
-          getCommandMention('list questions'),
-        ),
+        aboutMessage(getCommandMention('help'), getCommandMention('questions')),
       ),
     );
 

@@ -1,8 +1,6 @@
 /* eslint-disable camelcase -- catalog fields mirror the backend wire contract */
 import { z } from 'zod';
 
-import { labels } from '@/translations/labels.js';
-
 export const ModelAvailabilitySchema = z.enum([
   'both',
   'byok',
@@ -36,10 +34,6 @@ export const ModelCatalogResponseSchema = z.object({
   version: z.number(),
 });
 
-export type ModelCatalogResponse = z.infer<typeof ModelCatalogResponseSchema>;
-
-export const MAX_DISCORD_CHOICE_NAME_LENGTH = 100;
-
 // The Discord bot uses only the free/sponsored pool; BYOK models belong to the
 // web app. A catalog without availability metadata is treated as free.
 export const isFreeModelSelectable = (
@@ -48,31 +42,3 @@ export const isFreeModelSelectable = (
   model.availability === undefined ||
   model.availability === 'both' ||
   model.availability === 'sponsored';
-
-export const formatModelLabel = (model: ModelDescriptor): string => {
-  const baseLabel = `${model.name} (${model.provider})`;
-  const hasSponsoredAccess =
-    model.availability === 'sponsored' || model.availability === 'both';
-  if (!hasSponsoredAccess) {
-    return baseLabel.slice(0, MAX_DISCORD_CHOICE_NAME_LENGTH);
-  }
-
-  const quota = model.sponsored_quota;
-  const accessLabel =
-    quota === null || quota === undefined
-      ? labels.free
-      : `${labels.free} (${labels.quotaRemaining}: ${quota.remaining}/${quota.limit})`;
-  const suffix = ` — ${accessLabel}`;
-  const baseLength = Math.max(
-    0,
-    MAX_DISCORD_CHOICE_NAME_LENGTH - suffix.length,
-  );
-
-  return `${baseLabel.slice(0, baseLength)}${suffix}`;
-};
-
-export const EMBEDDING_MODELS = [
-  'BAAI/bge-m3',
-  'gemini-embedding-001',
-  'text-embedding-3-large',
-] as const;

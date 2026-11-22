@@ -22,8 +22,6 @@ export const MAX_TICKET_INACTIVITY_MILLISECONDS =
 export const TICKET_REMINDER_THREE_DAYS_MILLISECONDS = 3 * 86_400_000;
 export const TICKET_REMINDER_ONE_DAY_MILLISECONDS = 86_400_000;
 
-export const TICKETS_PER_PAGE = 8;
-
 // Discord's limit for thread names.
 export const MAX_THREAD_NAME_LENGTH = 100;
 

@@ -5,11 +5,11 @@ Discord bot for the [`FINKI Hub`](https://discord.gg/finki-studenti-810997107376
 ## Features
 
 - Slash commands for courses, rooms, office locations, staff, exam sessions, FAQ entries, links, help, and Anto quotes
-- LLM/chat-bot integration for `/ask`, `/prompt`, `/chat`, context-menu prompts, private chat threads, embeddings, model discovery, and FAQ/link lookup
+- LLM/chat-bot integration for `/ask`, `/prompt`, `/forget`, context-menu prompts, and FAQ/link lookup
 - Reply and thread-based chat continuation for LLM conversations
 - Per-guild configuration stored in `config/bot.json`, editable with `/config` commands
 - Crossposting for configured announcement channels
-- Ticket workflows with configurable ticket types, moderator controls, first-user-message routing, and scheduled cleanup of abandoned or inactive ticket threads
+- Ticket workflows with an admin-only `/tickets` panel, configurable ticket types, first-user-message routing, and scheduled cleanup of abandoned or inactive ticket threads
 - Optional PostHog analytics with hashed Discord user IDs
 - Docker and local Node.js development flows
 
@@ -68,7 +68,7 @@ Use `.env.sample` as a starting point for local development. The runtime also re
 | `TOKEN`            | Yes      | Discord bot token                                                                                                             |
 | `APPLICATION_ID`   | Yes      | Discord application ID                                                                                                        |
 | `CHATBOT_URL`      | No       | URL of the [`finki-hub/chat-bot`](https://github.com/finki-hub/chat-bot) instance                                             |
-| `API_KEY`          | No       | Chat-bot API authentication for `/chat` and credential management requests; never a sponsored provider credential             |
+| `API_KEY`          | No       | Chat-bot API authentication for chat and credential management requests; never a sponsored provider credential             |
 | `DIRECTUS_URL`     | No       | FINKI Hub Directus base URL for the course card's channel and "prerequisite for" lists (default `https://data.finki-hub.com`) |
 | `PUBAPI_URL`       | No       | FINKI public APIs MCP (SSE) URL for staff consultations (default `https://pubapi.finki.ukim.mk/sse`)                          |
 | `PUBAPI_API_KEY`   | No       | API key for FINKI public APIs; without it `/staff` shows only the consultations link                                          |
@@ -120,10 +120,9 @@ Exam sessions and their schedule files are managed in Directus. `/session` links
 
 This project features integration with [`finki-hub/chat-bot`](https://github.com/finki-hub/chat-bot) for enabling FAQ, links, and LLM chat functionality. The Discord bot communicates with the chat bot using REST endpoints. If they are deployed in Docker, they should be on the same network to be able to communicate.
 
-Set both `CHATBOT_URL` and `API_KEY` to enable chat. The Discord bot uses only the chat backend's sponsored free pool; provider credentials are managed in the web app, not in Discord. The private `/chat models` view shows the free models and remaining quota. If the sponsored tier is disabled, unavailable, or exhausted, use the web app or wait for the next UTC reset; do not work around it by reusing `API_KEY`.
+Set both `CHATBOT_URL` and `API_KEY` to enable chat. The Discord bot uses only the chat backend's sponsored free pool; provider credentials are managed in the web app, not in Discord. If the sponsored tier is disabled, unavailable, or exhausted, use the web app or wait for the next UTC reset; do not work around it by reusing `API_KEY`.
 
-Use the private `/chat models` view for availability and remaining quota. Do not
-log provider keys, provider URLs, quota internals, or raw provider errors, and do
+Do not log provider keys, provider URLs, quota internals, or raw provider errors, and do
 not retry an in-progress sponsored request blindly: one active sponsored
 request per user is intentional. Quota reset timestamps are displayed in UTC.
 The Discord bot does not receive or configure any sponsored-model credential

@@ -45,11 +45,8 @@ const streamOptions: SendPromptOptions = {
   embeddings_model: undefined,
   inference_model: 'sponsored-model',
   interface: 'discord',
-  max_tokens: undefined,
   messages: [{ content: 'question', role: 'user' }],
   reasoning: undefined,
-  temperature: undefined,
-  top_p: undefined,
   user_id: USER_ID,
 };
 

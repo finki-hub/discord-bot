@@ -10,15 +10,13 @@ import {
 import { logger } from '@/common/logger/index.js';
 import { getMemberFromGuild } from '@/common/utils/guild.js';
 import { name as chatFeedbackButtonId } from '@/modules/chat/commands/button/chatFeedback.js';
-import { name as chatCommandId } from '@/modules/chat/commands/chat/chat.js';
+import { name as forgetCommandId } from '@/modules/chat/commands/chat/forget.js';
 import { FEEDBACK_REASON_ID as chatFeedbackReasonButtonId } from '@/modules/chat/utils/feedback.js';
 import { name as listCommandsButtonId } from '@/modules/list/commands/button/listCommands.js';
 import { name as listLinksButtonId } from '@/modules/list/commands/button/listLinks.js';
 import { name as listQuestionsButtonId } from '@/modules/list/commands/button/listQuestions.js';
 import { name as ticketCloseButtonId } from '@/modules/ticket/commands/button/ticketClose.js';
 import { name as ticketCreateButtonId } from '@/modules/ticket/commands/button/ticketCreate.js';
-import { name as ticketListButtonId } from '@/modules/ticket/commands/button/ticketList.js';
-import { name as ticketCommandId } from '@/modules/ticket/commands/chat/ticket.js';
 import { commandErrors } from '@/translations/commands.js';
 
 import {
@@ -27,20 +25,16 @@ import {
 } from '../utils/permissions.js';
 
 const nonDeferredCommands = new Set<string>([
-  `${chatCommandId} forget`,
-  `${chatCommandId} models`,
-  `${chatCommandId} thread`,
-  `${ticketCommandId} list`,
   chatFeedbackButtonId,
   // Opens a modal, which cannot follow a deferred reply.
   chatFeedbackReasonButtonId,
+  forgetCommandId,
   listCommandsButtonId,
   listLinksButtonId,
   listQuestionsButtonId,
   // Replies with a prompt, then updates that prompt when confirmed.
   ticketCloseButtonId,
   ticketCreateButtonId,
-  ticketListButtonId,
 ]);
 
 export const shouldDeferCommand = (...commandNames: string[]): boolean =>

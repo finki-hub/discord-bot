@@ -1,4 +1,4 @@
-import { ChannelType, type Message } from 'discord.js';
+import { type Message } from 'discord.js';
 import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
@@ -8,11 +8,13 @@ import type * as Requests from '@/modules/chat/utils/requests.js';
 
 import { getOrInsert } from '@/common/utils/maps.js';
 import { execute as ask } from '@/modules/chat/commands/chat/ask.js';
-import { execute as chat } from '@/modules/chat/commands/chat/chat.js';
-import { forgetConversations } from '@/modules/chat/utils/conversation.js';
+import { execute as forget } from '@/modules/chat/commands/chat/forget.js';
+import {
+  forgetConversations,
+  registerConversation,
+} from '@/modules/chat/utils/conversation.js';
 import { forgetFeedbackContexts } from '@/modules/chat/utils/feedback.js';
 import { handleChatMessage } from '@/modules/chat/utils/reply.js';
-import { handleChatThread } from '@/modules/chat/utils/thread.js';
 import { commandResponses } from '@/translations/commands.js';
 
 import { fakeInteraction, requestUrl } from './interactionFixture.js';
@@ -167,22 +169,7 @@ test.each([false, true])(
     state.thread = thread;
     const threadId = `thread-${randomUUID()}`;
     if (thread) {
-      const create = fakeInteraction('chat', 'thread', A);
-      const channel = {
-        type: ChannelType.GuildText,
-        threads: {
-          create: async () => ({
-            id: threadId,
-            members: { add: async () => {} },
-            send: async () => {},
-          }),
-        },
-      };
-      Object.assign(create.interaction, {
-        channel,
-        guild: { id: randomUUID() },
-      });
-      await handleChatThread(create.interaction);
+      registerConversation([threadId], [], { userId: A });
       await handleChatMessage(followUp(threadId, A, 'A initial'));
     } else {
       const create = fakeInteraction('ask', '', A);
@@ -222,7 +209,7 @@ test.each([false, true])(
     expect(exchanges.get(aId)?.prompts).toEqual(['A initial', 'A followup']);
     expect(exchanges.get(bId)?.prompts).toEqual(['B first', 'B second']);
 
-    await chat(fakeInteraction('chat', 'forget', A).interaction);
+    await forget(fakeInteraction('forget', '', A).interaction);
     expect(exchanges.has(aId)).toBe(false);
     expect(exchanges.get(bId)?.prompts).toEqual(['B first', 'B second']);
     await handleChatMessage(

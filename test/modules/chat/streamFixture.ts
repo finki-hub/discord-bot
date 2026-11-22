@@ -20,10 +20,7 @@ export const streamOptionsFor = (userId: string) =>
     embeddings_model: undefined,
     inference_model: undefined,
     interface: 'discord',
-    max_tokens: undefined,
     messages: [{ content: 'question', role: 'user' as const }],
     reasoning: undefined,
-    temperature: undefined,
-    top_p: undefined,
     user_id: userId,
   }) satisfies SendPromptOptions;

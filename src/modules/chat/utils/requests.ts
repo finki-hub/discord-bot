@@ -12,13 +12,8 @@ import { capMap, setNewest } from '@/common/utils/maps.js';
 import { errorCategory } from '@/common/utils/safeError.js';
 import { withTimeout } from '@/common/utils/timeout.js';
 import { getApiKey, getChatbotUrl } from '@/configuration/environment.js';
-import { labels } from '@/translations/labels.js';
 
-import type {
-  FeedbackOptions,
-  FillEmbeddingsOptions,
-  SendPromptOptions,
-} from '../schemas/Chat.js';
+import type { FeedbackOptions, SendPromptOptions } from '../schemas/Chat.js';
 
 import {
   ChatApiError,
@@ -48,19 +43,6 @@ const drainEvents = async (
     const event = pending.shift();
     if (event !== undefined) {
       await onEvent(event);
-    }
-  }
-};
-
-// fillEmbeddings streams plain text (no control events), so it keeps a string drain.
-const drainChunks = async (
-  pending: string[],
-  onChunk: (chunk: string) => Promise<void>,
-) => {
-  while (pending.length > 0) {
-    const chunk = pending.shift();
-    if (chunk !== undefined) {
-      await onChunk(chunk);
     }
   }
 };
@@ -578,70 +560,4 @@ export const getValidatedInferenceModel = async (
     `Ignoring unsupported configured inference model: ${configuredModel}`,
   );
   return catalog.models.find(isFreeModelSelectable)?.id;
-};
-
-export const fillEmbeddings = async (
-  options: FillEmbeddingsOptions,
-  onChunk: (chunk: string) => Promise<void>,
-) => {
-  const chatbotUrl = getChatbotUrl();
-  const apiKey = getApiKey();
-
-  if (chatbotUrl === null || apiKey === null) {
-    throw new Error('LLM_UNAVAILABLE');
-  }
-
-  const result = await fetchStreamResponse(`${chatbotUrl}/questions/fill`, {
-    body: JSON.stringify(sanitizeOptions(options)),
-    headers: {
-      Accept: 'text/event-stream',
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-    },
-    method: 'POST',
-  });
-
-  if (!result.ok || !result.body || result.status !== 200) {
-    throw new Error('LLM_UNAVAILABLE');
-  }
-
-  const pendingChunks: string[] = [];
-  const parser = createParser({
-    onEvent: (event) => {
-      pendingChunks.push(event.data);
-    },
-  });
-
-  let hasChunks = false;
-
-  const reader: ReadableStreamDefaultReader<Uint8Array> =
-    result.body.getReader();
-
-  try {
-    const decoder = new TextDecoder();
-    while (true) {
-      const { done, value } = await readStreamChunk(reader);
-      if (done) {
-        break;
-      }
-      hasChunks = true;
-      parser.feed(decoder.decode(value, { stream: true }));
-      await drainChunks(pendingChunks, onChunk);
-    }
-  } finally {
-    try {
-      await reader.cancel();
-    } catch {
-      // The stream may already be closed or errored.
-    }
-  }
-
-  if (!hasChunks) {
-    parser.feed(`data: ${labels.none}\n\n`);
-    await drainChunks(pendingChunks, onChunk);
-  }
-
-  logger.info(
-    `Embeddings filled for model ${options.embeddings_model ?? 'ALL'}`,
-  );
 };

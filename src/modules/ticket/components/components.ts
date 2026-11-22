@@ -1,6 +1,5 @@
 import {
   ActionRowBuilder,
-  type AnyThreadChannel,
   ButtonBuilder,
   ButtonStyle,
   LabelBuilder,
@@ -9,22 +8,14 @@ import {
   TextInputStyle,
 } from 'discord.js';
 
-import { getPaginationComponent } from '@/common/components/pagination.js';
 import { truncateButtonLabel } from '@/common/utils/limits.js';
-import {
-  MAX_THREAD_NAME_LENGTH,
-  TICKETS_PER_PAGE,
-} from '@/modules/ticket/utils/constants.js';
-import {
-  componentMessages,
-  ticketCreateComponents,
-} from '@/translations/components.js';
+import { MAX_THREAD_NAME_LENGTH } from '@/modules/ticket/utils/constants.js';
+import { ticketCreateComponents } from '@/translations/components.js';
 import { emojis } from '@/translations/emojis.js';
 import { labels } from '@/translations/labels.js';
 
 import { type Ticket } from '../schemas/Ticket.js';
 
-const TICKET_LIST_BUTTON_ID = 'ticketList';
 export const TICKET_CREATE_MODAL_ID = 'ticketCreateModal';
 export const TICKET_TITLE_FIELD = 'title';
 export const TICKET_DESCRIPTION_FIELD = 'description';
@@ -32,11 +23,6 @@ export const TICKET_CLOSE_CONFIRM_ACTION = 'confirm';
 
 // A message holds five rows of five buttons.
 const MAX_TICKET_BUTTONS = 25;
-
-const dateFormatter = new Intl.DateTimeFormat('mk-MK', {
-  dateStyle: 'long',
-  timeStyle: 'short',
-});
 
 const buildTicketCreateButtons = (
   ticketTypes: Ticket[],
@@ -140,20 +126,3 @@ export const getTicketCloseConfirmComponents = (ticketId: string) => {
 
   return [row];
 };
-
-export const getTicketListComponent = (
-  ticketThreads: AnyThreadChannel[],
-  page: number,
-) =>
-  getPaginationComponent({
-    buttonId: TICKET_LIST_BUTTON_ID,
-    description: componentMessages.allTickets,
-    entries: ticketThreads.map(
-      (thread) =>
-        `${thread.url} (${thread.createdAt === null ? labels.none : dateFormatter.format(thread.createdAt)})`,
-    ),
-    entriesLabel: labels.tickets,
-    page,
-    pageSize: TICKETS_PER_PAGE,
-    title: labels.tickets,
-  });
