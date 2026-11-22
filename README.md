@@ -98,7 +98,7 @@ The bot configuration is stored in `config/bot.json`. This file uses a multi-gui
 }
 ```
 
-When the bot joins a new guild, it automatically initializes a default configuration for that guild. You can use `/config get`, `/config set`, and `/config reload` to view, modify, and reload the configuration. The `/config data` subcommand manually reloads all data from the data storage. Runtime state is otherwise kept in Discord or memory; the bot does not require a database.
+When the bot joins a new guild, it automatically initializes a default configuration for that guild. You can use `/config get` and `/config set` to view and modify the configuration, and `/config reload` to reload both the configuration and all data from the data storage. Runtime state is otherwise kept in Discord or memory; the bot does not require a database.
 
 The bot records the hash of the last registered application command set in `config/command-registration.json` and skips re-registering unchanged commands on startup. Delete that file to force registration on the next start.
 
@@ -110,7 +110,7 @@ Courses, rooms, staff, exam sessions and Anto quotes come from FINKI Hub's Direc
 
 `/course` also reads FINKI Hub's Directus (`DIRECTUS_URL`) when it answers: the course's Discord channel, shown as a mention when a text channel of that name exists on the server, and the courses whose prerequisites name it. If Directus does not answer, the card is shown without them. `/staff` lists the staff member's consultations of the coming week (day, date, time, room) from FINKI's public APIs when `PUBAPI_API_KEY` is set; otherwise, or if they do not answer, it keeps only the consultations link.
 
-You can manually trigger a data reload using the `/config data` command.
+You can manually trigger a data reload using the `/config reload` command.
 
 ### Sessions (Timetables)
 

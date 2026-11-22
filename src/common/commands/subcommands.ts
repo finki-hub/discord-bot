@@ -1,27 +1,11 @@
 import type { ChatInputCommandInteraction } from 'discord.js';
 
-type HandlerWithContext<T> = (
+export const executeSubcommand = async (
   interaction: ChatInputCommandInteraction,
-  context: T,
-) => Promise<void>;
-
-type HandlerWithoutContext = (
-  interaction: ChatInputCommandInteraction,
-) => Promise<void>;
-
-const callHandler = <T>(
-  handler: HandlerWithContext<T> | HandlerWithoutContext,
-  interaction: ChatInputCommandInteraction,
-  context: T | undefined,
-): Promise<void> =>
-  context === undefined
-    ? (handler as HandlerWithoutContext)(interaction)
-    : handler(interaction, context);
-
-export const executeSubcommand = async <T = void>(
-  interaction: ChatInputCommandInteraction,
-  handlers: Record<string, HandlerWithContext<T> | HandlerWithoutContext>,
-  context?: T,
+  handlers: Record<
+    string,
+    (interaction: ChatInputCommandInteraction) => Promise<void>
+  >,
 ): Promise<void> => {
   const subcommand = interaction.options.getSubcommand(false);
 
@@ -29,11 +13,5 @@ export const executeSubcommand = async <T = void>(
     return;
   }
 
-  const handler = handlers[subcommand];
-
-  if (handler === undefined) {
-    return;
-  }
-
-  await callHandler(handler, interaction, context);
+  await handlers[subcommand]?.(interaction);
 };
