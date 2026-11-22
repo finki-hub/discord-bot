@@ -42,10 +42,6 @@ export type ModelCatalogResponse = z.infer<typeof ModelCatalogResponseSchema>;
 
 export const MAX_DISCORD_CHOICE_NAME_LENGTH = 100;
 
-export const isModelSelectable = (
-  model: Pick<ModelDescriptor, 'availability'>,
-): boolean => model.availability !== 'unavailable';
-
 // The Discord bot uses only the free/sponsored pool; BYOK models belong to the
 // web app. A catalog without availability metadata is treated as free.
 export const isFreeModelSelectable = (
