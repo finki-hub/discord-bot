@@ -1,4 +1,3 @@
-/* eslint-disable camelcase -- catalog fields mirror the backend wire contract */
 import { z } from 'zod';
 
 export const ModelAvailabilitySchema = z.enum([
@@ -10,20 +9,11 @@ export const ModelAvailabilitySchema = z.enum([
 
 export type ModelAvailability = z.infer<typeof ModelAvailabilitySchema>;
 
-export const SponsoredQuotaSchema = z
-  .object({
-    limit: z.number().int().nonnegative(),
-    remaining: z.number().int().nonnegative(),
-    resets_at: z.string().min(1),
-  })
-  .refine(({ limit, remaining }) => remaining <= limit);
-
 export const ModelDescriptorSchema = z.object({
   availability: ModelAvailabilitySchema.optional(),
   id: z.string(),
   name: z.string(),
   provider: z.string(),
-  sponsored_quota: SponsoredQuotaSchema.nullable().optional(),
 });
 
 export type ModelDescriptor = z.infer<typeof ModelDescriptorSchema>;

@@ -128,10 +128,9 @@ describe('sponsored model catalog', () => {
     });
 
     expect(legacy.models[0]?.availability).toBeUndefined();
-    expect(legacy.models[0]?.sponsored_quota).toBeUndefined();
   });
 
-  test('strips provider secrets and rejects impossible quota values', () => {
+  test('strips provider secrets and quota details', () => {
     const parsed = ModelCatalogResponseSchema.parse(catalogFor('sponsored'));
 
     expect(parsed.models[0]).toEqual({
@@ -139,27 +138,7 @@ describe('sponsored model catalog', () => {
       id: SPONSORED_MODEL_ID,
       name: 'Gemini 3.1 Pro Preview',
       provider: 'google',
-      sponsored_quota: {
-        limit: 5,
-        remaining: 4,
-        resets_at: '2026-07-19T00:00:00Z',
-      },
     });
-    expect(() =>
-      ModelCatalogResponseSchema.parse({
-        ...catalogFor('sponsored'),
-        models: [
-          {
-            ...catalogFor('sponsored').models[0],
-            sponsored_quota: {
-              limit: 5,
-              remaining: 6,
-              resets_at: '2026-07-19T00:00:00Z',
-            },
-          },
-        ],
-      }),
-    ).toThrow();
   });
 
   test.each(availabilityCases)(
