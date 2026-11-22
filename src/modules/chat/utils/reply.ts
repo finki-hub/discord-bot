@@ -46,20 +46,17 @@ const COMMAND_LABEL = 'chat conversation continuation';
 // Someone joining another user's reply chain gets their own stored conversation
 // but never saw the notice under the original answer.
 const appendAnswerFootnote = async ({
-  inChatThread,
   lastMessage,
   message,
   persistence,
   timing,
 }: {
-  inChatThread: boolean;
   lastMessage: Message | undefined;
   message: Message;
   persistence: { markNoticeShown: () => void; noticePending: boolean };
   timing: { startedAt: number };
 }) => {
-  // Thread members already see the notice in the thread's welcome message.
-  if (inChatThread || !persistence.noticePending) {
+  if (!persistence.noticePending) {
     await appendTimingFootnote(lastMessage, timing);
     return;
   }
@@ -267,7 +264,6 @@ export const handleChatMessage = async (message: Message) => {
       );
 
       await appendAnswerFootnote({
-        inChatThread,
         lastMessage: messages.at(-1),
         message,
         persistence,

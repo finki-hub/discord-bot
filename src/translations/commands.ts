@@ -1,42 +1,34 @@
-import { channelMention, codeBlock, italic, userMention } from 'discord.js';
+import { codeBlock, italic, userMention } from 'discord.js';
 
 export const commandDescriptions = {
   about: 'За Discord ботот',
   anto: 'Преземи случајна Анто цитата',
   ask: 'Испрати промпт до LLM агентот',
-  'chat embed': 'Ембедирај ги документите',
-  'chat forget': 'Избриши ги твоите зачувани разговори со агентот',
-  'chat models': 'Преземи листа на јазични модели',
-  'chat query': 'Испрати промпт до LLM агентот',
-  'chat thread': 'Креирај своја приватна нишка за разговор со агентот',
   'config data': 'Освежи ги податоците од складиштето',
   'config get': 'Преземи конфигурација',
   'config reload': 'Освежи ги конфигурациите',
   'config set': 'Измени конфигурација',
   course: 'Преземи информации за предмет',
   faq: 'Преземи најчесто поставувано прашање',
+  forget: 'Избриши ги твоите зачувани разговори со агентот',
   help: 'Преземи листа од сите достапни команди',
   home: 'Преземи линк до изворниот код',
   link: 'Преземи најчесто баран линк',
-  'list commands': 'Преземи листа од сите достапни команди',
-  'list links': 'Преземи листа од сите линкови',
-  'list questions': 'Преземи листа од сите прашања',
+  links: 'Преземи листа од сите линкови',
   office: 'Преземи информации за просторија',
   prompt: 'Испрати промпт до LLM агентот',
+  questions: 'Преземи листа од сите прашања',
   room: 'Преземи информации за просторија',
   session: 'Преземи распоред за испитна сесија или колоквиумска недела',
   staff: 'Преземи информации за професор',
-  'ticket close': 'Затвори тикет',
-  'ticket list': 'Преземи листа од сите тикети',
-  'ticket send': 'Испрати порака за креирање тикети',
+  tickets: 'Испрати порака за креирање тикети',
 };
 
 const chatStorageNotice =
-  'Разговорите се зачувуваат за подобрување на ботот. Можеш да ги избришеш со /chat forget.';
+  'Разговорите се зачувуваат за подобрување на ботот. Можеш да ги избришеш со /forget.';
 
 export const commandResponses = {
   chatStorageNotice,
-  chatThreadWelcome: `Ова е твојот личен простор за разговор со агентот. Слободно постави прашање тука и ќе ти одговорам. 🤖\n-# ${chatStorageNotice}`,
   configurationReloaded: 'Конфигурацијата е освежена.',
   configurationReloading: 'Се освежува конфигурацијата...',
   dataReloaded: 'Податоците се освежени.',
@@ -54,12 +46,6 @@ export const commandResponseFunctions = {
   chatHistoryDeleted: (conversations: number, feedback: number) =>
     `Избришани се твоите зачувани разговори (${conversations}) и оценки на одговори (${feedback}).`,
 
-  chatThreadCreated: (threadId: string) =>
-    `Креирана е твојата приватна нишка: ${channelMention(threadId)}`,
-
-  chatThreadExisting: (threadId: string) =>
-    `Веќе имаш активна нишка за разговор: ${channelMention(threadId)}`,
-
   commandFor: (userId: string) => italic(`за ${userMention(userId)}`),
 };
 
@@ -73,10 +59,6 @@ export const commandErrors = {
   buttonNoPermission: 'Командата не е ваша.',
   chatHistoryDeleteFailed:
     'Бришењето на разговорите беше неуспешно. Обидете се повторно.',
-  chatThreadCreationFailed:
-    'Креирањето на нишката беше неуспешно. Обидете се повторно.',
-  chatThreadInvalidChannel:
-    'Приватна нишка може да се креира само во текстуален канал.',
   commandError:
     'Настана грешка при извршување на командата. Обидете се повторно, или пријавете ја грешката.',
   commandGuildOnly: 'Оваа команда може да се користи само на сервер.',
@@ -101,8 +83,6 @@ export const commandErrors = {
   freeTierUnavailable:
     'Бесплатниот спонзориран модел моментално не е достапен. Обидете се повторно подоцна.',
   invalidChannel: 'Каналот е невалиден.',
-  invalidInferenceModel:
-    'Избраниот модел не е достапен. Изберете модел од предложената листа.',
   invalidTicket: 'Тикетот не е валиден.',
   invalidTicketType: 'Дадениот тип на тикетот не е валиден.',
   linkNotFound: 'Линкот не постои.',

@@ -1,7 +1,4 @@
-/* eslint-disable camelcase -- catalog fields mirror the backend wire contract */
 import { z } from 'zod';
-
-import { labels } from '@/translations/labels.js';
 
 export const ModelAvailabilitySchema = z.enum([
   'both',
@@ -12,20 +9,11 @@ export const ModelAvailabilitySchema = z.enum([
 
 export type ModelAvailability = z.infer<typeof ModelAvailabilitySchema>;
 
-export const SponsoredQuotaSchema = z
-  .object({
-    limit: z.number().int().nonnegative(),
-    remaining: z.number().int().nonnegative(),
-    resets_at: z.string().min(1),
-  })
-  .refine(({ limit, remaining }) => remaining <= limit);
-
 export const ModelDescriptorSchema = z.object({
   availability: ModelAvailabilitySchema.optional(),
   id: z.string(),
   name: z.string(),
   provider: z.string(),
-  sponsored_quota: SponsoredQuotaSchema.nullable().optional(),
 });
 
 export type ModelDescriptor = z.infer<typeof ModelDescriptorSchema>;
@@ -36,10 +24,6 @@ export const ModelCatalogResponseSchema = z.object({
   version: z.number(),
 });
 
-export type ModelCatalogResponse = z.infer<typeof ModelCatalogResponseSchema>;
-
-export const MAX_DISCORD_CHOICE_NAME_LENGTH = 100;
-
 // The Discord bot uses only the free/sponsored pool; BYOK models belong to the
 // web app. A catalog without availability metadata is treated as free.
 export const isFreeModelSelectable = (
@@ -48,31 +32,3 @@ export const isFreeModelSelectable = (
   model.availability === undefined ||
   model.availability === 'both' ||
   model.availability === 'sponsored';
-
-export const formatModelLabel = (model: ModelDescriptor): string => {
-  const baseLabel = `${model.name} (${model.provider})`;
-  const hasSponsoredAccess =
-    model.availability === 'sponsored' || model.availability === 'both';
-  if (!hasSponsoredAccess) {
-    return baseLabel.slice(0, MAX_DISCORD_CHOICE_NAME_LENGTH);
-  }
-
-  const quota = model.sponsored_quota;
-  const accessLabel =
-    quota === null || quota === undefined
-      ? labels.free
-      : `${labels.free} (${labels.quotaRemaining}: ${quota.remaining}/${quota.limit})`;
-  const suffix = ` — ${accessLabel}`;
-  const baseLength = Math.max(
-    0,
-    MAX_DISCORD_CHOICE_NAME_LENGTH - suffix.length,
-  );
-
-  return `${baseLabel.slice(0, baseLength)}${suffix}`;
-};
-
-export const EMBEDDING_MODELS = [
-  'BAAI/bge-m3',
-  'gemini-embedding-001',
-  'text-embedding-3-large',
-] as const;

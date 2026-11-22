@@ -34,15 +34,15 @@ const expectEphemeral = (calls: ReturnType<typeof callsOf>): void => {
 };
 
 describe('interaction replies', () => {
-  test('defers public chat commands but not private model listings', () => {
-    expect(shouldDeferCommand('chat models')).toBe(false);
-    expect(shouldDeferCommand('chat query')).toBe(true);
+  test('defers public chat commands but not private ones', () => {
+    expect(shouldDeferCommand('forget')).toBe(false);
+    expect(shouldDeferCommand('ask')).toBe(true);
   });
 
   test('defers help and list responses that wait on external data', () => {
     expect(shouldDeferCommand('help')).toBe(true);
-    expect(shouldDeferCommand('list links')).toBe(true);
-    expect(shouldDeferCommand('list questions')).toBe(true);
+    expect(shouldDeferCommand('links')).toBe(true);
+    expect(shouldDeferCommand('questions')).toBe(true);
   });
 
   test('leaves pagination buttons un-deferred so they update in place', () => {
@@ -51,7 +51,7 @@ describe('interaction replies', () => {
   });
 
   test('blocks role and everyone mentions in replies by default', async () => {
-    const driver = fakeInteraction('chat', 'query', USER_ID);
+    const driver = fakeInteraction('ask', '', USER_ID);
 
     await safeReplyToInteraction(
       driver.interaction,
@@ -67,7 +67,7 @@ describe('interaction replies', () => {
   });
 
   test('allows only explicitly named users', async () => {
-    const driver = fakeInteraction('chat', 'query', USER_ID);
+    const driver = fakeInteraction('ask', '', USER_ID);
 
     await safeReplyToInteraction(driver.interaction, `<@${MENTIONED_ID}>`, {
       mentionUserIds: [MENTIONED_ID],
@@ -81,7 +81,7 @@ describe('interaction replies', () => {
   });
 
   test('preserves privacy across split private replies', async () => {
-    const driver = fakeInteraction('chat', 'models', USER_ID);
+    const driver = fakeInteraction('forget', '', USER_ID);
 
     await safeReplyToInteraction(driver.interaction, 'private '.repeat(1_000), {
       ephemeral: true,
@@ -92,7 +92,7 @@ describe('interaction replies', () => {
   });
 
   test('keeps split public replies public', async () => {
-    const driver = fakeInteraction('chat', 'query', USER_ID);
+    const driver = fakeInteraction('ask', '', USER_ID);
 
     await safeReplyToInteraction(driver.interaction, 'public '.repeat(1_000));
 

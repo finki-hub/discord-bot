@@ -1,9 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { logger } from '@/common/logger/index.js';
-import { execute as autocomplete } from '@/modules/chat/commands/autocomplete/chat.js';
 import {
-  formatModelLabel,
   type ModelAvailability,
   ModelCatalogResponseSchema,
 } from '@/modules/chat/schemas/Model.js';
@@ -18,8 +16,6 @@ const CACHED_USER_ID = '00000000-0000-4000-8000-000000000099';
 const SPONSORED_MODEL_ID = 'gemini-3.1-pro-preview';
 const SECRET = 'sponsored-secret';
 const ENDPOINT = 'https://sponsored.invalid/v1';
-const FREE_LABEL = 'Бесплатно';
-const QUOTA_LABEL = 'Преостанато: 4/5';
 
 type CatalogPayload = {
   readonly models: ReadonlyArray<Record<string, unknown>>;
@@ -28,14 +24,13 @@ type CatalogPayload = {
 };
 
 const availabilityCases = [
-  { availability: 'byok', selectable: false, sponsored: false },
-  { availability: 'sponsored', selectable: true, sponsored: true },
-  { availability: 'both', selectable: true, sponsored: true },
-  { availability: 'unavailable', selectable: false, sponsored: false },
+  { availability: 'byok', selectable: false },
+  { availability: 'sponsored', selectable: true },
+  { availability: 'both', selectable: true },
+  { availability: 'unavailable', selectable: false },
 ] as const satisfies ReadonlyArray<{
   readonly availability: ModelAvailability;
   readonly selectable: boolean;
-  readonly sponsored: boolean;
 }>;
 
 const catalogFor = (availability: ModelAvailability): CatalogPayload => ({
@@ -133,10 +128,9 @@ describe('sponsored model catalog', () => {
     });
 
     expect(legacy.models[0]?.availability).toBeUndefined();
-    expect(legacy.models[0]?.sponsored_quota).toBeUndefined();
   });
 
-  test('strips provider secrets and rejects impossible quota values', () => {
+  test('strips provider secrets and quota details', () => {
     const parsed = ModelCatalogResponseSchema.parse(catalogFor('sponsored'));
 
     expect(parsed.models[0]).toEqual({
@@ -144,75 +138,14 @@ describe('sponsored model catalog', () => {
       id: SPONSORED_MODEL_ID,
       name: 'Gemini 3.1 Pro Preview',
       provider: 'google',
-      sponsored_quota: {
-        limit: 5,
-        remaining: 4,
-        resets_at: '2026-07-19T00:00:00Z',
-      },
     });
-    expect(() =>
-      ModelCatalogResponseSchema.parse({
-        ...catalogFor('sponsored'),
-        models: [
-          {
-            ...catalogFor('sponsored').models[0],
-            sponsored_quota: {
-              limit: 5,
-              remaining: 6,
-              resets_at: '2026-07-19T00:00:00Z',
-            },
-          },
-        ],
-      }),
-    ).toThrow();
   });
 
   test.each(availabilityCases)(
-    'presents and validates $availability models consistently',
-    async ({ availability, selectable, sponsored }) => {
+    'validates $availability models consistently',
+    async ({ availability, selectable }) => {
       catalogs.set(USER_ID, catalogFor(availability));
 
-      const catalog = await getSupportedModels(USER_ID);
-      expect(catalog).not.toBeNull();
-      const model = catalog?.models[0];
-      expect(model).toBeDefined();
-      if (model === undefined) {
-        throw new Error('Expected the sponsored model in the catalog');
-      }
-
-      let choices: ReadonlyArray<{
-        readonly name: string;
-        readonly value: string;
-      }> = [];
-      const interaction = {
-        options: {
-          getFocused: () => ({ name: 'inference-model', value: '' }),
-        },
-        respond: async (
-          response: ReadonlyArray<{
-            readonly name: string;
-            readonly value: string;
-          }>,
-        ) => {
-          choices = response;
-        },
-        user: {
-          avatarURL: () => null,
-          displayName: 'Driver User',
-          id: `discord-${availability}`,
-        },
-      } as unknown as Parameters<typeof autocomplete>[0];
-
-      await autocomplete(interaction);
-
-      expect(choices).toHaveLength(25);
-      expect(
-        choices.some((choice) => choice.value === SPONSORED_MODEL_ID),
-      ).toBe(selectable);
-      const label = formatModelLabel(model);
-      expect(label.length).toBeLessThanOrEqual(100);
-      expect(label.includes(FREE_LABEL)).toBe(sponsored);
-      expect(label.includes(QUOTA_LABEL)).toBe(sponsored);
       await expect(
         getValidatedInferenceModel(USER_ID, SPONSORED_MODEL_ID),
       ).resolves.toBe(selectable ? SPONSORED_MODEL_ID : 'model-0');

@@ -23,11 +23,8 @@ export const SendPromptOptionsSchema = z
     embeddingsModel: z.string().optional(),
     history: z.array(ConversationTurnSchema).max(9).optional(),
     inferenceModel: z.string().optional(),
-    maxTokens: z.number().min(1).max(4_096).optional(),
     prompt: z.string().min(1, 'Query must not be empty').max(2_000),
     reasoning: z.boolean().optional(),
-    temperature: z.number().min(0).max(1).optional(),
-    topP: z.number().min(0).max(1).optional(),
     userId: z.uuid(),
   })
   .transform((data) => ({
@@ -41,14 +38,11 @@ export const SendPromptOptionsSchema = z
     embeddings_model: data.embeddingsModel,
     inference_model: data.inferenceModel,
     interface: 'discord' as const,
-    max_tokens: data.maxTokens,
     messages: [
       ...(data.history ?? []).slice(-9),
       { content: data.prompt, role: 'user' as const },
     ].slice(-10),
     reasoning: data.reasoning,
-    temperature: data.temperature,
-    top_p: data.topP,
     user_id: data.userId,
   }));
 
@@ -87,35 +81,3 @@ export const FeedbackOptionsSchema = z
   }));
 
 export type FeedbackOptions = z.infer<typeof FeedbackOptionsSchema>;
-
-export const FillProgressSchema = z.object({
-  error: z.string(),
-  id: z.string(),
-  index: z.number(),
-  model: z.string(),
-  name: z.string(),
-  status: z.string(),
-  total: z.number(),
-  ts: z.string(),
-});
-
-export const FillEmbeddingsOptionsSchema = z
-  .object({
-    allModels: z.boolean().optional(),
-    allQuestions: z.boolean().optional(),
-    embeddingsModel: z.string().optional(),
-    questions: z
-      .array(z.string().min(1, 'Question must not be empty'))
-      .optional(),
-  })
-  .transform((data) => ({
-    all_models: data.allModels,
-    all_questions: data.allQuestions,
-    embeddings_model: data.embeddingsModel,
-    questions:
-      data.questions !== undefined && data.questions.length > 0
-        ? data.questions
-        : undefined,
-  }));
-
-export type FillEmbeddingsOptions = z.infer<typeof FillEmbeddingsOptionsSchema>;

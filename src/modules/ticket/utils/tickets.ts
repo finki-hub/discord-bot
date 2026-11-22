@@ -1,8 +1,6 @@
 import {
   type AnyThreadChannel,
-  type ButtonInteraction,
   ChannelType,
-  type ChatInputCommandInteraction,
   type Collection,
   ComponentType,
   escapeMarkdown,
@@ -54,19 +52,16 @@ const TICKET_NAME_SEPARATOR = ' - ';
 // stops a double submission from passing the check twice.
 const ticketCreationsInProgress = new Set<string>();
 
-type TicketInteraction =
-  ButtonInteraction | ChatInputCommandInteraction | ModalSubmitInteraction;
-
-type TicketOptions = { description?: string; title?: string };
+type TicketOptions = { description: string; title: string };
 
 type TicketRequest = {
-  interaction: TicketInteraction;
+  interaction: ModalSubmitInteraction;
   options: TicketOptions;
   ticketMetadata: Ticket;
 };
 
 const getTicketThreadSuffix = (
-  interaction: TicketInteraction,
+  interaction: ModalSubmitInteraction,
   ticketMetadata: Ticket,
 ): string =>
   `${interaction.user.tag}${TICKET_NAME_SEPARATOR}${ticketMetadata.name}`;
@@ -93,17 +88,13 @@ const truncateThreadTitle = (title: string, maxLength: number): string => {
 
 // Returns null when the user and type leave no room within Discord's limit.
 const getTicketThreadName = (
-  interaction: TicketInteraction,
+  interaction: ModalSubmitInteraction,
   ticketMetadata: Ticket,
-  title?: string,
+  title: string,
 ): null | string => {
   // The title leads the thread name; the user/type suffix keeps existing-ticket
   // detection and type resolution working from the name alone.
   const suffix = getTicketThreadSuffix(interaction, ticketMetadata);
-
-  if (title === undefined || title.length === 0) {
-    return suffix.length > MAX_THREAD_NAME_LENGTH ? null : suffix;
-  }
 
   const maxTitleLength =
     MAX_THREAD_NAME_LENGTH - suffix.length - TICKET_NAME_SEPARATOR.length;
@@ -174,7 +165,7 @@ export const getActiveTickets = async (
 };
 
 export const findActiveTicket = async (
-  interaction: TicketInteraction,
+  interaction: ModalSubmitInteraction,
   ticketMetadata: Ticket,
 ): Promise<AnyThreadChannel | undefined> => {
   if (interaction.guild === null) {
@@ -191,30 +182,6 @@ export const findActiveTicket = async (
       thread.name === suffix ||
       thread.name.endsWith(`${TICKET_NAME_SEPARATOR}${suffix}`),
   );
-};
-
-export const getActiveTicketsSorted = async (
-  guild: Guild,
-): Promise<AnyThreadChannel[]> => {
-  const ticketThreadsCollection = await getActiveTickets(guild);
-  const ticketThreads =
-    ticketThreadsCollection === undefined
-      ? []
-      : ticketThreadsCollection.values().toArray();
-
-  ticketThreads.sort((a: AnyThreadChannel, b: AnyThreadChannel) => {
-    if (a.createdTimestamp === null || b.createdTimestamp === null) {
-      return 0;
-    }
-
-    if (a.createdTimestamp < b.createdTimestamp) {
-      return -1;
-    }
-
-    return a.createdTimestamp > b.createdTimestamp ? 1 : 0;
-  });
-
-  return ticketThreads;
 };
 
 const deleteTicketThread = async (
@@ -237,15 +204,6 @@ const sendTicketMessages = async (
 ): Promise<void> => {
   const components = getTicketCloseComponents(ticketChannel.id);
 
-  if (options.description === undefined) {
-    await ticketChannel.send({
-      components,
-      content: ticketMessageFunctions.ticketCreated(interaction.user.id),
-    });
-
-    return;
-  }
-
   await ticketChannel.send({
     allowedMentions: {
       parse: [],
@@ -254,7 +212,7 @@ const sendTicketMessages = async (
     },
     components,
     content: ticketMessageFunctions.ticketRequestHeader(
-      escapeMarkdown(options.title ?? ticketMetadata.name),
+      escapeMarkdown(options.title),
       interaction.user.id,
       ticketMetadata.roles.map((role) => roleMention(role)).join(' '),
     ),
@@ -356,9 +314,9 @@ const createTicketThread = async (
 };
 
 export const createTicket = async (
-  interaction: TicketInteraction,
+  interaction: ModalSubmitInteraction,
   ticketMetadata: Ticket,
-  options: TicketOptions = {},
+  options: TicketOptions,
 ): Promise<void> => {
   if (interaction.guild === null) {
     return;

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { logger } from '@/common/logger/index.js';
 import { shouldDeferCommand } from '@/core/commands/interactionHandlerUtils.js';
-import { execute as chat } from '@/modules/chat/commands/chat/chat.js';
+import { execute as forget } from '@/modules/chat/commands/chat/forget.js';
 import { SendPromptOptionsSchema } from '@/modules/chat/schemas/Chat.js';
 import { ChatApiError } from '@/modules/chat/schemas/Credentials.js';
 import {
@@ -162,9 +162,9 @@ test('forget privately resolves caller identity and clears only their caches', a
     answer: 'other',
     userId: 'other-user',
   });
-  const { interaction, state } = fakeInteraction('chat', 'forget', DISCORD_ID);
-  expect(shouldDeferCommand('chat', 'chat forget')).toBe(false);
-  await chat(interaction);
+  const { interaction, state } = fakeInteraction('forget', '', DISCORD_ID);
+  expect(shouldDeferCommand('forget')).toBe(false);
+  await forget(interaction);
   expect(state.calls).toEqual([
     { kind: 'defer', payload: { flags: 64 } },
     {
@@ -212,7 +212,7 @@ test.each(['http', 'network', 'invalid-response'])(
       'forget',
       DISCORD_ID,
     );
-    await chat(interaction);
+    await forget(interaction);
     expect(state.ephemeral).toBe(true);
     expect(state.calls.at(-1)?.payload).toBe(
       commandErrors.chatHistoryDeleteFailed,
@@ -226,8 +226,8 @@ test('identity failure never requests deletion and keeps the reply private', asy
     Response.json({ detail: 'private' }, { status: 503 }),
   );
   vi.stubGlobal('fetch', fetchMock);
-  const { interaction, state } = fakeInteraction('chat', 'forget', DISCORD_ID);
-  await chat(interaction);
+  const { interaction, state } = fakeInteraction('forget', '', DISCORD_ID);
+  await forget(interaction);
   expect(fetchMock).toHaveBeenCalledOnce();
   expect(state.ephemeral).toBe(true);
   expect(state.calls.at(-1)?.payload).toMatchObject({

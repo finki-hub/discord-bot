@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 
 import { logger } from '@/common/logger/index.js';
 import { execute as rate } from '@/modules/chat/commands/button/chatFeedback.js';
-import { execute as chat } from '@/modules/chat/commands/chat/chat.js';
+import { execute as forget } from '@/modules/chat/commands/chat/forget.js';
 import { FeedbackOptionsSchema } from '@/modules/chat/schemas/Chat.js';
 import {
   forgetFeedbackContexts,
@@ -478,8 +478,8 @@ test('forget holds its fence throughout the retry gap and deletes only after fee
   });
   const active = rate(button().interaction, args);
   await started.promise;
-  const forget = fakeInteraction('chat', 'forget', RATER);
-  const deletion = chat(forget.interaction);
+  const forgetCall = fakeInteraction('forget', '', RATER);
+  const deletion = forget(forgetCall.interaction);
   try {
     await vi.waitFor(
       () => {
@@ -503,5 +503,5 @@ test('forget holds its fence throughout the retry gap and deletes only after fee
     '/chat/feedback',
     `/chat/state/users/${USER_ID}/history`,
   ]);
-  expect(forget.state.ephemeral).toBe(true);
+  expect(forgetCall.state.ephemeral).toBe(true);
 });

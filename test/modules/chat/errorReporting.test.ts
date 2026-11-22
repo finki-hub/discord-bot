@@ -51,18 +51,15 @@ beforeEach(() => {
 });
 
 test('streaming failure keeps its reply and safe guild alert', async () => {
-  const driver = fakeInteraction('chat', 'query', 'test-user');
+  const driver = fakeInteraction('ask', '', 'test-user');
   await handlePromptWithStreaming(
     driver.interaction,
     {
       embeddings_model: undefined,
       inference_model: undefined,
       interface: 'discord',
-      max_tokens: undefined,
       messages: [{ content: 'question', role: 'user' }],
       reasoning: undefined,
-      temperature: undefined,
-      top_p: undefined,
       user_id: 'test-user',
     },
     'PRIVATE_DYNAMIC_LABEL',

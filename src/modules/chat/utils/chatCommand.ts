@@ -4,20 +4,17 @@ import {
   SlashCommandBuilder,
 } from 'discord.js';
 
-import { safeEphemeralReplyToInteraction } from '@/common/utils/messages.js';
 import { DEFAULT_CONFIGURATION } from '@/configuration/bot/defaults.js';
 import { getConfigProperty } from '@/configuration/bot/index.js';
 import {
   commandDescriptions,
-  commandErrors,
   commandResponses,
 } from '@/translations/commands.js';
 
 import { SendPromptOptionsSchema } from '../schemas/Chat.js';
-import { isFreeModelSelectable } from '../schemas/Model.js';
 import { interactionDiscordContext } from './discordContext.js';
 import { resolveInteractionChatUser } from './interaction.js';
-import { getSupportedModels, getValidatedInferenceModel } from './requests.js';
+import { getValidatedInferenceModel } from './requests.js';
 import { handlePromptWithStreaming } from './streaming.js';
 
 type CommonCommandOptions = {
@@ -64,15 +61,6 @@ export const getCommonCommand = (
     let streamingStarted = false;
     try {
       const prompt = interaction.options.getString('prompt', true);
-      const embeddingsModel =
-        interaction.options.getString('embeddings-model') ?? undefined;
-      const inferenceModel =
-        interaction.options.getString('inference-model') ?? undefined;
-      const temperature =
-        interaction.options.getNumber('temperature') ?? undefined;
-      const topP = interaction.options.getNumber('top-p') ?? undefined;
-      const maxTokens =
-        interaction.options.getNumber('max-tokens') ?? undefined;
       const reasoning = allowReasoning
         ? (interaction.options.getBoolean('reasoning') ?? undefined)
         : false;
@@ -87,46 +75,17 @@ export const getCommonCommand = (
         return;
       }
 
-      let validatedInferenceModel: string | undefined;
-      if (inferenceModel === undefined) {
-        validatedInferenceModel = await getValidatedInferenceModel(
-          chatUser.id,
-          models.inference,
-        );
-      } else {
-        const catalog = await getSupportedModels(chatUser.id);
-        if (catalog === null) {
-          await safeEphemeralReplyToInteraction(
-            interaction,
-            commandErrors.llmUnavailable,
-          );
-          return;
-        }
-        const selectedModel = catalog.models.find(
-          ({ id }) => id === inferenceModel,
-        );
-        if (
-          selectedModel === undefined ||
-          !isFreeModelSelectable(selectedModel)
-        ) {
-          await safeEphemeralReplyToInteraction(
-            interaction,
-            commandErrors.invalidInferenceModel,
-          );
-          return;
-        }
-        validatedInferenceModel = inferenceModel;
-      }
+      const inferenceModel = await getValidatedInferenceModel(
+        chatUser.id,
+        models.inference,
+      );
 
       const options = SendPromptOptionsSchema.parse({
         discordContext: interactionDiscordContext(interaction),
-        embeddingsModel: embeddingsModel ?? models.embeddings,
-        inferenceModel: validatedInferenceModel,
-        maxTokens,
+        embeddingsModel: models.embeddings,
+        inferenceModel,
         prompt,
         reasoning,
-        temperature,
-        topP,
         userId: chatUser.id,
       });
 

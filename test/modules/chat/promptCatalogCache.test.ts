@@ -13,19 +13,14 @@ import { jsonResponse, requestUrl } from './interactionFixture.js';
 
 const USER_ID = '00000000-0000-4000-8000-000000000004';
 
-const catalogResponse = (remaining: number): Response =>
+const catalogResponse = (available: boolean): Response =>
   jsonResponse({
     models: [
       {
-        availability: remaining === 0 ? 'unavailable' : 'sponsored',
+        availability: available ? 'sponsored' : 'unavailable',
         id: 'sponsored-model',
         name: 'Sponsored Model',
         provider: 'openai',
-        sponsored_quota: {
-          limit: 1,
-          remaining,
-          resets_at: '2026-07-21T00:00:00Z',
-        },
       },
     ],
     source: 'test',
@@ -45,11 +40,8 @@ const streamOptions: SendPromptOptions = {
   embeddings_model: undefined,
   inference_model: 'sponsored-model',
   interface: 'discord',
-  max_tokens: undefined,
   messages: [{ content: 'question', role: 'user' }],
   reasoning: undefined,
-  temperature: undefined,
-  top_p: undefined,
   user_id: USER_ID,
 };
 
@@ -69,7 +61,7 @@ describe('prompt catalog cache', () => {
         const url = requestUrl(input);
         if (url.pathname === '/chat/models') {
           catalogFetches++;
-          return catalogResponse(catalogFetches === 1 ? 1 : 0);
+          return catalogResponse(catalogFetches === 1);
         }
         if (url.pathname === '/chat/') {
           return promptResponse();
@@ -84,9 +76,9 @@ describe('prompt catalog cache', () => {
     logger.silent = originalLoggerSilent;
   });
 
-  test('refreshes sponsored quota after a completed prompt', async () => {
+  test('refreshes the catalog after a completed prompt', async () => {
     const beforePrompt = await getSupportedModels(USER_ID);
-    expect(beforePrompt?.models[0]?.sponsored_quota?.remaining).toBe(1);
+    expect(beforePrompt?.models[0]?.availability).toBe('sponsored');
 
     await sendPrompt(
       streamOptions,
@@ -97,7 +89,6 @@ describe('prompt catalog cache', () => {
 
     expect(catalogFetches).toBe(2);
     expect(afterPrompt?.models[0]?.availability).toBe('unavailable');
-    expect(afterPrompt?.models[0]?.sponsored_quota?.remaining).toBe(0);
   });
 
   test('sends the opaque session header without changing the prompt body', async () => {
@@ -129,9 +120,9 @@ describe('prompt catalog cache', () => {
     });
   });
 
-  test('refreshes sponsored quota after prompt stream consumption fails', async () => {
+  test('refreshes the catalog after prompt stream consumption fails', async () => {
     const beforePrompt = await getSupportedModels(USER_ID);
-    expect(beforePrompt?.models[0]?.sponsored_quota?.remaining).toBe(1);
+    expect(beforePrompt?.models[0]?.availability).toBe('sponsored');
 
     await expect(
       sendPrompt(
@@ -146,6 +137,5 @@ describe('prompt catalog cache', () => {
 
     expect(catalogFetches).toBe(2);
     expect(afterPrompt?.models[0]?.availability).toBe('unavailable');
-    expect(afterPrompt?.models[0]?.sponsored_quota?.remaining).toBe(0);
   });
 });

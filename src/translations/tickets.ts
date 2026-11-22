@@ -11,8 +11,6 @@ export const ticketMessages = {
 export const ticketMessageFunctions = {
   ticketClosedBy: (userId: string) =>
     `Тикетот беше затворен од ${userMention(userId)}.`,
-  ticketCreated: (userId: string) =>
-    `${userMention(userId)} Ова е Ваш приватен тикет. Ќе добиете одговор во најбрз можен рок, а дополнителни детали може да напишете овде.`,
   ticketExisting: (ticketLink: string) =>
     `Веќе имате активен тикет од овој тип: ${ticketLink}`,
   ticketInactivityWarning: (days: number) =>
