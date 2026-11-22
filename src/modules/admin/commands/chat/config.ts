@@ -29,7 +29,7 @@ import { reloadQuotes } from '@/modules/misc/utils/data.js';
 import { reloadRooms } from '@/modules/room/utils/data.js';
 import { reloadSessions } from '@/modules/session/utils/data.js';
 import { reloadStaff } from '@/modules/staff/utils/data.js';
-import { TicketNamesSchema } from '@/modules/ticket/schemas/Ticket.js';
+import { getTicketNamesSchema } from '@/modules/ticket/schemas/Ticket.js';
 import {
   commandDescriptions,
   commandErrorFunctions,
@@ -169,22 +169,26 @@ const handleConfigSet = async (interaction: ChatInputCommandInteraction) => {
     return;
   }
 
-  const ticketNames =
-    key === 'ticketing' ? TicketNamesSchema.safeParse(parsedValue.data) : null;
-
-  if (ticketNames?.success === false) {
-    await interaction.editReply(
-      commandErrorFunctions.invalidConfiguration(ticketNames.error),
-    );
-
-    return;
-  }
-
   if (interaction.guild === null) {
     return;
   }
 
   const guildId = interaction.guild.id;
+
+  if (key === 'ticketing') {
+    const saved = await getConfigProperty('ticketing', guildId);
+    const ticketNames = getTicketNamesSchema(
+      new Set(saved.tickets?.map((ticket) => ticket.name)),
+    ).safeParse(parsedValue.data);
+
+    if (!ticketNames.success) {
+      await interaction.editReply(
+        commandErrorFunctions.invalidConfiguration(ticketNames.error),
+      );
+
+      return;
+    }
+  }
 
   const rawNewConfig = await setConfigProperty(key, parsedValue.data, guildId);
 

@@ -1,6 +1,7 @@
 import {
   ChannelType,
   Collection,
+  ComponentType,
   type Guild,
   type Message,
   type ModalSubmitInteraction,
@@ -10,8 +11,8 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import { logger } from '@/common/logger/index.js';
 import {
+  getTicketNamesSchema,
   type Ticket,
-  TicketNamesSchema,
   TicketSchema,
 } from '@/modules/ticket/schemas/Ticket.js';
 import { commandErrors } from '@/translations/commands.js';
@@ -33,7 +34,7 @@ vi.mock('@/configuration/bot/index.js', () => ({
   getTicketingProperty: mocks.getTicketingProperty,
 }));
 
-const { createTicket, handleTicketMessage } =
+const { closeTicket, createTicket, handleTicketMessage } =
   await import('@/modules/ticket/utils/tickets.js');
 
 const TICKET_TYPE: Ticket = {
@@ -305,6 +306,53 @@ describe('ticket safeguards', () => {
   });
 });
 
+describe('closing a ticket', () => {
+  test.each([
+    ['the header', 0],
+    ['the description', 1],
+  ])('disables a close button on %s', async (_position, buttonIndex) => {
+    const edits = [
+      vi.fn<(payload: unknown) => Promise<void>>(async () => {}),
+      vi.fn<(payload: unknown) => Promise<void>>(async () => {}),
+    ];
+    const messages = edits.map((edit, index) => ({
+      author: { bot: true },
+      components:
+        index === buttonIndex
+          ? [
+              {
+                components: [{ customId: 'ticketClose:ticket-thread' }],
+                type: ComponentType.ActionRow,
+              },
+            ]
+          : [],
+      edit,
+    }));
+    const thread = {
+      id: 'ticket-thread',
+      locked: false,
+      messages: {
+        fetch: async () =>
+          new Collection(messages.map((message, index) => [index, message])),
+      },
+      send: async () => ({}),
+      setArchived: async () => ({}),
+      setLocked: async () => ({}),
+    };
+    mocks.getChannel.mockReturnValue({
+      threads: { cache: new Collection([[thread.id, thread]]) },
+      type: ChannelType.GuildText,
+    } as unknown as TextChannel);
+
+    await closeTicket(thread.id, 'guild', 'closer');
+
+    expect(edits[buttonIndex]).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ allowedMentions: { parse: [] } }),
+    );
+    expect(edits[1 - buttonIndex]).not.toHaveBeenCalled();
+  });
+});
+
 describe('ticket thread names', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -383,10 +431,15 @@ describe('ticket thread names', () => {
   test('limits new ticket type names without affecting saved ones', () => {
     const ticket = { ...TICKET_TYPE, name: 'т'.repeat(51) };
 
+    const value = { tickets: [ticket] };
+
     expect(TicketSchema.safeParse(ticket).success).toBe(true);
-    expect(TicketNamesSchema.safeParse({ tickets: [ticket] }).success).toBe(
+    expect(getTicketNamesSchema(new Set()).safeParse(value).success).toBe(
       false,
     );
+    expect(
+      getTicketNamesSchema(new Set([ticket.name])).safeParse(value).success,
+    ).toBe(true);
   });
 
   test('links an existing open ticket instead of creating another', async () => {
